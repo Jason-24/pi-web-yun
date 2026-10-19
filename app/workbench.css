@@ -1,0 +1,41 @@
+/* Codex-style workbench: persistent navigation, conversation, optional file preview. */
+.workspace-shell .sidebar-container { border-right-color: color-mix(in srgb, var(--border) 70%, transparent) !important; }
+.workspace-shell .session-sidebar .sidebar-header { height: 52px; padding: 8px; gap: 4px; border-bottom: 0; }
+.workspace-shell .sidebar-brand { font-family: var(--font-ui); font-size: 18px; font-weight: 600; letter-spacing: -0.5px; cursor: default; padding: 0 8px; margin: 0; display: flex; align-items: center; }
+.workspace-shell .sidebar-brand:hover { background: transparent; }
+.workspace-shell .sidebar-new-button,
+.workspace-shell .sidebar-search-toggle { border: 0; border-radius: 8px; }
+.workspace-shell .sidebar-tab { border: 0; border-radius: 7px; }
+.workspace-shell .sidebar-tab.is-selected { box-shadow: none; background: var(--bg-selected); }
+.workspace-shell .session-tree-session { border-radius: 8px; }
+.workspace-shell .session-tree-session.is-selected::before { display: none; }
+.workspace-shell .session-tree-title { font-size: 12px; }
+.workspace-shell .sidebar-files-section { background: transparent; }
+.workspace-shell .sidebar-files-head { padding-top: 8px; padding-bottom: 8px; }
+.workspace-shell .project-picker-button { border-radius: 7px; }
+.workspace-shell #file-panel > div:first-child { min-height: 52px; }
+.workspace-chat-header { background: var(--bg) !important; }
+.workspace-chat-header > div:first-child { height: calc(52px + env(safe-area-inset-top)) !important; border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent) !important; gap: 2px; padding-left: 8px; padding-right: 8px; }
+.workspace-chat-header > div:first-child > button { border-right: 0 !important; border-radius: 7px; }
+.workspace-chat-header > div:first-child > button:hover { background: var(--bg-hover) !important; }
+.workspace-shell .new-session-brand { gap: 12px; margin-bottom: 26px; }
+.workspace-shell .new-session-logo { width: 36px; height: 36px; }
+.workspace-shell .new-session-brand-text { font-family: var(--font-ui); }
+.workspace-shell .new-session-brand-name { font-size: 28px; font-weight: 600; letter-spacing: -1px; line-height: 1.2; }
+.workspace-shell .chat-input-shell { padding-top: 6px; }
+.workspace-shell .chat-input-shell:focus-within .chat-input-textarea { caret-color: var(--accent); }
+.workspace-shell .chat-input-shell div:has(> .chat-input-textarea):focus-within { border-color: color-mix(in srgb, var(--text-muted) 65%, var(--border)) !important; }
+@media (max-width: 640px) {
+  .workspace-shell .session-sidebar .sidebar-header { height: 44px; padding: 4px; }
+  .workspace-chat-header > div:first-child { height: calc(44px + env(safe-area-inset-top)) !important; padding-left: 2px; padding-right: 2px; }
+  .workspace-shell .new-session-brand-name { font-size: 25px; }
+}
+
+
+/* Branding uses its own wordmark stack, independent of chat/code fonts. */
+.workspace-shell .sidebar-brand,
+.workspace-shell .new-session-brand-name { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 650; letter-spacing: -0.65px; }
+.workspace-shell .sidebar-brand { font-size: 19px; }
+.workspace-shell .new-session-brand { gap: 13px; }
+.workspace-shell .new-session-logo { width: 42px; height: 42px; filter: drop-shadow(0 2px 3px rgb(15 35 45 / 0.12)); }
+.workspace-shell .new-session-brand-name { font-size: 29px; }

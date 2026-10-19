@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref, type RefObject, type UIEvent as ReactUIEvent } from "react";
+import { createPortal } from "react-dom";
 import type { SessionInfo } from "@/lib/types";
 import { listSessionFamilies, type SessionFamily } from "@/lib/session-family";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
@@ -197,6 +198,7 @@ export interface SelectSessionOptions {
 }
 
 interface Props {
+  fileExplorerTarget?: HTMLElement | null;
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => void;
   /** projectKey: the target's project identity when it is known (a group's "+", the composer's bar). */
@@ -492,7 +494,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
   return { kind: "rect", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, align };
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -559,7 +561,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // browser storage after hydration; the layout's choice is read the same
   // way (useFilesPlacement's server snapshot).
   const filesPlacement = useFilesPlacement();
-  const stacked = !isMobile && filesPlacement === "below";
+  const filesDocked = Boolean(fileExplorerTarget);
+  const stacked = !filesDocked && !isMobile && filesPlacement === "below";
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("sessions");
   const [filesCollapsed, setFilesCollapsed] = useState(false);
   const sessionsTabRef = useRef<HTMLButtonElement>(null);
@@ -2293,7 +2296,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // the request counter runs it all the same. An unfolding section is not
   // shown yet: its button is still below the sidebar's edge, where the
   // project menu would be placed.
-  const filesShown = stacked ? filesFold.open : sidebarTab === "files";
+  const filesShown = filesDocked || (stacked ? filesFold.open : sidebarTab === "files");
   useEffect(() => {
     const target = filesFocusRef.current;
     if (!target || !filesShown) return;
@@ -2665,8 +2668,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // The toolbar row's search button searches the files on the files tab:
   // the head has no search of its own. Below the sessions it is the
   // sessions' search alone; the files section's header has the files'.
-  const sessionsShown = stacked || sidebarTab === "sessions";
-  const searchesFiles = !stacked && sidebarTab === "files" && explorerCwd !== null;
+  const sessionsShown = filesDocked || stacked || sidebarTab === "sessions";
+  const searchesFiles = !filesDocked && !stacked && sidebarTab === "files" && explorerCwd !== null;
   // What the toolbar row's widths depend on: New's label, and the tabs (the
   // chosen tab's label is bolder, the files tab carries the count). The
   // brand's text reports its own changes (fitHeader).
@@ -2809,8 +2812,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           stands there (the panel's anchor, the versions on a click), and
           the search is the sessions'. */}
       <div ref={headerRef} className="sidebar-header">
-        {stacked && <PiWebTitle onWidthChange={fitHeader} />}
-        {!stacked && (
+        {(stacked || filesDocked) && <PiWebTitle onWidthChange={fitHeader} />}
+        {!stacked && !filesDocked && (
           <div className="sidebar-tabs-list" role="tablist" aria-label={t("sidebar.tabsLabel")}>
             <button
               ref={sessionsTabRef}
@@ -2889,10 +2892,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       <div
         ref={sessionsPanelRef}
         id="session-sidebar-panel-sessions"
-        role={stacked ? "region" : "tabpanel"}
-        aria-label={stacked ? t("sidebar.tabSessions") : undefined}
-        aria-labelledby={stacked ? undefined : "session-sidebar-tab-sessions"}
-        hidden={!stacked && sidebarTab !== "sessions"}
+        role={stacked || filesDocked ? "region" : "tabpanel"}
+        aria-label={stacked || filesDocked ? t("sidebar.tabSessions") : undefined}
+        aria-labelledby={stacked || filesDocked ? undefined : "session-sidebar-tab-sessions"}
+        hidden={!filesDocked && !stacked && sidebarTab !== "sessions"}
         className="sidebar-panel sidebar-sessions-panel"
         onScrollCapture={rememberScroll}
       >
@@ -3002,17 +3005,19 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       {/* Files: the project and worktree in use, and its files. A tab's
           panel, or the section below the sessions, under a header row of its
           own that folds it (only that row then shows, at the bottom). */}
+      <FileExplorerPlacement target={fileExplorerTarget}>
       <div
         ref={filesPanelRef}
         id="session-sidebar-panel-files"
-        role={stacked ? "region" : "tabpanel"}
-        aria-label={stacked ? t("sidebar.tabFiles") : undefined}
-        aria-labelledby={stacked ? undefined : "session-sidebar-tab-files"}
-        hidden={!stacked && sidebarTab !== "files"}
+        role={stacked || filesDocked ? "region" : "tabpanel"}
+        aria-label={stacked || filesDocked ? t("sidebar.tabFiles") : undefined}
+        aria-labelledby={stacked || filesDocked ? undefined : "session-sidebar-tab-files"}
+        hidden={!filesDocked && !stacked && sidebarTab !== "files"}
         className="sidebar-panel sidebar-files-panel"
         onScrollCapture={rememberScroll}
         onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "height") endFilesFold(); }}
       >
+        {filesDocked && <div className="workbench-tree-heading"><span>{t("sidebar.tabFiles")}</span><button type="button" title={t("sidebar.searchFiles")} aria-label={t("sidebar.searchFiles")} aria-controls="file-search-input" aria-expanded={fileSearchOpen} onClick={() => setFileSearchOpen((open) => !open)}><SearchIcon size={14} /></button></div>}
         {/* Below the sessions, one row: the section's toggle (its label,
             then the count, give way first), then the files' keys at its
             right end, in the files tab's order with the search last. They
@@ -3143,6 +3148,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           </div>
         </div>
       </div>
+      </FileExplorerPlacement>
 
       <SidebarMenu
         open={menu !== null}
@@ -3162,4 +3168,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       <SidebarToast toast={toast} onDismiss={() => setToast(null)} dismissLabel={t("sidebar.dismiss")} />
     </div>
   );
+}
+
+
+function FileExplorerPlacement({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+  return target ? createPortal(children, target) : children;
 }

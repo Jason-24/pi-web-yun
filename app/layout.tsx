@@ -6,6 +6,9 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./settings.css";
 import "./sidebar.css";
+import "./workbench.css";
+import "./navigation-rail.css";
+import "./file-workspace.css";
 import "./sidebar-menu.css";
 
 const notoSansMono = Noto_Sans_Mono({
@@ -15,21 +18,21 @@ const notoSansMono = Noto_Sans_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pi Web",
-  description: "Pi Web interface for the pi coding agent",
-  applicationName: "Pi Web",
+  title: "yun",
+  description: "yun interface for the pi coding agent",
+  applicationName: "yun",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       {
-        url: "/icons/icon-192.png",
+        url: "/icons/yun-mark-192.png",
         sizes: "192x192",
         type: "image/png",
       },
     ],
     apple: [
       {
-        url: "/icons/apple-touch-icon.png",
+        url: "/icons/yun-mark-apple-touch.png",
         sizes: "180x180",
         type: "image/png",
       },
@@ -38,7 +41,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Pi Web",
+    title: "yun",
   },
   formatDetection: {
     telephone: false,

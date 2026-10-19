@@ -41,3 +41,13 @@ export function useIsMobile(): boolean {
 export function useIsNarrowMobile(): boolean {
   return useSyncExternalStore(subscribeNarrowMobile, getNarrowMobileSnapshot, getServerSnapshot);
 }
+
+
+const WORKBENCH_QUERY = "(min-width: 1200px)";
+const subscribeWorkbench = (cb: () => void) => subscribeToQuery(WORKBENCH_QUERY, cb);
+const getWorkbenchSnapshot = () => queryMatches(WORKBENCH_QUERY);
+
+/** Wide screens have room for navigation, chat, preview and the file tree. */
+export function useIsWorkbenchDesktop(): boolean {
+  return useSyncExternalStore(subscribeWorkbench, getWorkbenchSnapshot, getServerSnapshot);
+}

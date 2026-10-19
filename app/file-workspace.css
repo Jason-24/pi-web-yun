@@ -1,0 +1,26 @@
+/* The right workspace contains its file tree on the left and preview on the right. */
+.workbench-files-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.workbench-file-preview { position: relative; }
+.workbench-file-tree, .workbench-tree-resizer { display: none; }
+.workbench-empty-tab { display: flex; align-items: center; height: 36px; padding: 0 14px; font-size: 12px; color: var(--text); }
+.workbench-file-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; color: var(--text-dim); }
+.workbench-file-empty strong { color: var(--text); font-size: 15px; font-weight: 500; }
+.workbench-file-empty span { font-size: 12px; line-height: 1.6; }
+.is-files-docked #file-panel.right-panel-open { min-width: 520px; }
+.is-files-docked #file-panel > .workbench-files-body { width: 100%; min-width: 0; }
+.is-files-docked .workbench-file-tree { display: flex; flex-direction: column; flex: 0 0 auto; width: var(--workbench-tree-width, 320px); min-width: 200px; background: var(--bg); border-right: 1px solid var(--border); }
+.is-files-docked .workbench-tree-resizer { display: block; flex: 0 0 5px; margin-left: -5px; position: relative; z-index: 5; cursor: col-resize; touch-action: none; }
+.is-files-docked .workbench-tree-resizer:hover, .is-files-docked .workbench-tree-resizer:focus-visible { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+.workbench-tree-heading { height: 40px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; color: var(--text-muted); }
+.workbench-tree-heading button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; background: transparent; color: inherit; border-radius: 6px; cursor: pointer; }
+.workbench-tree-heading button:hover { background: var(--bg-hover); }
+.workbench-file-tree .sidebar-files-head { padding-top: 0; }
+
+
+/* A fresh workspace reserves only the directory width, not an empty preview. */
+.is-files-docked.is-preview-closed #file-panel.right-panel-open { width: var(--workbench-tree-width, 320px); min-width: 200px; }
+.is-files-docked.is-preview-closed #file-panel > * { width: 100%; min-width: 0; }
+.is-files-docked.is-preview-closed .workbench-file-preview,
+.is-files-docked.is-preview-closed .workbench-tree-resizer,
+.is-files-docked.is-preview-closed .file-panel-expand-button { display: none; }
+.is-files-docked.is-preview-closed .workbench-file-tree { border-right: 0; }

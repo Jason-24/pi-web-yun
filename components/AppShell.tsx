@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
@@ -22,7 +23,7 @@ import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTa
 import { useTheme } from "@/hooks/useTheme";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { useI18n } from "@/hooks/useI18n";
-import { useIsMobile, useIsNarrowMobile } from "@/hooks/useIsMobile";
+import { useIsMobile, useIsNarrowMobile, useIsWorkbenchDesktop } from "@/hooks/useIsMobile";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useAudio } from "@/hooks/useAudio";
@@ -110,6 +111,8 @@ export function AppShell() {
   const { locale, t: translate } = useI18n();
   const isMobile = useIsMobile();
   const isNarrowMobile = useIsNarrowMobile();
+  const isWorkbenchDesktop = useIsWorkbenchDesktop();
+  const [fileExplorerDock, setFileExplorerDock] = useState<HTMLDivElement | null>(null);
   useViewportHeight();
 
   // Once the user has granted notification permission, register a Web Push
@@ -229,36 +232,41 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => !initialNavigation.sidebarCollapsed);
   const desktopSidebarOpenRef = useRef(!initialNavigation.sidebarCollapsed);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
+  const treeOnly = isWorkbenchDesktop && activeFileTabId === null;
+  const [workspaceDismissed, setWorkspaceDismissed] = useState(false);
+  const fileWorkspaceOpen = rightPanelOpen || (isWorkbenchDesktop && !workspaceDismissed);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(false);
-  const rightPanelFullWidth = rightPanelOpen && rightPanelExpanded && !isMobile;
+  const rightPanelFullWidth = fileWorkspaceOpen && rightPanelExpanded && !isMobile && !treeOnly;
   useEffect(() => {
-    if (!rightPanelOpen || isMobile) setRightPanelExpanded(false);
-  }, [rightPanelOpen, isMobile]);
+    if (!fileWorkspaceOpen || isMobile || treeOnly) setRightPanelExpanded(false);
+  }, [fileWorkspaceOpen, isMobile, treeOnly]);
   const [mobileToolbarMoreOpen, setMobileToolbarMoreOpen] = useState(false);
   const [mobileSidebarReady, setMobileSidebarReady] = useState(false);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
   const rightPanelWidthRef = useRef(RIGHT_PANEL_FALLBACK_WIDTH);
+  const fileTreeWidthRef = useRef(320);
   const getResponsiveRightPanelWidth = useCallback(
     () => typeof window === "undefined"
       ? RIGHT_PANEL_FALLBACK_WIDTH
-      : getDefaultRightPanelWidth(window.innerWidth),
+      : window.innerWidth >= 1200 ? Math.round(window.innerWidth * 0.48) : getDefaultRightPanelWidth(window.innerWidth),
     [],
   );
   const getResponsiveSidebarMaxWidth = useCallback(
     () => typeof window === "undefined"
       ? SIDEBAR_MAX_WIDTH
       : getSidebarMaxWidth({
-        viewportWidth: window.innerWidth,
-        rightPanelOpen,
-        rightPanelWidth: rightPanelWidthRef.current,
+        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 52 : 0),
+        rightPanelOpen: fileWorkspaceOpen,
+        rightPanelWidth: treeOnly ? fileTreeWidthRef.current : rightPanelWidthRef.current,
       }),
-    [rightPanelOpen],
+    [fileWorkspaceOpen, treeOnly],
   );
   const getResponsiveRightPanelMaxWidth = useCallback(
     () => typeof window === "undefined"
       ? RIGHT_PANEL_MAX_WIDTH
       : getRightPanelMaxWidth({
-        viewportWidth: window.innerWidth,
+        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 52 : 0),
         sidebarOpen,
         sidebarWidth: sidebarWidthRef.current,
       }),
@@ -283,10 +291,33 @@ export function AppShell() {
     getMaxWidth: getResponsiveRightPanelMaxWidth,
     growthDirection: "left",
     maxWidth: RIGHT_PANEL_MAX_WIDTH,
-    minWidth: RIGHT_PANEL_MIN_WIDTH,
+    minWidth: isWorkbenchDesktop ? 520 : RIGHT_PANEL_MIN_WIDTH,
     storageKey: "pi-right-panel-width",
     widthRef: rightPanelWidthRef,
   });
+  const fileTreeResizer = useResizablePanel({
+    ariaLabel: translate("sidebar.resizeFiles"),
+    cssVariable: "--workbench-tree-width",
+    defaultWidth: 320,
+    minWidth: 200,
+    maxWidth: 640,
+    getMaxWidth: useCallback(() => Math.max(200, Math.min(640, treeOnly
+      ? window.innerWidth - sidebarWidthRef.current - 52 - 420
+      : rightPanelWidthRef.current - 280)), [treeOnly]),
+    growthDirection: treeOnly ? "left" : "right",
+    persistClamp: false,
+    storageKey: "pi-workbench-file-tree-width",
+    widthRef: fileTreeWidthRef,
+  });
+  const fileTreePanelRef = fileTreeResizer.panelRef;
+  const filePanelRef = rightPanelResizer.panelRef;
+  const attachFilePanel = useCallback((node: HTMLDivElement | null) => {
+    filePanelRef.current = node;
+    fileTreePanelRef.current = node;
+  }, [filePanelRef, fileTreePanelRef]);
+  const attachFileExplorerDock = useCallback((node: HTMLDivElement | null) => { setFileExplorerDock(node); }, []);
+  const reclampFileTreeWidth = fileTreeResizer.reclampWidth;
+  useEffect(() => { reclampFileTreeWidth(); }, [rightPanelResizer.width, reclampFileTreeWidth]);
   const reclampSidebarWidth = sidebarResizer.reclampWidth;
   const reclampRightPanelWidth = rightPanelResizer.reclampWidth;
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
@@ -299,10 +330,10 @@ export function AppShell() {
     setMobileSidebarReady(true);
   }, []);
   useEffect(() => {
-    if (!rightPanelOpen) return;
+    if (!fileWorkspaceOpen) return;
     reclampSidebarWidth();
     reclampRightPanelWidth();
-  }, [reclampRightPanelWidth, reclampSidebarWidth, rightPanelOpen]);
+  }, [reclampRightPanelWidth, reclampSidebarWidth, fileWorkspaceOpen, treeOnly, fileTreeResizer.width]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const [pendingQuotePrompt, setPendingQuotePrompt] = useState<{ sessionId: string; text: string } | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -464,8 +495,14 @@ export function AppShell() {
       setActiveTopPanel(null);
       setMobileToolbarMoreOpen(false);
     }
-    setRightPanelOpen((open) => !open);
-  }, [isMobile]);
+    setWorkspaceDismissed(fileWorkspaceOpen);
+    setRightPanelOpen(!fileWorkspaceOpen);
+  }, [isMobile, fileWorkspaceOpen]);
+
+  const handleRightPanelClose = useCallback(() => {
+    setWorkspaceDismissed(true);
+    setRightPanelOpen(false);
+  }, []);
 
   const handleRightPanelExpandToggle = useCallback(() => {
     setActiveTopPanel(null);
@@ -521,7 +558,6 @@ export function AppShell() {
 
   // Files unmount when inactive; workspace terminals stay mounted until closed.
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
-  const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const fileWorkspaceStatesRef = useRef(new Map<string, ParkedFileWorkspace>());
   // Bumped on every workspace switch. The active viewer reports its state as
   // it unmounts, tagged with the generation it rendered in, so the report of a
@@ -1401,7 +1437,7 @@ export function AppShell() {
   // Subagent work tabs: like files, only the active one is mounted.
   const activeAgentTab = agentTabs.find((tab) => `agent:${tab.sessionId}` === activeFileTabId) ?? null;
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
-  const windowTitle = activeCwdName ? `${activeCwdName} - Pi Web` : "Pi Web";
+  const windowTitle = activeCwdName ? `${activeCwdName} - yun` : "yun";
 
   useEffect(() => {
     const syncWindowTitle = () => {
@@ -1414,9 +1450,32 @@ export function AppShell() {
     return () => observer.disconnect();
   }, [windowTitle]);
 
+  const settingsNavigation = (
+    <nav className={`workbench-settings-navigation${isMobile ? " is-mobile" : ""}`} aria-label={translate("common.settings")} inert={rightPanelFullWidth}>
+      {!isMobile && <div className="workbench-rail-brand" aria-hidden="true"><Image src="/icons/yun-mark.svg" width={30} height={30} alt="" priority /></div>}
+      {([
+        ["models", translate("common.models")],
+        ["skills", translate("common.skills")],
+      ] as const).map(([section, label]) => {
+        const disabled = settingsSectionRequiresProject(section) && !projectTrustCwd;
+        return (
+          <button key={section} type="button" onClick={() => setSettingsSection(section)} disabled={disabled} title={disabled ? `${label}: ${translate("settings.projectRequired")}` : label} aria-label={label} aria-pressed={settingsSection === section}>
+            <SettingsSectionIcon section={section} size={19} strokeWidth={1.7} />
+            <span className="workbench-settings-label">{label}</span>
+          </button>
+        );
+      })}
+      <button type="button" onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))} title={translate("common.settings")} aria-label={translate("common.settings")} aria-pressed={Boolean(settingsSection && settingsSection !== "models" && settingsSection !== "skills")}>
+        <SettingsSectionIcon section="general" size={19} strokeWidth={1.7} />
+        <span className="workbench-settings-label">{translate("common.settings")}</span>
+      </button>
+    </nav>
+  );
+
   const sidebarContent = (
     <>
       <SessionSidebar
+        fileExplorerTarget={isWorkbenchDesktop ? fileExplorerDock : null}
         selectedSessionId={selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
@@ -1440,53 +1499,8 @@ export function AppShell() {
         onRunningSessionIdsChange={handleRunningSessionIdsChange}
         onSessionsChange={handleSessionsChange}
       />
-      <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
-        {([
-          ["models", translate("common.models")],
-          ["skills", translate("common.skills")],
-        ] as const).map(([section, label]) => {
-          const disabled = settingsSectionRequiresProject(section) && !projectTrustCwd;
-          return (
-            <button
-              key={section}
-              type="button"
-              onClick={() => setSettingsSection(section)}
-              disabled={disabled}
-              title={disabled ? translate("settings.projectRequired") : label}
-              aria-label={label}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                height: 32, padding: 0, background: "none", border: "none",
-                borderRadius: 9, color: "var(--text-muted)", cursor: disabled ? "default" : "pointer",
-                fontSize: 12, opacity: disabled ? 0.35 : 1,
-                transition: "background 0.12s, color 0.12s",
-              }}
-              onMouseEnter={(event) => { if (!disabled) { event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; } }}
-              onMouseLeave={(event) => { event.currentTarget.style.background = "none"; event.currentTarget.style.color = "var(--text-muted)"; }}
-            >
-              <SettingsSectionIcon section={section} size={14} strokeWidth={2} />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))}
-          title={translate("common.settings")}
-          aria-label={translate("common.settings")}
-          style={{
-            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            height: 32, padding: 0, background: "none", border: "none",
-            borderRadius: 9, color: "var(--text-muted)", cursor: "pointer",
-            fontSize: 12, transition: "background 0.12s, color 0.12s",
-          }}
-          onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; event.currentTarget.style.color = "var(--text)"; }}
-          onMouseLeave={(event) => { event.currentTarget.style.background = "none"; event.currentTarget.style.color = "var(--text-muted)"; }}
-        >
-          <SettingsSectionIcon section="general" size={14} strokeWidth={2} />
-          <span>{translate("common.settings")}</span>
-        </button>
-      </div>
+      {isMobile && settingsNavigation}
+
     </>
   );
 
@@ -2006,10 +2020,10 @@ export function AppShell() {
         disabled={covered}
         tabIndex={covered ? -1 : undefined}
         aria-controls="file-panel"
-        aria-expanded={rightPanelOpen}
+        aria-expanded={fileWorkspaceOpen}
         aria-hidden={covered ? true : undefined}
-        title={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-        aria-label={rightPanelOpen ? translate("files.hidePanel") : translate("files.showPanel")}
+        title={fileWorkspaceOpen ? translate("files.hidePanel") : translate("files.showPanel")}
+        aria-label={fileWorkspaceOpen ? translate("files.hidePanel") : translate("files.showPanel")}
         data-mobile-toolbar-file={mobile ? "true" : undefined}
         style={{
           marginLeft: !mobile && !sessionStats && !contextUsage ? "auto" : 0,
@@ -2017,13 +2031,13 @@ export function AppShell() {
           width: TOP_BAR_ICON_BUTTON_SIZE, height: TOP_BAR_ICON_BUTTON_SIZE, padding: 0,
           visibility: covered ? "hidden" : "visible",
           pointerEvents: covered ? "none" : "auto",
-          background: rightPanelOpen ? "var(--bg-selected)" : "none",
+          background: fileWorkspaceOpen ? "var(--bg-selected)" : "none",
           border: "none", borderLeft: "1px solid var(--border)",
-          color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
+          color: fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)",
           cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
         }}
         onMouseEnter={(event) => { if (!covered) event.currentTarget.style.color = "var(--text)"; }}
-        onMouseLeave={(event) => { event.currentTarget.style.color = rightPanelOpen ? "var(--text)" : "var(--text-muted)"; }}
+        onMouseLeave={(event) => { event.currentTarget.style.color = fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)"; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
@@ -2118,7 +2132,7 @@ export function AppShell() {
         }
       }
     `}</style>
-    <div style={{
+    <div className={`workspace-shell${isWorkbenchDesktop ? " is-files-docked" : ""}${treeOnly ? " is-preview-closed" : ""}`} style={{
       display: "flex",
       width: "100%",
       height: "var(--app-viewport-height, 100dvh)",
@@ -2127,6 +2141,7 @@ export function AppShell() {
       overflow: "hidden",
       background: "var(--bg)",
     }}>
+      {!isMobile && settingsNavigation}
       {/* Mobile overlay backdrop */}
       <div
         className={`sidebar-overlay-backdrop${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
@@ -2176,7 +2191,7 @@ export function AppShell() {
       {/* Center: chat */}
       <div inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
+        <div ref={topBarRef} className="workspace-chat-header" style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
           <button
             onClick={handleSidebarToggle}
@@ -2624,15 +2639,15 @@ export function AppShell() {
 
       <div
         aria-hidden="true"
-        className={`right-panel-overlay-backdrop${rightPanelOpen ? " is-open" : ""}`}
-        onClick={() => setRightPanelOpen(false)}
+        className={`right-panel-overlay-backdrop${fileWorkspaceOpen ? " is-open" : ""}`}
+        onClick={handleRightPanelClose}
       />
-      {rightPanelOpen && (
+      {fileWorkspaceOpen && (
         <div
-          {...rightPanelResizer.separatorProps}
+          {...(treeOnly ? fileTreeResizer.separatorProps : rightPanelResizer.separatorProps)}
           inert={rightPanelFullWidth}
           aria-controls="file-panel"
-          className={`panel-resize-handle right-panel-resize-handle${rightPanelResizer.isResizing ? " is-resizing" : ""}`}
+          className={`panel-resize-handle right-panel-resize-handle${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " is-resizing" : ""}`}
           data-resize-handle="right-panel"
           title={`${translate("layout.resizeFilePanel")}: ${translate("layout.resizeHint")}`}
         />
@@ -2640,11 +2655,12 @@ export function AppShell() {
 
       {/* Right panel: file viewer — always mounted, width animated via CSS */}
       <div
-        ref={rightPanelResizer.panelRef}
+        ref={attachFilePanel}
         id="file-panel"
-        className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing ? " right-panel-resizing" : ""}`}
+        className={`right-panel-container${fileWorkspaceOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " right-panel-resizing" : ""}`}
         style={{
           "--right-panel-width": `${rightPanelResizer.width}px`,
+          "--workbench-tree-width": `${fileTreeResizer.width}px`,
           display: "flex",
           flexDirection: "column",
           borderLeft: "1px solid var(--border)",
@@ -2662,12 +2678,13 @@ export function AppShell() {
           borderBottom: "1px solid var(--border)",
         }}>
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <TabBar
+            {isWorkbenchDesktop && panelTabs.length === 0 && <span className="workbench-empty-tab">{translate("sidebar.tabFiles")}</span>}
+            {(!isWorkbenchDesktop || panelTabs.length > 0) && <TabBar
               tabs={panelTabs}
               activeTabId={activeFileTabId ?? ""}
               onSelectTab={setActiveFileTabId}
               onCloseTab={handleCloseFileTab}
-            />
+            />}
           </div>
           <button
             type="button"
@@ -2686,9 +2703,9 @@ export function AppShell() {
           </button>
           <button
             type="button"
-            onClick={() => setRightPanelOpen(false)}
+            onClick={handleRightPanelClose}
             aria-controls="file-panel"
-            aria-expanded={rightPanelOpen}
+            aria-expanded={fileWorkspaceOpen}
             title={translate("files.hidePanel")}
             aria-label={translate("files.hidePanel")}
             style={{
@@ -2706,8 +2723,11 @@ export function AppShell() {
           </button>
         </div>
 
+        <div className="workbench-files-body">
+        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" />
+        <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {activeFileTab?.filePath ? (
             <FileViewer
               key={`${fileWorkspaceGeneration}:${activeFileTab.id}:${activeFileTab.viewerRevision ?? 0}`}
@@ -2718,14 +2738,14 @@ export function AppShell() {
               initialDisplayMode={activeFileTab.initialDisplayMode}
               initialPage={activeFileTab.page}
               initialState={activeFileTab.viewerState}
-              watchEnabled={rightPanelOpen}
+              watchEnabled={fileWorkspaceOpen}
               onStateChange={(viewerState) => handleFileViewerStateChange(
                 fileWorkspaceGeneration,
                 activeFileTab.id,
                 activeFileTab.viewerRevision ?? 0,
                 viewerState,
               )}
-              onMentionLines={rightPanelOpen ? handleFileLineMention : undefined}
+              onMentionLines={fileWorkspaceOpen ? handleFileLineMention : undefined}
               onAtMention={handleAtMention}
               onOpenFile={(filePath, page) => handleOpenFile(
                 filePath,
@@ -2734,15 +2754,17 @@ export function AppShell() {
               )}
             />
           ) : !terminalTabs.some((tab) => tab.id === activeFileTabId) && !activeAgentTab ? (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-               {translate("files.noneOpen")}
+            <div className="workbench-file-empty">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+              <strong>{translate("workbench.openFile")}</strong>
+              <span>{translate(isWorkbenchDesktop ? "workbench.pickFile" : "files.noneOpen")}</span>
             </div>
           ) : null}
           {terminalTabs.map((tab) => (
             <div key={tab.id} hidden={tab.id !== activeFileTabId} style={{ width: "100%", height: "100%" }}>
               <TerminalPanel
                 tab={tab}
-                active={rightPanelOpen && tab.id === activeFileTabId}
+                active={fileWorkspaceOpen && tab.id === activeFileTabId}
                 onRestart={() => setTerminalTabs((tabs) => tabs.map((item) => item.id === tab.id ? { ...item, closing: "restart" } : item))}
                 onClosed={() => handleTerminalClosed(tab)}
                 onCloseError={() => setTerminalTabs((tabs) => tabs.map((item) => item.id === tab.id ? { ...item, closing: undefined } : item))}
@@ -2758,6 +2780,7 @@ export function AppShell() {
               onOpenFile={handleOpenLinkedFile}
             />
           )}
+        </div>
         </div>
       </div>
     </div>

@@ -5,6 +5,8 @@ export const enLocale: LocalePlugin = {
   id: "en",
   label: "English",
   messages: {
+    "workbench.openFile": "Open file",
+    "workbench.pickFile": "Select a file from the tree on the left",
     "common.ok": "OK",
     "common.language": "Language",
     "common.models": "Models",
@@ -368,7 +370,7 @@ export const enLocale: LocalePlugin = {
     "sidebar.worktreePath": "Worktree: {path}",
     "sidebar.removeWorktreeTitle": "Remove worktree checkout {path}; the branch is kept",
     "sidebar.removeWorktreeHeading": "Remove {name}",
-    "sidebar.brandLabel": "Pi Web, versions: web {app}, pi {pi}",
+    "sidebar.brandLabel": "yun, versions: web {app}, pi {pi}",
     "sidebar.tabsLabel": "Sidebar view",
     "sidebar.tabSessions": "Sessions",
     "sidebar.tabFiles": "Files",

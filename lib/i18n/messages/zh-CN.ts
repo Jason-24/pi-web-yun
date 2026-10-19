@@ -5,6 +5,8 @@ export const zhCNLocale: LocalePlugin = {
   id: "zh-CN",
   label: "简体中文",
   messages: {
+    "workbench.openFile": "打开文件",
+    "workbench.pickFile": "从左侧文件树中选择文件",
     "common.ok": "确定",
     "common.language": "语言",
     "common.models": "模型",
@@ -368,7 +370,7 @@ export const zhCNLocale: LocalePlugin = {
     "sidebar.worktreePath": "Worktree：{path}",
     "sidebar.removeWorktreeTitle": "移除 worktree checkout {path}；保留分支",
     "sidebar.removeWorktreeHeading": "移除 {name}",
-    "sidebar.brandLabel": "Pi Web，版本：web {app}，pi {pi}",
+    "sidebar.brandLabel": "yun，版本：web {app}，pi {pi}",
     "sidebar.tabsLabel": "侧边栏视图",
     "sidebar.tabSessions": "会话",
     "sidebar.tabFiles": "文件",
