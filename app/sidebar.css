@@ -183,7 +183,7 @@
 .session-tree-session {
   right: var(--session-tree-inset-right);
   left: var(--session-tree-inset-left);
-  padding: 0 4px 0 20px;
+  padding: 0 4px 0 40px;
   border-radius: 7px;
   cursor: pointer;
   overflow: hidden;
@@ -628,6 +628,12 @@ a.session-tree-main {
   color: var(--text);
 }
 
+.session-tree-group-icon {
+  flex: none;
+  margin-right: 3px;
+  color: var(--text-dim);
+}
+
 .session-tree-group-name {
   min-width: 0;
   overflow: hidden;
@@ -739,7 +745,7 @@ a.session-tree-main {
 /* In the text column, with the session titles. */
 .session-tree-group-empty,
 .session-tree-more {
-  padding-left: calc(var(--session-tree-inset-left) + 20px);
+  padding-left: calc(var(--session-tree-inset-left) + 40px);
   color: var(--text-dim);
   font-size: 11px;
 }

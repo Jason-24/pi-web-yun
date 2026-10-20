@@ -140,11 +140,11 @@ test("a collapsed group shows its running and unread counts and labelled actions
   assert.match(html, /^<div class="session-tree-row session-tree-group" style="top:0;height:28px"/);
   assert.match(html, /<button type="button" class="session-tree-group-toggle" aria-expanded="false" title="\/work\/app">/);
   // The chevron leads, inside the toggle (the whole header still toggles)
-  // and hidden from its accessible name; then the name, its pin, the summary.
-  assert.match(html, /title="\/work\/app"><svg width="12" height="12"[^>]*stroke-width="3"[^>]*class="session-tree-chevron" aria-hidden="true"><path[^>]*><\/path><\/svg><span class="session-tree-group-name">app<\/span>/, "the chevron precedes the name");
+  // and hidden from its accessible name; then the folder, name, pin and summary.
+  assert.match(html, /title="\/work\/app"><svg width="12" height="12"[^>]*stroke-width="3"[^>]*class="session-tree-chevron" aria-hidden="true"><path[^>]*><\/path><\/svg><svg width="14" height="14"[^>]*class="session-tree-group-icon" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">app<\/span>/, "the chevron and decorative folder precede the name");
   assert.match(html, /<span class="session-tree-group-name">app<\/span><svg[^>]*class="session-tree-group-pin"[\s\S]*?<\/svg><span class="session-tree-summary">/);
-  // No folder: a project group is no second file tree.
-  assert.doesNotMatch(html, /session-tree-group-icon/);
+  // Project decoration must not change the toggle's accessible name.
+  assert.match(html, /class="session-tree-group-icon" aria-hidden="true"/);
   assert.match(html, /<svg[^>]*class="session-tree-group-pin" role="img" aria-label="Pinned"/);
   assert.match(html, /aria-label="Agent running… \(2\)"/);
   assert.match(html, /aria-label="New session activity \(1\)"/);
@@ -154,6 +154,7 @@ test("a collapsed group shows its running and unread counts and labelled actions
   const expanded = rowMarkup(render({ rows: [groupRow({ expanded: true, running: 2, unread: 1 })] }), "group:/work/app");
   assert.match(expanded, /session-tree-group is-current/);
   assert.match(expanded, /aria-expanded="true" title="\/work\/app"/);
+  assert.match(expanded, /class="session-tree-group-icon is-open" aria-hidden="true"/);
   assert.doesNotMatch(expanded, /session-tree-summary/);
   assert.doesNotMatch(expanded, /session-tree-group-pin/);
 });
@@ -325,7 +326,7 @@ test("rename mode swaps the row for a field seeded with the title", () => {
 test("a named project shows its name as plain text in its header, the path as the tooltip", () => {
   const named = { name: "Thermal <b>Models</b>", customName: "Thermal <b>Models</b>" };
   const raw = renderToStaticMarkup(h(I18nProvider, null, h(SessionTree, { ...defaults, rows: [groupRow({}, named)] })));
-  assert.match(raw, /title="\/work\/app"><svg[^>]*class="session-tree-chevron is-open"[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
+  assert.match(raw, /title="\/work\/app"><svg[^>]*class="session-tree-chevron is-open"[\s\S]*?<\/svg><svg[^>]*class="session-tree-group-icon is-open" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
   assert.doesNotMatch(raw, /<b>/, "never markup");
   const html = render({ rows: [groupRow({}, named)] });
   assert.match(html, /aria-label="New session in Thermal <b>Models<\/b>"/);
@@ -506,30 +507,29 @@ test("a row's controls fit its height with room to spare: 28px rows on a desktop
   }
 });
 
-test("headers lead with their chevron, and every row's text starts in one column", () => {
+test("project names and sessions share a content column, with section labels before it", () => {
   // The left inset is 6px in every browser, the grid the brand, the files'
   // header, the picker and the file tree keep; a classic scrollbar takes its
   // room from the right only.
   assert.match(cssRule(".session-tree-scroll"), /--session-tree-inset-left: 6px;\s*--session-tree-inset-right: max\(0px, calc\(6px - var\(--session-tree-scrollbar, 0px\)\)\);/);
 
-  // The text column: the toggle's left padding, the 12px chevron and the
-  // gap. Session titles, "show more", the empty group's note, the archive's
-  // project names and the footer's labels (their 12px icons in the
-  // chevron column) start there too. The last length of a padding
-  // shorthand is its left side.
+  // Section labels follow the chevron. Project names and session titles
+  // align after the decorative folder, whose width/gap is reserved even
+  // on child rows. The footer remains at section depth.
   const lastPx = (rule, property) => {
     const value = cssRule(rule).match(new RegExp(`(?:^|\\n)\\s*${property}: ([^;]+);`))[1];
     return Number(value.trim().split(/\s+/).at(-1).replace(/px\)?$/, ""));
   };
   const textStart = lastPx(".session-tree-group-toggle", "padding") + 12 + lastPx(".session-tree-group-toggle", "gap");
   assert.equal(textStart, 20);
-  assert.equal(lastPx(".session-tree-session", "padding"), textStart);
+  const projectTextStart = textStart + 14 + lastPx(".session-tree-group-toggle", "gap") + lastPx(".session-tree-group-icon", "margin-right");
+  assert.equal(lastPx(".session-tree-session", "padding"), projectTextStart);
   // A group header's toggle starts at the row's own left edge.
   assert.match(cssRule(".session-tree-group"), /padding: 0 4px 0 0;/);
   assert.equal(lastPx(".session-tree-footer-button", "padding") + 12 + lastPx(".session-tree-footer-button", "gap"), textStart);
   assert.deepEqual([...source.matchAll(/<(?:FolderPlus|Archive)Icon size=\{(\d+)\} \/>\s*<span className="session-tree-footer-label">/g)].map((match) => Number(match[1])), [12, 12]);
   // These rows span the whole width, so their padding adds the rows' inset.
-  assert.match(css, /\.session-tree-group-empty,\s*\.session-tree-more \{\s*padding-left: calc\(var\(--session-tree-inset-left\) \+ 20px\);/);
+  assert.match(css, /\.session-tree-group-empty,\s*\.session-tree-more \{\s*padding-left: calc\(var\(--session-tree-inset-left\) \+ 40px\);/);
   // The pinned section's chevron in the same column (its row spans the
   // whole width, a group's sits at the inset).
   assert.match(cssRule(".session-tree-pinned-toggle"), /padding: 0 8px 0 calc\(var\(--session-tree-inset-left\) \+ 5px\);/);

@@ -40,6 +40,7 @@ import {
   ArchiveIcon,
   BranchIcon,
   ChevronIcon,
+  FolderIcon,
   FolderPlusIcon,
   MoreIcon,
   PinIcon,
@@ -478,6 +479,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
       </div>
       {ghostProject && (
         <div ref={ghostRef} className="session-tree-drag-ghost" aria-hidden="true">
+          <FolderIcon size={14} className="session-tree-group-icon" />
           <span className="session-tree-group-name">{ghostProject.name}</span>
         </div>
       )}
@@ -923,10 +925,10 @@ const GroupRowView = memo(function GroupRowView({
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
       >
-        {/* A section header, not one more row: the chevron leads in a
-            column of its own, so the name starts where the session titles
-            below it do and every header's chevron lines up. */}
+        {/* The chevron and folder identify the project; session titles
+            below align with the project name. Icons are decorative. */}
         <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
         {project.pinned && <PinIcon size={10} className="session-tree-group-pin" label={t("sidebar.pinnedProject")} />}
         {!expanded && <ActivitySummary running={row.running} unread={row.unread} t={t} />}
@@ -1107,6 +1109,7 @@ const ArchiveGroupRowView = memo(function ArchiveGroupRowView({
         onClick={(event) => handlers.current.onToggleArchiveGroup?.(project.key, event.altKey)}
       >
         <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
+        <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
         <span className="session-tree-archive-group-count">· {row.count}</span>
       </button>

@@ -107,7 +107,7 @@ import {
   PencilIcon,
   PinIcon,
   PinOffIcon,
-  PlusIcon,
+  ComposeIcon,
   RefreshIcon,
   RestoreIcon,
   SearchIcon,
@@ -2857,7 +2857,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
           disabled={!selectedCwd}
           title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
         >
-          <PlusIcon size={12} />
+          <ComposeIcon size={15} />
           <span className="sidebar-new-label">{t("sidebar.new")}</span>
         </button>
         <button

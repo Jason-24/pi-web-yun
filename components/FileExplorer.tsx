@@ -398,6 +398,7 @@ export function TreeNode({
           {node.isDir ? <FolderIcon size={14} open={open} /> : getFileIcon(node.name, 14)}
         </span>
         <span
+          className="file-tree-name"
           data-hidden-reason={hidden}
           style={{
             fontSize: 12,

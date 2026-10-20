@@ -166,8 +166,23 @@ export function CloseIcon(props: SidebarIconProps) {
   return <SidebarIcon {...props}><path d="M18 6 6 18M6 6l12 12" /></SidebarIcon>;
 }
 
-export function FolderIcon(props: SidebarIconProps) {
-  return <SidebarIcon {...props}><path d="M3 8a2 2 0 0 1 2-2h3.4l1.9 1.9H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></SidebarIcon>;
+export function FolderIcon({ open = false, ...props }: SidebarIconProps & { open?: boolean }) {
+  return (
+    <SidebarIcon {...props}>
+      <path d={open
+        ? "M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.5 6a2 2 0 0 1-1.94 1.5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2"
+        : "M3 8a2 2 0 0 1 2-2h3.4l1.9 1.9H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"} />
+    </SidebarIcon>
+  );
+}
+
+export function ComposeIcon(props: SidebarIconProps) {
+  return (
+    <SidebarIcon {...props}>
+      <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
+      <path d="m16 3 5 5M10 14l1-4L18 3a2.12 2.12 0 0 1 3 3l-7 7Z" />
+    </SidebarIcon>
+  );
 }
 
 export function FolderPlusIcon(props: SidebarIconProps) {

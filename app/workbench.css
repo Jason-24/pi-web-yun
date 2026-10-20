@@ -1,41 +1,137 @@
-/* Codex-style workbench: persistent navigation, conversation, optional file preview. */
+/* Persistent navigation, conversation, and optional file preview. */
 .workspace-shell .sidebar-container { border-right-color: color-mix(in srgb, var(--border) 70%, transparent) !important; }
 .workspace-shell .session-sidebar .sidebar-header { height: 52px; padding: 8px; gap: 4px; border-bottom: 0; }
-.workspace-shell .sidebar-brand { font-family: var(--font-ui); font-size: 18px; font-weight: 600; letter-spacing: -0.5px; cursor: default; padding: 0 8px; margin: 0; display: flex; align-items: center; }
+.workspace-shell .sidebar-brand {
+  display: flex; align-items: center; padding: 0 8px; margin: 0;
+  font-size: 19px; cursor: default;
+}
 .workspace-shell .sidebar-brand:hover { background: transparent; }
 .workspace-shell .sidebar-new-button,
-.workspace-shell .sidebar-search-toggle { border: 0; border-radius: 8px; }
+.workspace-shell .sidebar-search-toggle {
+  height: 32px; min-width: 32px; padding: 0 8px;
+  border: 0; border-radius: 8px; gap: 6px;
+}
+.workspace-shell .sidebar-new-button { margin-left: 0; }
+.workspace-shell .sidebar-search-toggle { width: 32px; padding: 0; }
+.workspace-shell .sidebar-search-toggle > svg { width: 15px; height: 15px; }
 .workspace-shell .sidebar-tab { border: 0; border-radius: 7px; }
 .workspace-shell .sidebar-tab.is-selected { box-shadow: none; background: var(--bg-selected); }
-.workspace-shell .session-tree-session { border-radius: 8px; }
+.workspace-shell .session-tree-session { border-radius: 8px; transition: background 0.12s; }
+.workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming) {
+  background: var(--bg-selected);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-dim) 8%, transparent);
+}
+.workspace-shell .session-tree-group.is-current .session-tree-group-icon { color: var(--text-muted); }
 .workspace-shell .session-tree-session.is-selected::before { display: none; }
-.workspace-shell .session-tree-title { font-size: 12px; }
+/* Keep virtualized row heights and existing text/meta colors. */
+.workspace-shell .session-tree-title,
+.workspace-shell .session-tree-group-toggle { font-size: 13px; }
+.workspace-shell .session-tree-title { line-height: 1.5; }
+.workspace-shell .session-tree-session.is-selected .session-tree-title { font-weight: 600; }
 .workspace-shell .sidebar-files-section { background: transparent; }
 .workspace-shell .sidebar-files-head { padding-top: 8px; padding-bottom: 8px; }
 .workspace-shell .project-picker-button { border-radius: 7px; }
+.workspace-shell .file-tree-name { font-size: 13px !important; }
 .workspace-shell #file-panel > div:first-child { min-height: 52px; }
+
+/* Toolbar buttons share a quiet material and a clearly visible active state. */
 .workspace-chat-header { background: var(--bg) !important; }
-.workspace-chat-header > div:first-child { height: calc(52px + env(safe-area-inset-top)) !important; border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent) !important; gap: 2px; padding-left: 8px; padding-right: 8px; }
-.workspace-chat-header > div:first-child > button { border-right: 0 !important; border-radius: 7px; }
-.workspace-chat-header > div:first-child > button:hover { background: var(--bg-hover) !important; }
-.workspace-shell .new-session-brand { gap: 12px; margin-bottom: 26px; }
-.workspace-shell .new-session-logo { width: 36px; height: 36px; }
-.workspace-shell .new-session-brand-text { font-family: var(--font-ui); }
-.workspace-shell .new-session-brand-name { font-size: 28px; font-weight: 600; letter-spacing: -1px; line-height: 1.2; }
+.workspace-chat-header > div:first-child {
+  height: calc(52px + env(safe-area-inset-top)) !important;
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent) !important;
+  gap: 6px; padding-left: 10px; padding-right: 10px;
+}
+.workspace-chat-header > div:first-child > button,
+.workspace-toolbar-actions > button {
+  height: 34px !important; border: 0 !important; border-radius: 8px;
+  transition: color 0.15s, background 0.15s !important;
+}
+.workspace-toolbar-actions {
+  align-items: center !important; gap: 3px; min-width: 0;
+}
+.workspace-toolbar-actions > button { padding: 0 10px !important; font-size: 12px !important; }
+.workspace-toolbar-actions > button > svg { width: 14px; height: 14px; }
+.workspace-chat-header button:hover:not(:disabled) { background: var(--bg-hover) !important; }
+.workspace-toolbar-actions > button[aria-pressed="true"] { background: var(--bg-selected) !important; }
+.workspace-chat-header button:focus-visible,
+.workspace-shell .chat-composer-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Branding is independent of the configurable conversation/code fonts. */
+.workspace-shell .sidebar-brand,
+.workspace-shell .new-session-brand-name {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 650; letter-spacing: -0.65px;
+}
+.workspace-shell .new-session-brand { gap: 12px; margin-bottom: 22px; }
+.workspace-shell .new-session-logo { width: 40px; height: 40px; }
+.workspace-shell .new-session-brand-name { font-size: 29px; line-height: 1.2; }
+
+/* One composer surface; menus stay outside clipping/stacking containers. */
 .workspace-shell .chat-input-shell { padding-top: 6px; }
-.workspace-shell .chat-input-shell:focus-within .chat-input-textarea { caret-color: var(--accent); }
-.workspace-shell .chat-input-shell div:has(> .chat-input-textarea):focus-within { border-color: color-mix(in srgb, var(--text-muted) 65%, var(--border)) !important; }
+.workspace-shell .chat-composer-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.03), 0 10px 28px -20px rgb(0 0 0 / 0.16);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.workspace-shell .chat-composer-card:focus-within {
+  border-color: color-mix(in srgb, var(--text-muted) 65%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 8%, transparent), 0 4px 12px rgb(0 0 0 / 0.04);
+}
+.workspace-shell .chat-composer-card[data-bash] { border-color: var(--tool-bg); }
+.workspace-shell .chat-composer-card[data-queuing] { border-color: rgba(234,179,8,0.4); }
+.workspace-shell .chat-composer-card .chat-input-textarea {
+  caret-color: var(--accent);
+  font-size: var(--chat-content-font-size, 14px);
+}
+.workspace-shell .chat-composer-attachments { padding: 12px 16px 0; }
+.workspace-shell .chat-composer-footer {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 6px; padding: 4px 10px 10px; min-width: 0;
+}
+.workspace-shell .chat-input-controls {
+  flex: 1 1 280px; min-width: 0; flex-wrap: wrap;
+  margin-top: 0 !important; gap: 2px !important;
+}
+.workspace-shell .chat-composer-model { flex: 1 1 120px !important; }
+.workspace-shell .chat-composer-model > button { width: 30px !important; height: 32px !important; }
+.workspace-shell .chat-composer-model .model-selector { max-width: calc(100% - 32px); }
+.workspace-shell .chat-composer-model .model-selector > button { max-width: 100% !important; font-size: 12px !important; padding: 0 8px !important; }
+.workspace-shell .chat-composer-options { max-width: 100%; }
+.workspace-shell .chat-composer-options > div { flex-wrap: wrap; }
+.workspace-shell .chat-composer-options > div > div > button { padding-left: 8px !important; padding-right: 8px !important; }
+.workspace-shell .chat-composer-submit { flex: 0 0 auto; margin-left: auto; }
+.workspace-shell .chat-composer-send {
+  width: 34px !important; height: 34px !important; padding: 0 !important;
+  border-radius: 50% !important; box-shadow: none !important;
+}
+.workspace-shell .chat-composer-send > svg { width: 16px; height: 16px; }
+.workspace-shell .chat-composer-send:hover:not(:disabled) { background: var(--accent-hover) !important; }
+
+@media (min-width: 641px) and (max-width: 1500px) {
+  .is-files-docked:not(.is-preview-closed) .workspace-toolbar-actions > button > span { display: none; }
+}
 @media (max-width: 640px) {
   .workspace-shell .session-sidebar .sidebar-header { height: 44px; padding: 4px; }
-  .workspace-chat-header > div:first-child { height: calc(44px + env(safe-area-inset-top)) !important; padding-left: 2px; padding-right: 2px; }
+  .workspace-shell .sidebar-new-button,
+  .workspace-shell .sidebar-search-toggle { height: 36px; min-width: 36px; }
+  .workspace-chat-header > div:first-child { height: calc(44px + env(safe-area-inset-top)) !important; padding-left: 4px; padding-right: 4px; gap: 2px; }
   .workspace-shell .new-session-brand-name { font-size: 25px; }
+  .workspace-shell .chat-composer-card { border-radius: 17px; }
+  .workspace-shell .chat-composer-entry { padding: 12px 12px 2px !important; }
+  .workspace-shell .chat-composer-footer { padding: 4px 7px 7px; gap: 4px; }
+  .workspace-shell .chat-input-controls { flex-basis: 0; }
+  .workspace-shell .chat-composer-model { flex-basis: 0 !important; }
+  .workspace-shell .chat-composer-options > div { flex-wrap: nowrap; }
 }
-
-
-/* Branding uses its own wordmark stack, independent of chat/code fonts. */
-.workspace-shell .sidebar-brand,
-.workspace-shell .new-session-brand-name { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 650; letter-spacing: -0.65px; }
-.workspace-shell .sidebar-brand { font-size: 19px; }
-.workspace-shell .new-session-brand { gap: 13px; }
-.workspace-shell .new-session-logo { width: 42px; height: 42px; filter: drop-shadow(0 2px 3px rgb(15 35 45 / 0.12)); }
-.workspace-shell .new-session-brand-name { font-size: 29px; }
+@media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
+  html[data-keyboard-open] .workspace-shell .chat-composer-card .chat-input-textarea { min-height: 24px !important; }
+  html[data-keyboard-open] .workspace-shell .chat-composer-footer { padding-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell .chat-composer-card,
+  .workspace-shell .session-tree-session,
+  .workspace-chat-header button { transition: none !important; }
+}
