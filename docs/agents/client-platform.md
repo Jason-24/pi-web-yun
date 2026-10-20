@@ -26,3 +26,6 @@
 - A stopped run is not a finished one (pi 1.1's `agent_settled.aborted`, which pi's own status reporting reads as idle, not done): `onAgentEnd({ aborted })` plays no tone and AppShell shows no browser notification, and the wrapper sends no "Task finished" push (`lastRunAborted`). The wrapper's `prompt_done` carries `aborted: true` for it, since the client finishes a prompt it sent on `prompt_done`, not `agent_settled`.
 
 - `useIsWorkbenchDesktop()` uses a separate 1200px breakpoint for the right preview/tree dock. It must not change the 640px mobile drawer breakpoint. Below 1200px the original file placement returns; the wide default empty workspace must not open a mobile overlay by itself.
+
+## Development indicator
+- `devIndicators: false` hides the normal Next.js development badge. Next 16 still renders the red issue count on errors, so the development-only `DevIndicatorPreference` adds a narrowly scoped rule inside Next's shadow root to hide `[data-nextjs-toast]`. It does not hide the full error dialog or suppress console errors. Its observer handles a portal mounted after React's effects and disconnects/removes its styles on unmount. Production does not mount this component.
