@@ -1,14 +1,14 @@
 {
-  "name": "@agegr/pi-web",
-  "version": "0.12.2",
-  "description": "Web UI for the pi coding agent",
-  "homepage": "https://github.com/agegr/pi-web#readme",
+  "name": "pi-yun",
+  "version": "0.1.1",
+  "description": "Web UI for the pi coding agent (fork of @agegr/pi-web)",
+  "homepage": "https://github.com/Jason-24/pi-web-yun#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/agegr/pi-web.git"
+    "url": "git+https://github.com/Jason-24/pi-web-yun.git"
   },
   "bugs": {
-    "url": "https://github.com/agegr/pi-web/issues"
+    "url": "https://github.com/Jason-24/pi-web-yun/issues"
   },
   "license": "MIT",
   "engines": {
@@ -22,7 +22,7 @@
     "ios_saf 16.2"
   ],
   "bin": {
-    "pi-web": "bin/pi-web.js"
+    "pi-yun": "bin/pi-web.js"
   },
   "files": [
     "bin",
@@ -45,7 +45,7 @@
     "test:terminal": "node e2e/terminal.mjs",
     "test:e2e": "node e2e/run.mjs",
     "test": "node --experimental-strip-types --test \"app/**/*.test.mjs\" \"components/**/*.test.mjs\" \"hooks/**/*.test.mjs\" \"lib/**/*.test.mjs\" \"public/**/*.test.mjs\"",
-    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
+    "release": "npm version patch --no-git-tag-version && npm run build && npm publish"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.2.0",
