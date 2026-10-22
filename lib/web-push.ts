@@ -49,7 +49,7 @@ function stateFilePath(): string {
 export function vapidSubject(): string {
   const configured = process.env.PI_WEB_PUSH_SUBJECT?.trim();
   if (configured) return configured;
-  return "https://github.com/agegr/pi-web";
+  return "https://github.com/Jason-24/pi-web-yun";
 }
 
 // Ask the push service to deliver immediately. Lower urgencies let idle

@@ -5,7 +5,10 @@ import { getPiWebReleaseUrl, isNewerStableVersion } from "@/lib/app-update";
 export const dynamic = "force-dynamic";
 
 const CURRENT_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
-const NPM_LATEST_URL = "https://registry.npmjs.org/@agegr%2Fpi-web/latest";
+// The fork's own package name (next.config.ts reads it from package.json), so the
+// registry lookup never falls back to the upstream package.
+const APP_PACKAGE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "pi-yun";
+const NPM_LATEST_URL = `https://registry.npmjs.org/${APP_PACKAGE_NAME.replace("/", "%2F")}/latest`;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 5_000;
 const SKIP_VERSION_CHECK = process.env.PI_WEB_SKIP_VERSION_CHECK === "1";

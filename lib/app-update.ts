@@ -22,7 +22,8 @@ export function isNewerStableVersion(candidate: string, current: string): boolea
   return false;
 }
 
+// This fork has its own repository; the update notice links to its releases.
 export function getPiWebReleaseUrl(version: string): string | null {
   if (!parseStableVersion(version)) return null;
-  return `https://github.com/agegr/pi-web/releases/tag/v${version}`;
+  return `https://github.com/Jason-24/pi-web-yun/releases/tag/v${version}`;
 }

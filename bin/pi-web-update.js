@@ -7,9 +7,15 @@ const fs = require("fs");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require("path");
 
-const NPM_LATEST_URL = "https://registry.npmjs.org/@agegr%2Fpi-web/latest";
+// This fork publishes under its own package name, so the update check and the
+// install command both follow package.json: a rename stays a one-line change.
+const PACKAGE_NAME =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("../package.json").name;
+const PACKAGE_BASENAME = PACKAGE_NAME.split("/").pop();
+const NPM_LATEST_URL = `https://registry.npmjs.org/${PACKAGE_NAME.replace("/", "%2F")}/latest`;
 const FETCH_TIMEOUT_MS = 10_000;
-const MANUAL_COMMAND = "npm install -g pi-web-yun@latest";
+const MANUAL_COMMAND = `npm install -g ${PACKAGE_NAME}@latest`;
 
 // Port of lib/app-update.ts (bin cannot import TypeScript).
 function parseStableVersion(version) {
@@ -64,13 +70,13 @@ function realpathOrSelf(target, realpath = fs.realpathSync) {
   }
 }
 
-// "global": pkgDir is <npm root -g>/pi-web-yun (unscoped); "npx": an npx cache; else "other".
+// "global": pkgDir is <npm root -g>/<package name>; "npx": an npx cache; else "other".
 function getInstallKind({ pkgDir, npmRoot, realpath = fs.realpathSync }) {
   const realPkgDir = realpathOrSelf(pkgDir, realpath);
   if (realPkgDir.split(/[\\/]/).includes("_npx")) return "npx";
   if (!npmRoot) return "other";
   const inGlobalRoot =
-    path.basename(realPkgDir) === "pi-web-yun" &&
+    path.basename(realPkgDir) === PACKAGE_BASENAME &&
     realpathOrSelf(path.dirname(realPkgDir), realpath) === realpathOrSelf(npmRoot, realpath);
   return inGlobalRoot ? "global" : "other";
 }
@@ -86,7 +92,7 @@ function getGlobalNpmRoot() {
 }
 
 function runNpmInstall(version) {
-  const invocation = findNpmInvocation(["install", "-g", `pi-web-yun@${version}`]);
+  const invocation = findNpmInvocation(["install", "-g", `${PACKAGE_NAME}@${version}`]);
   if (!invocation) return null;
   const result = spawnSync(invocation.command, invocation.args, { stdio: "inherit" });
   return result.status ?? 1;
@@ -113,26 +119,26 @@ async function runUpdate({
     return 1;
   }
   if (!isNewerStableVersion(latest, currentVersion)) {
-    log(`pi-web ${currentVersion} is up to date.`);
+    log(`${PACKAGE_NAME} ${currentVersion} is up to date.`);
     return 0;
   }
-  log(`pi-web ${latest} is available (installed: ${currentVersion}).`);
+  log(`${PACKAGE_NAME} ${latest} is available (installed: ${currentVersion}).`);
   if (check) return 0;
 
   // A running `next start` has .next/ open; never replace it underneath.
   const running = await listRecords();
   if (running.length > 0) {
-    error(`pi-web is running:\n${running.map(formatRecord).join("\n")}\nRun \`pi-web stop\` first, then update.`);
+    error(`${PACKAGE_NAME} is running:\n${running.map(formatRecord).join("\n")}\nRun \`${PACKAGE_BASENAME} stop\` first, then update.`);
     return 1;
   }
 
   const kind = getInstallKind({ pkgDir, npmRoot: getNpmRoot(), realpath });
   if (kind === "npx") {
-    error("This pi-web runs from the npx cache. Run `npx pi-web-yun@latest` instead.");
+    error(`This ${PACKAGE_BASENAME} runs from the npx cache. Run \`npx ${PACKAGE_NAME}@latest\` instead.`);
     return 1;
   }
   if (kind !== "global") {
-    error(`This pi-web is not a global npm install. Update it yourself, for example: ${MANUAL_COMMAND}`);
+    error(`This ${PACKAGE_BASENAME} is not a global npm install. Update it yourself, for example: ${MANUAL_COMMAND}`);
     return 1;
   }
 
