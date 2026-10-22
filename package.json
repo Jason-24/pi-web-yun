@@ -1,6 +1,6 @@
 {
   "name": "pi-yun",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Web UI for the pi coding agent (fork of @agegr/pi-web)",
   "homepage": "https://github.com/Jason-24/pi-web-yun#readme",
   "repository": {
