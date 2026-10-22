@@ -628,11 +628,11 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   // that asked was in the sessions tab, which hides with its focus, or the
   // files section was folded. A request also counts when the files already
   // show (below the sessions), hence the counter.
-  const filesFocusRef = useRef<"project-button" | "project-list" | "file-search" | null>(null);
+  const filesFocusRef = useRef<"project-button" | "file-search" | null>(null);
   const [filesFocusRequest, setFilesFocusRequest] = useState(0);
   const contextMenuFocusRef = useRef<HTMLElement | null>(null);
-  // The composer's "Open another project…": where the validated folder goes,
-  // and the control focus returns to when the composer does not move.
+  // The composer's folder selection callback, and the project control focus
+  // returns to when a folder picker is cancelled or the composer does not move.
   const folderPickRef = useRef<((target: NewSessionTarget) => void) | null>(null);
   const folderReturnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -1209,6 +1209,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
         focusAfterCommit(() => (opener?.isConnected ? opener : null));
         return;
       }
+      folderReturnFocusRef.current = null;
       setValidatedProject({
         cwd: data.cwd,
         root: data.projectRoot,
@@ -1222,7 +1223,8 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     }
   }, [customPathOpen, customPathValue, customPathValidating, focusAfterCommit]);
 
-  const handleCustomPathClick = useCallback(() => {
+  const handleCustomPathClick = useCallback((opener: HTMLElement | null) => {
+    folderReturnFocusRef.current = opener;
     setCustomPathOpen("files");
     setCustomPathError(null);
   }, []);
@@ -2267,7 +2269,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   // Everything that goes to the files goes through here: the files tab, or
   // the files section below the sessions, opened (and saved so) if folded.
   // The focus follows once they show.
-  const revealFiles = useCallback((focusTarget: "project-button" | "project-list" | "file-search") => {
+  const revealFiles = useCallback((focusTarget: "project-button" | "file-search") => {
     filesFocusRef.current = focusTarget;
     setFilesFocusRequest((count) => count + 1);
     if (stacked) setFilesSectionCollapsed(false);
@@ -2287,12 +2289,13 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     window.open(newSessionDeepLink(cwd), "_blank", "noopener,noreferrer");
   };
 
-  const handleOpenOtherProject = () => {
-    revealFiles("project-list");
+  const handleOpenOtherProject = (opener: HTMLElement) => {
+    // The picker can live in a hidden right-hand dock. Anchor to the actual
+    // trigger without revealing the file workspace or changing sidebar tabs.
+    filesPickerRef.current?.openMenu("project", opener);
   };
-  // Once the files show, the project button takes the focus, or its menu
-  // opens below it (the menu takes the focus: its filter or first project),
-  // or the file search field does. Below the sessions they may show already:
+  // Once the files show, their project button or search field takes focus.
+  // Below the sessions they may show already:
   // the request counter runs it all the same. An unfolding section is not
   // shown yet: its button is still below the sidebar's edge, where the
   // project menu would be placed.
@@ -2301,8 +2304,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     const target = filesFocusRef.current;
     if (!target || !filesShown) return;
     filesFocusRef.current = null;
-    if (target === "project-list") filesPickerRef.current?.openMenu("project");
-    else if (target === "file-search") document.getElementById("file-search-input")?.focus({ preventScroll: true });
+    if (target === "file-search") document.getElementById("file-search-input")?.focus({ preventScroll: true });
     else filesPickerRef.current?.button("project")?.focus({ preventScroll: true });
   }, [filesShown, filesFocusRequest]);
 
@@ -2793,9 +2795,8 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
           busy={customPathValidating}
           error={customPathError}
           onCancel={() => {
-            // The composer's "Open another project…" puts focus back on its
-            // control: the picker took it and leaves nothing behind.
-            const opener = customPathOpen === "new-session" ? folderReturnFocusRef.current : null;
+            // Return to whichever project control opened the folder picker.
+            const opener = folderReturnFocusRef.current;
             folderPickRef.current = null;
             folderReturnFocusRef.current = null;
             setCustomPathOpen(false);

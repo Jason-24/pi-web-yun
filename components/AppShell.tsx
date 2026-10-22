@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
+import { CloseIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { ChatWindow } from "./ChatWindow";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
@@ -75,7 +76,7 @@ import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib
 import type { FileViewerState } from "@/lib/file-viewer-state";
 import { PRESET_READ_ONLY, type ToolEntry } from "@/lib/tool-presets";
 import { getSessionFamily } from "@/lib/session-family";
-import { getLastSettingsSection, settingsSectionRequiresProject, type SettingsSection } from "@/lib/settings-navigation";
+import { getLastSettingsSection, type SettingsSection } from "@/lib/settings-navigation";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
 type AutoNameStatus =
@@ -234,8 +235,7 @@ export function AppShell() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const treeOnly = isWorkbenchDesktop && activeFileTabId === null;
-  const [workspaceDismissed, setWorkspaceDismissed] = useState(false);
-  const fileWorkspaceOpen = rightPanelOpen || (isWorkbenchDesktop && !workspaceDismissed);
+  const fileWorkspaceOpen = rightPanelOpen;
   const [rightPanelExpanded, setRightPanelExpanded] = useState(false);
   const rightPanelFullWidth = fileWorkspaceOpen && rightPanelExpanded && !isMobile && !treeOnly;
   useEffect(() => {
@@ -404,7 +404,7 @@ export function AppShell() {
     };
   }, []);
 
-  // Context usage — populated by ChatWindow, displayed in top bar
+  // Context usage — desktop composer status, mobile header status.
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
   const handleContextUsageChange = useCallback((usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => {
     setContextUsage(usage);
@@ -412,7 +412,9 @@ export function AppShell() {
 
   // Single active panel — only one dropdown open at a time
   const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | null>(null);
-  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number; above?: boolean } | null>(null);
+  const sessionStatsButtonRef = useRef<HTMLButtonElement>(null);
+  const sessionStatsPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionHasBranches) {
@@ -495,13 +497,13 @@ export function AppShell() {
       setActiveTopPanel(null);
       setMobileToolbarMoreOpen(false);
     }
-    setWorkspaceDismissed(fileWorkspaceOpen);
     setRightPanelOpen(!fileWorkspaceOpen);
   }, [isMobile, fileWorkspaceOpen]);
 
   const handleRightPanelClose = useCallback(() => {
-    setWorkspaceDismissed(true);
     setRightPanelOpen(false);
+    topBarRef.current?.querySelector<HTMLButtonElement>(".workspace-files-toggle:not([aria-hidden='true'])")
+      ?.focus({ preventScroll: true });
   }, []);
 
   const handleRightPanelExpandToggle = useCallback(() => {
@@ -540,6 +542,19 @@ export function AppShell() {
     if (!activeTopPanel || !topBarRef.current) return;
     const update = () => {
       const topBarRect = topBarRef.current!.getBoundingClientRect();
+      if (activeTopPanel === "session" && !isMobile && sessionStatsButtonRef.current) {
+        const button = sessionStatsButtonRef.current;
+        const anchor = button.closest(".chat-composer-card") ?? button;
+        const rect = anchor.getBoundingClientRect();
+        const width = Math.max(0, Math.min(600, topBarRect.width - 24));
+        setTopPanelPos({
+          top: Math.max(12, rect.top - 8),
+          left: Math.max(topBarRect.left + 12, Math.min(rect.left + (rect.width - width) / 2, topBarRect.right - width - 12)),
+          width,
+          above: true,
+        });
+        return;
+      }
       if (activeTopPanel === "agents") {
         setTopPanelPos({
           top: topBarRect.bottom,
@@ -553,7 +568,35 @@ export function AppShell() {
     update();
     const ro = new ResizeObserver(update);
     ro.observe(topBarRef.current);
-    return () => ro.disconnect();
+    const composer = sessionStatsButtonRef.current?.closest(".chat-composer-card");
+    if (composer) ro.observe(composer);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [activeTopPanel, isMobile]);
+
+  useEffect(() => {
+    if (activeTopPanel !== "session" || isMobile) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (sessionStatsButtonRef.current?.contains(target) || sessionStatsPopoverRef.current?.contains(target)) return;
+      setActiveTopPanel(null);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setActiveTopPanel(null);
+      sessionStatsButtonRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
   }, [activeTopPanel, isMobile]);
 
   // Files unmount when inactive; workspace terminals stay mounted until closed.
@@ -1453,22 +1496,14 @@ export function AppShell() {
   const settingsNavigation = (
     <nav className={`workbench-settings-navigation${isMobile ? " is-mobile" : ""}`} aria-label={translate("common.settings")} inert={rightPanelFullWidth}>
       {!isMobile && <div className="workbench-rail-brand" aria-hidden="true"><Image src="/icons/yun-mark.svg" width={30} height={30} alt="" priority /></div>}
-      {([
-        ["models", translate("common.models")],
-        ["skills", translate("common.skills")],
-      ] as const).map(([section, label]) => {
-        const disabled = settingsSectionRequiresProject(section) && !projectTrustCwd;
-        return (
-          <button key={section} type="button" onClick={() => setSettingsSection(section)} disabled={disabled} title={disabled ? `${label}: ${translate("settings.projectRequired")}` : label} aria-label={label} aria-pressed={settingsSection === section}>
-            <SettingsSectionIcon section={section} size={19} strokeWidth={1.7} />
-            <span className="workbench-settings-label">{label}</span>
-          </button>
-        );
-      })}
-      <button type="button" onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))} title={translate("common.settings")} aria-label={translate("common.settings")} aria-pressed={Boolean(settingsSection && settingsSection !== "models" && settingsSection !== "skills")}>
+      <button type="button" onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))} title={translate("common.settings")} aria-label={translate("common.settings")} aria-pressed={Boolean(settingsSection)}>
         <SettingsSectionIcon section="general" size={19} strokeWidth={1.7} />
         <span className="workbench-settings-label">{translate("common.settings")}</span>
       </button>
+      {!isMobile && showChat && <>
+        <div className="workbench-rail-divider" role="separator" />
+        {renderChatToolbarActions(false, true)}
+      </>}
     </nav>
   );
 
@@ -1555,10 +1590,16 @@ export function AppShell() {
     );
   };
 
-  const renderChatToolbarActions = (mobile: boolean) => {
+  function renderChatToolbarActions(mobile: boolean, rail = false) {
     if (!mobile && !showChat) return null;
+    const iconOnly = mobile || rail;
     return (
-      <div className={mobile ? undefined : "workspace-toolbar-actions"} style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
+      <div
+        className={rail ? "workbench-session-actions" : mobile ? undefined : "workspace-toolbar-actions"}
+        role={rail ? "group" : undefined}
+        aria-label={rail ? translate("chat.moreControls") : undefined}
+        style={{ display: "flex", alignItems: rail ? "center" : "stretch", flexDirection: rail ? "column" : "row", height: rail ? "auto" : "100%" }}
+      >
         <button
           type="button"
           onClick={() => {
@@ -1573,9 +1614,9 @@ export function AppShell() {
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
-            width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+            width: iconOnly ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
             height: "100%",
-            padding: mobile ? 0 : "0 12px",
+            padding: iconOnly ? 0 : "0 12px",
             background: "none",
             border: "none",
             borderTop: "2px solid transparent",
@@ -1618,7 +1659,7 @@ export function AppShell() {
             <path d="M3 3v5h5" />
             <path d="M12 7v5l3 2" />
           </svg>
-          {!mobile && <span>{translate("history.label")}</span>}
+          {!iconOnly && <span>{translate("history.label")}</span>}
         </button>
         {(() => {
           // 上下文压缩后当前消息可能不再包含 user 消息，需同时参考会话文件的消息总数。
@@ -1656,8 +1697,8 @@ export function AppShell() {
               aria-label={label}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-                height: "100%", padding: mobile ? 0 : "0 12px",
+                width: iconOnly ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+                height: "100%", padding: iconOnly ? 0 : "0 12px",
                 background: "none", border: "none",
                 borderTop: "2px solid transparent",
                 borderRight: "1px solid var(--border)",
@@ -1694,7 +1735,7 @@ export function AppShell() {
                   <path d="M6 4V2M5 3H3M19 19v3M17.5 20.5h3" />
                 </svg>
               )}
-              {!mobile && <span>{label}</span>}
+              {!iconOnly && <span>{label}</span>}
             </button>
           );
         })()}
@@ -1708,8 +1749,8 @@ export function AppShell() {
             style={{
               position: "relative",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-              height: "100%", padding: mobile ? 0 : "0 12px",
+              width: iconOnly ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+              height: "100%", padding: iconOnly ? 0 : "0 12px",
               background: activeTopPanel === "agents" ? "var(--bg-selected)" : "none",
               border: "none",
               borderTop: activeTopPanel === "agents" ? "2px solid var(--accent)" : "2px solid transparent",
@@ -1723,24 +1764,24 @@ export function AppShell() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
             </svg>
-            {!mobile && <span>{translate("agentSwitcher.title")}</span>}
+            {!iconOnly && <span>{translate("agentSwitcher.title")}</span>}
             <span
               aria-hidden="true"
               style={{
                 minWidth: 15, height: 15, padding: "0 4px", display: "grid", placeItems: "center",
                 borderRadius: 7, background: "var(--bg-selected)", color: "var(--accent)",
                 fontSize: 10, lineHeight: 1, fontVariantNumeric: "tabular-nums",
-                ...(mobile ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
+                ...(iconOnly ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
               }}
             >
               {activeSessionFamily!.subagents.length}
             </span>
           </button>
         )}
-        {sessionHasBranches && (mobile ? (
+        {sessionHasBranches && (iconOnly ? (
           <button
             type="button"
-            onClick={() => toggleTopPanel("branches", true)}
+            onClick={() => toggleTopPanel("branches", mobile)}
             title={translate("i18n.branches")}
             aria-label={translate("i18n.branches")}
             aria-pressed={activeTopPanel === "branches"}
@@ -1754,7 +1795,7 @@ export function AppShell() {
               color: activeTopPanel === "branches" ? "var(--text)" : "var(--text-muted)",
               cursor: "pointer", flexShrink: 0,
             }}
-            data-mobile-toolbar-action="branches"
+            data-mobile-toolbar-action={mobile ? "branches" : undefined}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: branchTree.length > 0 ? "var(--accent)" : "var(--text-dim)" }} aria-hidden="true">
               <line x1="6" y1="3" x2="6" y2="15" />
@@ -1786,8 +1827,8 @@ export function AppShell() {
           aria-pressed={activeTopPanel === "system"}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-            height: "100%", padding: mobile ? 0 : "0 12px",
+            width: iconOnly ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+            height: "100%", padding: iconOnly ? 0 : "0 12px",
             background: activeTopPanel === "system" ? "var(--bg-selected)" : "none",
             border: "none",
             borderTop: activeTopPanel === "system" ? "2px solid var(--accent)" : "2px solid transparent",
@@ -1812,7 +1853,7 @@ export function AppShell() {
             <line x1="8" y1="13" x2="16" y2="13" />
             <line x1="8" y1="17" x2="13" y2="17" />
           </svg>
-          {!mobile && <span>{translate("system.label")}</span>}
+          {!iconOnly && <span>{translate("system.label")}</span>}
         </button>
         <button
           type="button"
@@ -1823,8 +1864,8 @@ export function AppShell() {
           aria-pressed={activeTopPanel === "tools"}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-            height: "100%", padding: mobile ? 0 : "0 12px",
+            width: iconOnly ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+            height: "100%", padding: iconOnly ? 0 : "0 12px",
             background: activeTopPanel === "tools" ? "var(--bg-selected)" : "none",
             border: "none",
             borderTop: activeTopPanel === "tools" ? "2px solid var(--accent)" : "2px solid transparent",
@@ -1846,11 +1887,11 @@ export function AppShell() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: systemTools?.some((tool) => tool.active) ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }} aria-hidden="true">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z" />
           </svg>
-          {!mobile && <span>{translate("tools.label")}</span>}
+          {!iconOnly && <span>{translate("tools.label")}</span>}
         </button>
       </div>
     );
-  };
+  }
 
   const renderSessionStatsButton = (mobile: boolean) => {
     if (!mobile && (!showChat || (!sessionStats && !contextUsage))) return null;
@@ -1897,29 +1938,33 @@ export function AppShell() {
       <button
         type="button"
         onClick={() => toggleTopPanel("session")}
+        ref={sessionStatsButtonRef}
         disabled={!showChat || covered}
         tabIndex={covered ? -1 : undefined}
         title={tooltip || translate("session.title")}
         aria-label={translate("session.title")}
         aria-pressed={activeTopPanel === "session"}
         aria-hidden={covered ? true : undefined}
-        className={mobile ? "mobile-session-stats" : undefined}
+        className={mobile ? "mobile-session-stats" : "composer-session-stats"}
+        aria-controls="session-stats-panel"
+        aria-expanded={activeTopPanel === "session"}
         data-mobile-toolbar-stats={mobile ? "true" : undefined}
         style={{
-          marginLeft: mobile ? 0 : "auto",
+          marginLeft: 0,
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           flex: mobile ? 1 : undefined,
           minWidth: 0,
-          gap: mobile ? 7 : 10,
-          paddingLeft: mobile ? 6 : 12,
-          paddingRight: mobile ? 6 : 12,
-          height: "100%",
+          gap: mobile ? 7 : 8,
+          paddingLeft: 6,
+          paddingRight: 6,
+          height: mobile ? "100%" : 30,
           overflow: "hidden",
           visibility: covered ? "hidden" : "visible",
           pointerEvents: covered ? "none" : "auto",
           background: activeTopPanel === "session" ? "var(--bg-selected)" : "none",
           border: "none",
-          borderTop: activeTopPanel === "session" ? "2px solid var(--accent)" : "2px solid transparent",
+          borderTop: mobile ? (activeTopPanel === "session" ? "2px solid var(--accent)" : "2px solid transparent") : undefined,
+          borderRadius: mobile ? undefined : 7,
           fontSize: 11, color: "var(--text-muted)",
           whiteSpace: "nowrap", cursor: showChat ? "pointer" : "default",
           fontVariantNumeric: "tabular-nums",
@@ -1969,7 +2014,7 @@ export function AppShell() {
         ) : (
           <>
             {tokens && tokens.input > 0 && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span className="composer-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
                 </svg>
@@ -1977,24 +2022,11 @@ export function AppShell() {
               </span>
             )}
             {tokens && tokens.output > 0 && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span className="composer-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
                 </svg>
                 {formatCompact(tokens.output)}
-              </span>
-            )}
-            {tokens && tokens.cacheRead > 0 && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M8.5 5a3.5 3.5 0 1 1-1-2.45" /><polyline points="6.5 1.5 8.5 2.5 7.5 4.5" />
-                </svg>
-                {formatCompact(tokens.cacheRead)}
-              </span>
-            )}
-            {costText && (
-              <span style={{ display: "flex", alignItems: "center", color: "var(--text)", fontWeight: 500 }}>
-                {costText}
               </span>
             )}
             {desktopContextText && (
@@ -2017,6 +2049,7 @@ export function AppShell() {
       <button
         type="button"
         onClick={handleRightPanelToggle}
+        className="workspace-files-toggle"
         disabled={covered}
         tabIndex={covered ? -1 : undefined}
         aria-controls="file-panel"
@@ -2026,22 +2059,22 @@ export function AppShell() {
         aria-label={fileWorkspaceOpen ? translate("files.hidePanel") : translate("files.showPanel")}
         data-mobile-toolbar-file={mobile ? "true" : undefined}
         style={{
-          marginLeft: !mobile && !sessionStats && !contextUsage ? "auto" : 0,
+          marginLeft: !mobile ? "auto" : 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          width: TOP_BAR_ICON_BUTTON_SIZE, height: TOP_BAR_ICON_BUTTON_SIZE, padding: 0,
+          width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+          height: TOP_BAR_ICON_BUTTON_SIZE, padding: mobile ? 0 : "0 10px", gap: 6,
           visibility: covered ? "hidden" : "visible",
           pointerEvents: covered ? "none" : "auto",
           background: fileWorkspaceOpen ? "var(--bg-selected)" : "none",
-          border: "none", borderLeft: "1px solid var(--border)",
+          border: "none", borderRadius: 8,
           color: fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)",
           cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
         }}
         onMouseEnter={(event) => { if (!covered) event.currentTarget.style.color = "var(--text)"; }}
         onMouseLeave={(event) => { event.currentTarget.style.color = fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)"; }}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
-        </svg>
+        <FolderIcon size={17} open={fileWorkspaceOpen} />
+        {!mobile && <span>{translate("sidebar.tabFiles")}</span>}
       </button>
     );
   };
@@ -2194,7 +2227,11 @@ export function AppShell() {
         <div ref={topBarRef} className="workspace-chat-header" style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
           <button
+            type="button"
             onClick={handleSidebarToggle}
+            className="workspace-sidebar-toggle"
+            aria-controls="session-sidebar"
+            aria-expanded={sidebarOpen}
              title={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
              aria-label={sidebarOpen ? translate("sidebar.hide") : translate("sidebar.show")}
             style={{
@@ -2206,15 +2243,7 @@ export function AppShell() {
             onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            {sidebarOpen ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            )}
+            <SidebarToggleIcon size={18} open={sidebarOpen} />
           </button>
           {isMobile && (
             <div
@@ -2291,12 +2320,10 @@ export function AppShell() {
           {!isMobile && (
             <>
               {renderProjectTrustWarning(false)}
-              {renderChatToolbarActions(false)}
-              {renderSessionStatsButton(false)}
             </>
           )}
           {!isMobile && renderMainFileToggle(false)}
-          {isMobile && sessionHasBranches && (
+          {sessionHasBranches && (
             <BranchNavigator
               tree={branchTree}
               activeLeafId={branchActiveLeafId}
@@ -2313,12 +2340,19 @@ export function AppShell() {
           )}
           {/* Top panel dropdown — shared, only one active at a time */}
           {activeTopPanel && topPanelPos && (
-            <div style={{
+            <div
+              ref={activeTopPanel === "session" ? sessionStatsPopoverRef : undefined}
+              id={activeTopPanel === "session" ? "session-stats-panel" : undefined}
+              className={topPanelPos.above ? "composer-session-popover" : undefined}
+              role={activeTopPanel === "session" ? "region" : undefined}
+              aria-label={activeTopPanel === "session" ? translate("session.title") : undefined}
+              style={{
               position: "fixed",
               top: topPanelPos.top,
               left: topPanelPos.left,
               width: topPanelPos.width,
-              maxHeight: `calc(100dvh - ${topPanelPos.top}px)`,
+              maxHeight: topPanelPos.above ? Math.max(0, topPanelPos.top - 12) : `calc(100dvh - ${topPanelPos.top}px)`,
+              transform: topPanelPos.above ? "translateY(-100%)" : undefined,
               overflowY: "auto",
               zIndex: 500,
             }}>
@@ -2517,7 +2551,7 @@ export function AppShell() {
                     ) : null;
 
                     return (
-                      <div style={{
+                      <div className="session-stats-details" style={{
                         display: "grid",
                         gridTemplateColumns: isMobile
                           ? "1fr"
@@ -2578,6 +2612,7 @@ export function AppShell() {
               onSystemInfoLoaderChange={handleSystemInfoLoaderChange}
               onSessionStatsChange={handleSessionStatsChange}
               onSessionStatsPanelOpen={openSessionStatsPanel}
+              sessionStatsControl={!isMobile ? renderSessionStatsButton(false) : undefined}
               onOpenSettings={openSettingsSection}
               onContextUsageChange={handleContextUsageChange}
               onOpenFile={handleOpenLinkedFile}
@@ -2704,6 +2739,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={handleRightPanelClose}
+            className="file-panel-close-button"
             aria-controls="file-panel"
             aria-expanded={fileWorkspaceOpen}
             title={translate("files.hidePanel")}
@@ -2711,15 +2747,11 @@ export function AppShell() {
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: TOP_BAR_ICON_BUTTON_SIZE, height: TOP_BAR_ICON_BUTTON_SIZE, padding: 0,
-              background: "var(--bg-selected)", border: "none", borderLeft: "1px solid var(--border)",
-              color: "var(--text)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s",
+              background: "transparent", border: "none", borderRadius: 8,
+              color: "var(--text-muted)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
             }}
-            onMouseEnter={(event) => { event.currentTarget.style.color = "var(--accent)"; }}
-            onMouseLeave={(event) => { event.currentTarget.style.color = "var(--text)"; }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
-            </svg>
+            <CloseIcon size={16} />
           </button>
         </div>
 

@@ -52,6 +52,15 @@
 .workspace-toolbar-actions > button { padding: 0 10px !important; font-size: 12px !important; }
 .workspace-toolbar-actions > button > svg { width: 14px; height: 14px; }
 .workspace-chat-header button:hover:not(:disabled) { background: var(--bg-hover) !important; }
+.workspace-files-toggle { font-family: inherit; font-size: 12px; }
+.workspace-files-toggle > svg { flex-shrink: 0; }
+.workspace-shell .file-panel-close-button {
+  width: 30px !important;
+  height: 30px !important;
+  margin: 0 8px 0 4px;
+}
+.workspace-shell .file-panel-close-button:hover { background: var(--bg-hover) !important; color: var(--text) !important; }
+.workspace-shell .file-panel-close-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workspace-toolbar-actions > button[aria-pressed="true"] { background: var(--bg-selected) !important; }
 .workspace-chat-header button:focus-visible,
 .workspace-shell .chat-composer-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -93,6 +102,7 @@
 }
 .workspace-shell .chat-input-controls {
   flex: 1 1 280px; min-width: 0; flex-wrap: wrap;
+  container-type: inline-size;
   margin-top: 0 !important; gap: 2px !important;
 }
 .workspace-shell .chat-composer-model { flex: 1 1 120px !important; }
@@ -100,6 +110,20 @@
 .workspace-shell .chat-composer-model .model-selector { max-width: calc(100% - 32px); }
 .workspace-shell .chat-composer-model .model-selector > button { max-width: 100% !important; font-size: 12px !important; padding: 0 8px !important; }
 .workspace-shell .chat-composer-options { max-width: 100%; }
+.composer-session-stats { flex-shrink: 0; max-width: 100%; }
+.composer-session-stats:hover { background: var(--bg-hover) !important; }
+.composer-session-popover {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .12);
+  scrollbar-width: thin;
+}
+.composer-session-popover .session-info-popover { background: var(--bg) !important; border: 0 !important; }
+.composer-session-popover .session-stats-details { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 20px !important; }
+.composer-session-popover .session-stats-details > div:first-child { grid-column: 1 / -1; }
+@container (max-width: 620px) {
+  .composer-session-stat-io { display: none !important; }
+}
 .workspace-shell .chat-composer-options > div { flex-wrap: wrap; }
 .workspace-shell .chat-composer-options > div > div > button { padding-left: 8px !important; padding-right: 8px !important; }
 .workspace-shell .chat-composer-submit { flex: 0 0 auto; margin-left: auto; }

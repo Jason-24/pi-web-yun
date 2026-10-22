@@ -100,6 +100,8 @@ interface Props {
   cwd?: string | null;
   /** Files picked with the attach button, handled like files dropped onto the chat. Without it the button takes images only. */
   onAttachFiles?: (files: File[]) => void;
+  /** Compact session usage, displayed between the model and composer options. */
+  sessionStatsControl?: React.ReactNode;
 }
 
 export interface ChatInputHandle {
@@ -662,6 +664,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   draftKey,
   cwd,
   onAttachFiles,
+  sessionStatsControl,
   compact = false,
 }: Props, ref) {
   const { t } = useI18n();
@@ -2462,7 +2465,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           </div>
 
           {/* spacer */}
-          {!isMobile && <div style={{ flex: 1 }} />}
+          {!isMobile && <div className="chat-composer-usage" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>{sessionStatsControl}</div>}
 
           {/* RIGHT: thinking + tools preset + compact + sound (idle) | Stop + sound (streaming) */}
           <div ref={controlsMenuRef} className="chat-composer-options" style={{

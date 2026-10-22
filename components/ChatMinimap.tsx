@@ -24,9 +24,8 @@ interface Props {
   turnsBefore: number;
 }
 
-const MINIMAP_WIDTH = 36;
-const MAX_NODE_GAP = 50;
-const MINIMAP_PADDING = 12;
+const MAX_NODE_GAP = 22;
+const MINIMAP_PADDING = 28;
 // The lock button sits at the bottom of the rail (6px inset + 30px): nodes stop
 // above it so the last turn stays visible and clickable.
 const MINIMAP_BOTTOM_PADDING = 36 + MINIMAP_PADDING;
@@ -225,7 +224,7 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
   }
 
   const height = Math.max(1, minimapHeight);
-  const usableHeight = Math.max(0, height - MINIMAP_PADDING - MINIMAP_BOTTOM_PADDING);
+  const usableHeight = Math.min(256, Math.max(0, height - MINIMAP_PADDING - MINIMAP_BOTTOM_PADDING));
   if (allNodes.length === 1) {
     return {
       nodes: [{ ...allNodes[0], topRatio: MINIMAP_PADDING / height }],
@@ -502,7 +501,7 @@ export const ChatMinimap = memo(function ChatMinimap({
   }, [lockActiveNode, onRevealHistory, scrollContainer]);
 
   const findNearestNode = useCallback((ratio: number): NodeInfo | null => {
-    const { nodes, gap, fillsHeight } = nodeLayoutRef.current;
+    const { nodes, gap } = nodeLayoutRef.current;
     const height = containerRef.current?.clientHeight ?? 0;
     if (nodes.length === 0 || height <= 0) return null;
 
@@ -512,11 +511,9 @@ export const ChatMinimap = memo(function ChatMinimap({
     const nodeIndex = Math.max(0, Math.min(nodes.length - 1, rawIndex));
     const nearestNode = nodes[nodeIndex];
 
-    if (!fillsHeight) {
-      const nodeY = nearestNode.topRatio * height;
-      const hitRadius = Math.max(10, gap / 2);
-      if (Math.abs(pointerY - nodeY) > hitRadius) return null;
-    }
+    const nodeY = nearestNode.topRatio * height;
+    const hitRadius = Math.max(10, gap / 2);
+    if (Math.abs(pointerY - nodeY) > hitRadius) return null;
     return nearestNode;
   }, []);
 
@@ -631,30 +628,20 @@ export const ChatMinimap = memo(function ChatMinimap({
 
   if (!visible) return null;
 
-  const lastNodeTop = positionedNodes.length > 0
-    ? positionedNodes[positionedNodes.length - 1].topRatio * minimapHeight
-    : MINIMAP_PADDING;
-  const railHeight = Math.max(1, lastNodeTop - MINIMAP_PADDING);
-
   return (
     <div
       ref={containerRef}
+      className={styles.rail}
+      role="navigation"
+      aria-label={t("chatMinimap.title")}
       onMouseDown={handleMouseDown}
-      onMouseEnter={showPreview}
       onMouseLeave={schedulePreviewHide}
       onMouseMove={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        setMouseYRatio((event.clientY - rect.top) / rect.height);
-      }}
-      style={{
-        width: MINIMAP_WIDTH,
-        flexShrink: 0,
-        position: "relative",
-        cursor: "pointer",
-        userSelect: "none",
-        borderLeft: "1px solid var(--border)",
-        background: "var(--bg-panel)",
-        overflow: "visible",
+        const ratio = (event.clientY - rect.top) / rect.height;
+        setMouseYRatio(ratio);
+        if (findNearestNode(ratio)) showPreview();
+        else schedulePreviewHide();
       }}
     >
       {turnsBefore > 0 && (
@@ -672,55 +659,32 @@ export const ChatMinimap = memo(function ChatMinimap({
           }}
         />
       )}
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: MINIMAP_PADDING,
-          height: railHeight,
-          width: 1,
-          background: "var(--border)",
-          transform: "translateX(-50%)",
-          zIndex: 0,
-        }}
-      />
-
       {positionedNodes.map((node) => {
         const isNearest = minimapHovered && nearestNode?.index === node.index;
         const isActive = activeIndex === node.index;
 
         return (
-          <div
+          <button
+            type="button"
             key={node.index}
+            className={styles.node}
             data-minimap-node-index={node.index}
             data-minimap-node-active={isActive ? "" : undefined}
+            data-nearest={isNearest ? "true" : undefined}
+            aria-label={t("chatMinimap.turn", { count: turnsBefore + node.index + 1 })}
+            aria-current={isActive ? "step" : undefined}
+            title={getUserPreview(node.targetTurn.userMessage) || t("chatMinimap.turn", { count: turnsBefore + node.index + 1 })}
+            onClick={(event) => {
+              // Pointer navigation (including dragging) is handled by the rail.
+              if (event.detail === 0) scrollToNode(node, "smooth");
+            }}
             style={{
-              position: "absolute",
               top: `${node.topRatio * 100}%`,
-              transform: "translateY(-50%)",
-              left: 0,
-              right: 0,
-              height: Math.max(1, nodeGap),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-              zIndex: 2,
+              height: Math.max(1, Math.min(32, nodeGap)),
             }}
           >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 2,
-                background: isActive ? "rgba(128,128,128,0.42)" : "rgba(128,128,128,0.16)",
-                border: `1.5px solid ${isActive ? "rgba(128,128,128,0.95)" : "rgba(128,128,128,0.58)"}`,
-                boxShadow: isActive ? "0 0 0 2px var(--bg-panel)" : "none",
-                transition: "transform 0.1s, background 0.1s",
-                transform: isNearest ? "scale(1.25)" : "scale(1)",
-              }}
-            />
-          </div>
+            <span className={styles.marker} aria-hidden="true" />
+          </button>
         );
       })}
 
@@ -730,7 +694,7 @@ export const ChatMinimap = memo(function ChatMinimap({
         data-minimap-lock={locked ? "on" : "off"}
         aria-pressed={locked}
         title={t(locked ? "chatMinimap.unlockPreview" : "chatMinimap.lockPreview")}
-        aria-label={t("chatMinimap.lockPreview")}
+        aria-label={t(locked ? "chatMinimap.unlockPreview" : "chatMinimap.lockPreview")}
         onMouseDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
@@ -766,6 +730,17 @@ export const ChatMinimap = memo(function ChatMinimap({
           onMouseDown={(event) => event.stopPropagation()}
           onMouseMove={(event) => event.stopPropagation()}
         >
+          <div className={styles.previewHeader}>
+            <span className={styles.previewTitle}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M8 6h12M8 12h9M8 18h12M3 6h.01M3 12h.01M3 18h.01" />
+              </svg>
+              {t("chatMinimap.title")}
+            </span>
+            <span className={styles.previewCount}>
+              {t("chatMinimap.turnCount", { count: turnsBefore + allNodes.length })}
+            </span>
+          </div>
           {turnsBefore > 0 && (
             <button
               type="button"
@@ -789,6 +764,7 @@ export const ChatMinimap = memo(function ChatMinimap({
                 className={styles.turn}
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
+                data-active={activeIndex === node.index ? "true" : undefined}
               >
                 <span className={styles.number}>
                   <span aria-hidden="true">
@@ -832,7 +808,9 @@ export const ChatMinimap = memo(function ChatMinimap({
                         aria-label={t("chatMinimap.locateAssistant")}
                         title={t("chatMinimap.locateAssistant")}
                       >
-                        A
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M5 4v9a4 4 0 0 0 4 4h10m-4-4 4 4-4 4" />
+                        </svg>
                       </button>
                       <AssistantOutline
                         markdown={assistant.markdown}

@@ -27,8 +27,8 @@ export type WorktreeRemoval = "removed" | "dirty" | { error: string };
 export interface ProjectWorktreePickerHandle {
   /** The control's button, while it is shown. */
   button(control: ProjectWorktreeControl): HTMLButtonElement | null;
-  /** Opens the control's menu below its button (the sessions tab's "Open another project…"). */
-  openMenu(control: ProjectWorktreeControl): void;
+  /** Opens below the control, or below an external trigger such as "Open another project…". */
+  openMenu(control: ProjectWorktreeControl, opener?: HTMLElement): void;
 }
 
 type MenuBody =
@@ -282,8 +282,8 @@ export function ProjectWorktreePicker({
 
   useImperativeHandle(handleRef, () => ({
     button: (control) => (control === "worktree" ? worktreeRef : projectRef).current,
-    openMenu: (control) => {
-      const button = (control === "worktree" ? worktreeRef : projectRef).current;
+    openMenu: (control, opener) => {
+      const button = opener ?? (control === "worktree" ? worktreeRef : projectRef).current;
       if (button) openMenuRef.current(control, button);
     },
   }), []);

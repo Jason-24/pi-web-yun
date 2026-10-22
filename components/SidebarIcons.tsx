@@ -166,6 +166,16 @@ export function CloseIcon(props: SidebarIconProps) {
   return <SidebarIcon {...props}><path d="M18 6 6 18M6 6l12 12" /></SidebarIcon>;
 }
 
+export function SidebarToggleIcon({ open, ...props }: SidebarIconProps & { open: boolean }) {
+  return (
+    <SidebarIcon {...props} strokeWidth={1.7}>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M9 4v16" />
+      <path d={open ? "m16 9-3 3 3 3" : "m13 9 3 3-3 3"} />
+    </SidebarIcon>
+  );
+}
+
 export function FolderIcon({ open = false, ...props }: SidebarIconProps & { open?: boolean }) {
   return (
     <SidebarIcon {...props}>

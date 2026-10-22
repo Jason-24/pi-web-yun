@@ -1054,6 +1054,7 @@ const PlainRowView = memo(function PlainRowView({
           <button
             type="button"
             className="session-tree-footer-button"
+            aria-haspopup="menu"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
             <FolderPlusIcon size={12} />

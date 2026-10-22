@@ -23,5 +23,6 @@
 
 
 ## Workbench settings entry points
-- AppShell's Models, Skills and Settings actions live in a 52px vertical rail at the far left on desktop (`app/navigation-rail.css`). It remains available when the session sidebar is collapsed. The actions retain the existing project requirement checks and panel handlers; labels remain available as tooltips and accessible names, and an open section marks its icon active.
+- AppShell has a single Settings entry in the 52px rail at the far left on desktop (`app/navigation-rail.css`), available even when the session sidebar is collapsed. Models, Skills and the other categories remain in SettingsPanel's navigation; do not duplicate them as rail shortcuts. The entry opens the last available settings section, keeps its tooltip and accessible name, and stays active for any open settings section. Project requirements are checked inside SettingsPanel.
 - Phones render the same navigation once as a labelled row at the bottom of the session drawer; do not add a second set of interactive buttons. Desktop panel width limits reserve the rail's 52px.
+- Desktop session actions share the rail below a divider after Settings; these are conversation controls, not extra settings entries. Mobile session actions stay in the chat header/overflow menu, leaving only the single Settings entry in the drawer.
