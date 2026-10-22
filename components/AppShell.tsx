@@ -8,6 +8,7 @@ import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl }
 import { CloseIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { ChatWindow } from "./ChatWindow";
 import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
+import { PetWidget } from "./PetWidget";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
 import { TabBar, type Tab } from "./TabBar";
@@ -1504,6 +1505,7 @@ export function AppShell() {
         <div className="workbench-rail-divider" role="separator" />
         {renderChatToolbarActions(false, true)}
       </>}
+      <PetWidget />
     </nav>
   );
 
