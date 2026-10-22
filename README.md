@@ -29,24 +29,24 @@ The CLI opens a browser after the server is ready. If it does not, open [http://
 
 If no model provider is configured yet, open the **Models** panel to sign in or add an API key.
 
-To install the `pi-web-yun` command globally:
+To install the `pi-yun` command globally:
 
 ```bash
-npm install -g pi-web-yun@latest
-pi-web
+npm install -g pi-yun@latest
+pi-yun
 ```
 
 Commands:
 
 ```bash
-pi-web version          # print the installed version
-pi-web status           # list running servers
-pi-web stop [--port N]  # stop a running server
-pi-web open [--port N]  # open a running server in the browser
-pi-web update [--check] # update a global npm install
+pi-yun version          # print the installed version
+pi-yun status           # list running servers
+pi-yun stop [--port N]  # stop a running server
+pi-yun open [--port N]  # open a running server in the browser
+pi-yun update [--check] # update a global npm install
 ```
 
-To update, run `pi-web-yun stop`, then `pi-web-yun update` (or run the same install command again). To uninstall, run `npm uninstall -g pi-web-yun`.
+To update, run `pi-yun stop`, then `pi-yun update` (or run the same install command again). To uninstall, run `npm uninstall -g pi-yun`.
 
 ## Configuration
 

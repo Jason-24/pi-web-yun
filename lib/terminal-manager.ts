@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
+import { chmodSync, statSync } from "fs";
 import { homedir } from "os";
+import { dirname, join } from "path";
 import type { IPty } from "node-pty";
 import { samePath } from "./paths";
 
@@ -71,6 +73,24 @@ function dimension(value: number, fallback: number): number {
   return Math.min(1000, Math.max(2, Number.isFinite(value) ? Math.floor(value) : fallback));
 }
 
+// node-pty 1.1.0 ships macOS spawn-helper binaries without executable bits.
+// This used to be a postinstall script, but npm 11 blocks install scripts by
+// default, so the repair runs here instead, at first terminal creation.
+// Remove this workaround once the upstream package preserves those modes.
+function fixMacSpawnHelperBits(): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const root = dirname(require.resolve("node-pty/package.json"));
+    for (const directory of ["build/Release", "build/Debug", `prebuilds/darwin-${process.arch}`]) {
+      const helper = join(root, directory, "spawn-helper");
+      const stat = statSync(helper, { throwIfNoEntry: false });
+      if (stat?.isFile() && (stat.mode & 0o111) !== 0o111) chmodSync(helper, stat.mode | 0o111);
+    }
+  } catch {
+    // Best effort only; native loading failures surface in the catch below.
+  }
+}
+
 export function createTerminal(cwd: string, cols: number, rows: number, id: string = randomUUID()): string {
   const existing = registry().get(id);
   if (existing) {
@@ -80,6 +100,7 @@ export function createTerminal(cwd: string, cols: number, rows: number, id: stri
   let spawn: typeof import("node-pty").spawn;
   try {
     // Load inside creation so native module failures reach the API's JSON error handler.
+    fixMacSpawnHelperBits();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     ({ spawn } = require("node-pty") as typeof import("node-pty"));
   } catch (error) {

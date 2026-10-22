@@ -40,8 +40,10 @@ without splitting Unicode characters. Failed input is not retried because its
 delivery may be ambiguous. Reconnect attaches to the same process with a fresh
 writer; restart explicitly replaces the process.
 
-`bin/prepare-terminal.js` repairs node-pty 1.1.0's macOS spawn-helper executable
-bits during installation, including published/npm-installed Pi Web packages.
+node-pty 1.1.0 shipped macOS `spawn-helper` binaries without executable bits.
+npm 11 blocks install scripts by default, so there is no postinstall repair
+anymore; `lib/terminal-manager.ts` instead repairs the bits at first terminal
+creation (macOS only, best effort), including published/npm-installed packages.
 
 Pi Web pins node-pty to `1.2.0-beta.15`, which includes Linux x64 and ARM64
 prebuilt binaries. Native module loading is deferred until terminal creation,
