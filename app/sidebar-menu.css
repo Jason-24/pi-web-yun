@@ -21,10 +21,10 @@
   overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg);
   color: var(--text);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.08);
   font-size: 12px;
   animation: sidebar-menu-in 0.12s ease-out;
 }

@@ -1,9 +1,9 @@
 /* Persistent navigation, conversation, and optional file preview. */
-.workspace-shell .sidebar-container { border-right-color: color-mix(in srgb, var(--border) 70%, transparent) !important; }
+.workspace-shell .sidebar-container { border-right-color: color-mix(in srgb, var(--border) 72%, transparent) !important; }
 .workspace-shell .session-sidebar .sidebar-header { height: 52px; padding: 8px; gap: 4px; border-bottom: 0; }
 .workspace-shell .sidebar-brand {
   display: flex; align-items: center; padding: 0 8px; margin: 0;
-  font-size: 19px; cursor: default;
+  font-size: 20px; cursor: default;
 }
 .workspace-shell .sidebar-brand:hover { background: transparent; }
 .workspace-shell .sidebar-new-button,
@@ -18,8 +18,8 @@
 .workspace-shell .sidebar-tab.is-selected { box-shadow: none; background: var(--bg-selected); }
 .workspace-shell .session-tree-session { border-radius: 8px; transition: background 0.12s; }
 .workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming) {
-  background: var(--bg-selected);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-dim) 8%, transparent);
+  background: color-mix(in srgb, var(--bg-selected) 74%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 72%, transparent);
 }
 .workspace-shell .session-tree-group.is-current .session-tree-group-icon { color: var(--text-muted); }
 .workspace-shell .session-tree-session.is-selected::before { display: none; }
@@ -28,6 +28,14 @@
 .workspace-shell .session-tree-group-toggle { font-size: 13px; }
 .workspace-shell .session-tree-title { line-height: 1.5; }
 .workspace-shell .session-tree-session.is-selected .session-tree-title { font-weight: 600; }
+.workspace-shell .session-tree-group-toggle { color: var(--text-muted); font-weight: 600; }
+.workspace-shell .session-tree-group.is-current .session-tree-group-toggle { color: var(--text); }
+.workspace-shell .session-tree-footer-button {
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: color 120ms ease, background 120ms ease;
+}
+.workspace-shell .session-tree-footer-button:hover { color: var(--text); background: var(--bg-hover); }
 .workspace-shell .sidebar-files-section { background: transparent; }
 .workspace-shell .sidebar-files-head { padding-top: 8px; padding-bottom: 8px; }
 .workspace-shell .project-picker-button { border-radius: 7px; }
@@ -52,7 +60,7 @@
 .workspace-toolbar-actions > button { padding: 0 10px !important; font-size: 12px !important; }
 .workspace-toolbar-actions > button > svg { width: 14px; height: 14px; }
 .workspace-chat-header button:hover:not(:disabled) { background: var(--bg-hover) !important; }
-.workspace-files-toggle { font-family: inherit; font-size: 12px; }
+.workspace-files-toggle { font-family: inherit; font-size: 12px; font-weight: 500; }
 .workspace-files-toggle > svg { flex-shrink: 0; }
 .workspace-shell .file-panel-close-button {
   width: 30px !important;
@@ -72,22 +80,24 @@
   font-weight: 650; letter-spacing: -0.65px;
 }
 .workspace-shell .new-session-brand { gap: 12px; margin-bottom: 22px; }
-.workspace-shell .new-session-logo { width: 40px; height: 40px; }
-.workspace-shell .new-session-brand-name { font-size: 29px; line-height: 1.2; }
+.workspace-shell .new-session-logo { width: 40px; height: 40px; border-radius: 11px; box-shadow: 0 2px 5px rgb(0 0 0 / 0.08); }
+.workspace-shell .new-session-brand-name { font-size: 30px; line-height: 1.2; }
+.workspace-shell .new-session-context .project-picker-button { border-radius: 8px; color: var(--text-muted); }
+.workspace-shell .new-session-context .project-picker-button:hover { color: var(--text); }
 
 /* One composer surface; menus stay outside clipping/stacking containers. */
 .workspace-shell .chat-input-shell { padding-top: 6px; }
 .workspace-shell .chat-composer-card {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, var(--text-dim));
+  border-radius: 18px;
   background: var(--bg);
-  box-shadow: 0 2px 5px rgb(0 0 0 / 0.03), 0 10px 28px -20px rgb(0 0 0 / 0.16);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.025), 0 8px 24px -12px rgb(0 0 0 / 0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .workspace-shell .chat-composer-card:focus-within {
-  border-color: color-mix(in srgb, var(--text-muted) 65%, var(--border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 8%, transparent), 0 4px 12px rgb(0 0 0 / 0.04);
+  border-color: color-mix(in srgb, var(--text-muted) 42%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 5%, transparent), 0 4px 16px rgb(0 0 0 / 0.04);
 }
 .workspace-shell .chat-composer-card[data-bash] { border-color: var(--tool-bg); }
 .workspace-shell .chat-composer-card[data-queuing] { border-color: rgba(234,179,8,0.4); }
@@ -95,6 +105,8 @@
   caret-color: var(--accent);
   font-size: var(--chat-content-font-size, 14px);
 }
+.workspace-shell .chat-input-textarea::placeholder { color: var(--text-dim); opacity: 1; }
+.workspace-shell .chat-composer-entry { padding: 16px 18px 4px !important; }
 .workspace-shell .chat-composer-attachments { padding: 12px 16px 0; }
 .workspace-shell .chat-composer-footer {
   display: flex; flex-wrap: wrap; align-items: flex-end;
@@ -110,7 +122,7 @@
 .workspace-shell .chat-composer-model .model-selector { max-width: calc(100% - 32px); }
 .workspace-shell .chat-composer-model .model-selector > button { max-width: 100% !important; font-size: 12px !important; padding: 0 8px !important; }
 .workspace-shell .chat-composer-options { max-width: 100%; }
-.composer-session-stats { flex-shrink: 0; max-width: 100%; }
+.composer-session-stats { flex-shrink: 0; max-width: 100%; font-family: var(--font-ui); }
 .composer-session-stats:hover { background: var(--bg-hover) !important; }
 .composer-session-popover {
   border: 1px solid var(--border);
@@ -134,6 +146,37 @@
 .workspace-shell .chat-composer-send > svg { width: 16px; height: 16px; }
 .workspace-shell .chat-composer-send:hover:not(:disabled) { background: var(--accent-hover) !important; }
 
+/* Reading rhythm and surfaces; the conversation column and row geometry stay intact. */
+.workspace-shell .markdown-body { line-height: 1.8; }
+.workspace-shell .markdown-body p { margin-bottom: .8em; }
+.workspace-shell .markdown-body p:last-child { margin-bottom: 0; }
+.workspace-shell .markdown-body :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 1.25em;
+  margin-bottom: .5em;
+  line-height: 1.5;
+}
+.workspace-shell .markdown-body > :first-child { margin-top: 0; }
+.workspace-shell .markdown-body h1 { font-size: 1.24em; }
+.workspace-shell .markdown-body h2 { font-size: 1.13em; }
+.workspace-shell .markdown-body h3 { font-size: 1em; color: var(--text); }
+.workspace-shell .markdown-body :is(ul, ol) { margin-top: .5em; margin-bottom: .8em; }
+.workspace-shell .markdown-body li { margin-top: .3em; margin-bottom: .3em; }
+.workspace-shell .markdown-body li > p { margin: 0; }
+.workspace-shell .markdown-table-frame { margin: 14px 0; border-radius: 10px; }
+.workspace-shell .markdown-body :is(th, td) { padding: 9px 12px; border-bottom-color: color-mix(in srgb, var(--border) 78%, transparent); }
+.workspace-shell .markdown-body th { background: var(--bg-panel); font-size: .95em; }
+.workspace-shell .markdown-body tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--bg-panel) 42%, var(--bg)); }
+.workspace-shell .markdown-body blockquote { border-radius: 0 8px 8px 0; }
+.workspace-shell .markdown-code-block { border-radius: 10px; margin-top: 14px; margin-bottom: 14px; }
+.workspace-shell .markdown-code-header { border-bottom-color: color-mix(in srgb, var(--border) 78%, transparent); }
+.workspace-shell .assistant-model-label { margin-bottom: 8px !important; font-size: 11px; line-height: 1.5; }
+.workspace-shell .user-message-bubble { border-radius: 14px !important; }
+.workspace-shell .project-picker:not(.is-inline) .project-picker-button {
+  background: var(--bg-panel);
+  border-color: color-mix(in srgb, var(--border) 86%, transparent);
+}
+.workspace-shell .project-picker:not(.is-inline) .project-picker-button:hover { background: var(--bg-hover); }
+
 @media (min-width: 641px) and (max-width: 1500px) {
   .is-files-docked:not(.is-preview-closed) .workspace-toolbar-actions > button > span { display: none; }
 }
@@ -143,7 +186,7 @@
   .workspace-shell .sidebar-search-toggle { height: 36px; min-width: 36px; }
   .workspace-chat-header > div:first-child { height: calc(44px + env(safe-area-inset-top)) !important; padding-left: 4px; padding-right: 4px; gap: 2px; }
   .workspace-shell .new-session-brand-name { font-size: 25px; }
-  .workspace-shell .chat-composer-card { border-radius: 17px; }
+  .workspace-shell .chat-composer-card { border-radius: 16px; }
   .workspace-shell .chat-composer-entry { padding: 12px 12px 2px !important; }
   .workspace-shell .chat-composer-footer { padding: 4px 7px 7px; gap: 4px; }
   .workspace-shell .chat-input-controls { flex-basis: 0; }
@@ -157,5 +200,6 @@
 @media (prefers-reduced-motion: reduce) {
   .workspace-shell .chat-composer-card,
   .workspace-shell .session-tree-session,
+  .workspace-shell .session-tree-footer-button,
   .workspace-chat-header button { transition: none !important; }
 }
