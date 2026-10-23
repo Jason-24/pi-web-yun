@@ -10,8 +10,6 @@
   border-right: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   background: color-mix(in srgb, var(--bg-panel) 55%, var(--bg));
 }
-.workbench-rail-brand { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text); margin-bottom: 8px; }
-.workbench-rail-brand img { border-radius: 8px; }
 .workbench-settings-navigation button {
   width: 36px;
   height: 36px;
@@ -33,6 +31,8 @@
 .workbench-settings-navigation button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workbench-settings-navigation button:disabled { opacity: 0.35; cursor: default; }
 .workbench-settings-navigation button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); }
+.workbench-settings-navigation .workbench-home-button { margin-bottom: 8px; color: var(--text); background: var(--bg-hover); }
+.workbench-settings-navigation .workbench-home-button[aria-current="page"] { background: var(--bg-selected); }
 .workbench-settings-label { display: none; }
 .workbench-rail-divider { width: 20px; height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
 .workbench-session-actions { gap: 8px; }

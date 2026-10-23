@@ -95,13 +95,8 @@ test("client code stays parseable by Safari 16.2 and its CSS flat", () => {
   const rules = css.slice(css.indexOf(".new-session-hero-inner {"), css.indexOf(".file-viewer-icon-button {"));
   assert.ok(header.length > 0 && rules.length > header.length);
   assert.doesNotMatch(rules.replace(/@media[^{]*\{/g, ""), /\{[^}]*\{|&/, "no nested rules");
-  // The link's box: padding offset by equal negative margins, so hover and
-  // focus never move the line.
-  const update = header.match(/\.new-session-update \{[^}]*\smargin: -(\d+)px -(\d+)px;\s*padding: (\d+)px (\d+)px;/);
-  assert.ok(update);
-  assert.deepEqual([update[1], update[2]], [update[3], update[4]]);
   // The bar is pulled left by the project button's own padding, so its
-  // folder icon stands on the logo's and the composer card's edge.
+  // folder icon stands on the composer card's edge.
   const row = header.match(/\.new-session-context \{[^}]*\smargin: 0 0 \d+px -(\d+)px;/);
   assert.ok(row);
   const button = rules.match(/\.project-picker\.is-inline \.project-picker-button \{[^}]*\spadding: 0 (\d+)px;/);

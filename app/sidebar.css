@@ -1015,15 +1015,8 @@ a.session-tree-main {
   font-weight: 400;
 }
 
-/* With the files below the sessions there is no tab to choose: the brand
-   stands where the tabs were (PiWebTitle), the panel's typographic anchor,
-   as on the old sidebar. Not a cell: no box, no line on its right; its text
-   in the chevron column (6px in plus a header toggle's 5px). A click shows
-   the versions in the accent for a few seconds. Never cut: New's label
-   gives way first, and on a row too narrow for the versions they take the
-   sidebar's meta size (data-fit 2, which only they reach: "Pi Web" fits
-   beside the two cells at the sidebar's 180px minimum, and at 11px so do
-   the versions with a digit to spare). */
+/* The desktop application menu replaces the tabs in the stacked layout.
+   Header fitting reduces New first, then the brand text at the narrowest size. */
 .sidebar-brand {
   flex: none;
   align-self: center;
@@ -1042,10 +1035,6 @@ a.session-tree-main {
   text-align: left;
   white-space: nowrap;
   cursor: default;
-}
-
-.sidebar-brand.is-version {
-  color: var(--accent);
 }
 
 .sidebar-brand:focus {
@@ -1078,7 +1067,7 @@ a.session-tree-main {
 
 /* Where the labels do not fit (useHeaderFit measures them: their widths
    change with the language): New keeps its + (data-fit 1), then the tabs
-   their icons, or the brand's versions take a smaller type (2). A hidden
+   their icons, or the brand takes a smaller type (2). A hidden
    label is still each one's name. */
 .sidebar-header[data-fit="1"] .sidebar-new-button,
 .sidebar-header[data-fit="2"] .sidebar-new-button {

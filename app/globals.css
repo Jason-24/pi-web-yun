@@ -1839,103 +1839,32 @@ pre, code {
   }
 }
 
-/* The empty new-session page's header above the composer (ChatWindow), on
-   the composer's left edge: the brand (the logo, "Pi Web" and its versions
-   line), then the project and worktree row (NewSessionContextBar) right
-   above the composer card. Nothing on the right. */
+/* The fresh composer has a centered welcome heading; project/worktree controls stay
+   on the composer's left edge directly above the card. */
 .new-session-hero-inner {
   margin: 0 auto;
 }
 
-.new-session-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  margin-bottom: 20px;
-}
-
-.new-session-logo {
-  flex: none;
-  width: 40px;
-  height: 40px;
-}
-
-.new-session-brand-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-family: var(--font-mono);
-}
-
-.new-session-brand-name {
+.new-session-intro { display: flex; flex-direction: column; align-items: center; gap: 20px; margin-bottom: 30px; }
+.new-session-welcome-mark { flex: none; color: var(--text-dim); opacity: 0.55; }
+.new-session-welcome {
+  margin: 0;
   color: var(--text);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.15;
-  white-space: nowrap;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.03em;
+  text-align: center;
+  text-wrap: balance;
 }
+.new-session-welcome-project { max-width: 100%; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; vertical-align: baseline; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 6px; overflow-wrap: anywhere; cursor: pointer; }
+.new-session-welcome-project:hover { text-decoration-color: var(--text-muted); }
+.new-session-welcome-project:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
-/* "web v<app> → v<latest> ↗ · pi v<pi>", on one line: where it is narrow,
-   pi's version gives way (its ellipsis); the version in use and the update
-   link are never cut. */
-.new-session-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-.new-session-meta > * {
-  flex: none;
-}
-
-.new-session-meta > .new-session-meta-pi {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Its box shows on hover and focus; the negative margins keep it off the
-   line's layout, and on a coarse pointer they grow the tap target the same
-   way. */
-.new-session-update {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin: -3px -4px;
-  padding: 3px 4px;
-  border-radius: 5px;
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 0.12s;
-}
-
-.new-session-update:hover,
-.new-session-update:focus-visible {
-  background: var(--bg-hover);
-}
-
-/* The ring inside the box, clear of the "→" and "·" beside it. */
-.new-session-update:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.new-session-update svg {
-  flex: none;
-}
-
-/* The project and worktree: a row of their own, under the brand. The
+/* The project and worktree: a row of their own, under the welcome. The
    project button's own padding is pulled out on the left, so its folder
-   icon stands on the logo's and the composer card's edge. */
+   icon stands on the composer card's edge. */
 .new-session-context {
   display: flex;
   flex-wrap: nowrap;
@@ -1946,28 +1875,11 @@ pre, code {
 }
 
 @media (max-width: 640px) {
-  .new-session-brand {
-    margin-bottom: 16px;
-  }
-
-  .new-session-logo {
-    width: 32px;
-    height: 32px;
-  }
-
-  .new-session-brand-name {
-    font-size: 20px;
+  .new-session-intro {
+    margin-bottom: 24px;
   }
 }
 
-@media (pointer: coarse) {
-  .new-session-update {
-    margin-top: -8px;
-    margin-bottom: -8px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-  }
-}
 
 /* The project and worktree picker (ProjectWorktreePicker). The files' (the
    tab's stacked boxes, the row below the sessions), as the sidebar drew it
@@ -2652,9 +2564,6 @@ span.token.table {
 
 /* Mobile sidebar: slide in/out as overlay */
 @media (max-width: 640px) {
-  .chat-stats-center {
-    display: none !important;
-  }
   .sidebar-container {
     position: fixed !important;
     top: 0;

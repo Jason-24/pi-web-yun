@@ -24,6 +24,8 @@
 
 
 ## Workbench settings entry points
-- AppShell has a single Settings entry in the 52px rail at the far left on desktop (`app/navigation-rail.css`), available even when the session sidebar is collapsed. Models, Skills and the other categories remain in SettingsPanel's navigation; do not duplicate them as rail shortcuts. The entry opens the last available settings section, keeps its tooltip and accessible name, and stays active for any open settings section. Project requirements are checked inside SettingsPanel.
+- AppShell has its primary Settings entry in the 52px rail at the far left on desktop (`app/navigation-rail.css`), available even when the session sidebar is collapsed. Models, Skills and the other categories remain in SettingsPanel's navigation; do not duplicate them as rail shortcuts. The entry opens the last available settings section, keeps its tooltip and accessible name, and stays active for any open settings section. Project requirements are checked inside SettingsPanel.
 - Phones render the same navigation once as a labelled row at the bottom of the session drawer; do not add a second set of interactive buttons. Desktop panel width limits reserve the rail's 52px.
 - Desktop session actions share the rail below a divider after Settings; these are conversation controls, not extra settings entries. Mobile session actions stay in the chat header/overflow menu, leaving only the single Settings entry in the drawer.
+
+- The PI-YUN application dropdown also links to the existing Settings dialog through the same shell setter; it adds no settings panel, category or persistence of its own.

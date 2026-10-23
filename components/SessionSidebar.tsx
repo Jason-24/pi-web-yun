@@ -203,6 +203,7 @@ interface Props {
   onSelectSession: (session: SessionInfo, isRestore?: boolean, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => void;
   /** projectKey: the target's project identity when it is known (a group's "+", the composer's bar). */
   onNewSession?: (sessionId: string, cwd: string, projectKey?: string | null, options?: NewSessionOptions) => void;
+  onOpenSettings?: () => void;
   /** What the bar above a fresh composer moves through (`SessionSidebarControl`). */
   controlRef?: Ref<SessionSidebarControl>;
   /** The sidebar's cwd as the bar above a fresh composer shows it; reported when that changes. */
@@ -468,7 +469,7 @@ export function handOffDisabledKeyFocus(doc: FocusDocument, key: Element, fallba
  * resizes or `labels` change. The returned fit is for what the row's size
  * does not show: the brand's text changing its width.
  */
-function useHeaderFit(ref: RefObject<HTMLElement | null>, labels: string): () => void {
+function useHeaderFit(ref: RefObject<HTMLElement | null>, labels: string): void {
   const fit = useCallback(() => {
     const header = ref.current;
     if (!header) return;
@@ -485,7 +486,6 @@ function useHeaderFit(ref: RefObject<HTMLElement | null>, labels: string): () =>
     observer.observe(header);
     return () => observer.disconnect();
   }, [ref, fit, labels]);
-  return fit;
 }
 
 /** A menu placed below (or above) a button, lined up with one of its edges. */
@@ -494,7 +494,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
   return { kind: "rect", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, align };
 }
 
-export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, onOpenSettings, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -2673,9 +2673,8 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   const sessionsShown = filesDocked || stacked || sidebarTab === "sessions";
   const searchesFiles = !filesDocked && !stacked && sidebarTab === "files" && explorerCwd !== null;
   // What the toolbar row's widths depend on: New's label, and the tabs (the
-  // chosen tab's label is bolder, the files tab carries the count). The
-  // brand's text reports its own changes (fitHeader).
-  const fitHeader = useHeaderFit(headerRef, (stacked
+  // chosen tab's label is bolder, the files tab carries the count).
+  useHeaderFit(headerRef, (stacked
     ? ["below", t("sidebar.new")]
     : ["tabs", t("sidebar.tabSessions"), t("sidebar.tabFiles"), t("sidebar.new"), explorerCwd && changesCount > 0 ? changesCount : "", sidebarTab]
   ).join("\n"));
@@ -2810,10 +2809,11 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
           line continues that bar's): Sessions | Files, then New and the
           search of the tab in view. Only the two tabs are the tablist. With
           the files below the sessions there is nothing to choose: the brand
-          stands there (the panel's anchor, the versions on a click), and
+          opens the application menu, and
           the search is the sessions'. */}
       <div ref={headerRef} className="sidebar-header">
-        {(stacked || filesDocked) && <PiWebTitle onWidthChange={fitHeader} />}
+        {(stacked || filesDocked) && <PiWebTitle canCreate={Boolean(selectedCwd)} onNewSession={handleNewSession}
+          onOpenProject={handleCustomPathClick} onOpenSettings={onOpenSettings} />}
         {!stacked && !filesDocked && (
           <div className="sidebar-tabs-list" role="tablist" aria-label={t("sidebar.tabsLabel")}>
             <button

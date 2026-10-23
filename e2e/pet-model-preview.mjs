@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import { chromium } from "playwright";
+import { mkdir } from "node:fs/promises";
+
+const browser = await chromium.launch({ channel: process.platform === "win32" ? "msedge" : undefined, headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: "zh-CN", hasTouch: true });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => localStorage.setItem("pi-locale", "zh-CN"));
+  await page.goto("http://127.0.0.1:30141/pet-preview", { waitUntil: "domcontentloaded", timeout: 90000 });
+  const scene = page.locator("[data-model-ready][data-rendered]");
+  await scene.waitFor({ timeout: 90000 });
+  assert.equal(await page.locator("canvas").count(), 1);
+  const initial = Number(await scene.getAttribute("data-view-angle"));
+  const box = await scene.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(350);
+  assert.ok(Math.abs(Number(await scene.getAttribute("data-view-angle")) - initial) > 0.5, "Dragging must change the 3D camera angle");
+  await page.getByRole("button", { name: "回到正面", exact: true }).click();
+  await page.waitForTimeout(350);
+  assert.ok(Math.abs(Number(await scene.getAttribute("data-view-angle"))) < 0.05);
+  await mkdir("test-results/pet-model-candidate", { recursive: true });
+  await page.screenshot({ path: "test-results/pet-model-candidate/preview-page.png" });
+  await page.getByRole("button", { name: "自动旋转", exact: true }).click();
+  await page.waitForTimeout(800);
+  assert.ok(Math.abs(Number(await scene.getAttribute("data-view-angle"))) > 0.01);
+  await page.getByRole("button", { name: "停止旋转", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
+  assert.ok((await scene.boundingBox()).width <= 390);
+  const mobileBox = await scene.boundingBox();
+  await page.locator("canvas").scrollIntoViewIfNeeded();
+  assert.ok(mobileBox.height > 200);
+  await page.screenshot({ path: "test-results/pet-model-candidate/preview-mobile.png" });
+  assert.deepEqual(errors, []);
+  console.log("PASS: actual GLB loading, live WebGL rendering, drag rotation, front reset, automatic rotation, responsive preview");
+} finally { await browser.close(); }

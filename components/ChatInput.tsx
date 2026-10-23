@@ -105,6 +105,7 @@ interface Props {
 }
 
 export interface ChatInputHandle {
+  focus: () => void;
   insertText: (text: string) => void;
   insertIfEmpty: (text: string) => void;
   replaceMessage: (message: UserMessage) => void;
@@ -729,6 +730,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   attachedImagesRef.current = attachedImages;
 
   useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus({ preventScroll: true }),
     insertIfEmpty(text: string) {
       const ta = textareaRef.current;
       const current = ta ? ta.value : value;

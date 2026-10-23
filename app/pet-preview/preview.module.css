@@ -1,0 +1,22 @@
+.page { height: 100dvh; overflow: auto; background: var(--bg); color: var(--text); font-family: inherit; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 22px 5vw; }
+.header a { color: var(--text-muted); font-size: 13px; text-decoration: none; }
+.tag { padding: 5px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--text-muted); }
+.layout { display: grid; grid-template-columns: minmax(240px, 0.8fr) minmax(300px, 1.2fr); max-width: 1120px; margin: 0 auto; align-items: center; padding: 0 30px 30px; }
+.copy { max-width: 380px; padding: 30px 0; }
+.eyebrow { font-size: 11px; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 20px; }
+.copy h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 550; letter-spacing: -0.04em; line-height: 1.25; margin-bottom: 22px; }
+.copy > p { font-size: 14px; line-height: 1.9; color: var(--text-muted); }
+.copy .note { margin-top: 18px; padding-left: 14px; border-left: 2px solid var(--border); font-size: 12px; }
+.controls { display: flex; gap: 10px; margin: 28px 0 20px; }
+.controls button { border: 1px solid var(--border); border-radius: 9px; background: transparent; padding: 11px 17px; cursor: pointer; font-size: 12px; }
+.controls button:first-child { background: var(--text); border-color: var(--text); color: var(--bg); }
+.controls button:disabled { opacity: 0.45; cursor: default; }
+.source { color: var(--text-muted); font-size: 11px; text-decoration: underline; text-underline-offset: 4px; }
+.stage { position: relative; height: min(780px, calc(100dvh - 105px)); min-height: 460px; }
+.canvas { width: 100%; height: calc(100% - 30px); cursor: grab; touch-action: none; }
+.canvas:active { cursor: grabbing; }
+.canvas canvas { display: block; width: 100%; height: 100%; }
+.hint { position: absolute; bottom: 0; width: 100%; text-align: center; font-size: 11px; color: var(--text-muted); }
+.message { position: absolute; top: 50%; width: 100%; text-align: center; font-size: 12px; color: var(--text-muted); pointer-events: none; }
+@media (max-width: 700px) { .layout { grid-template-columns: 1fr; padding: 0 20px 24px; } .copy { padding: 15px 5px 0; max-width: none; } .copy h1 { margin-bottom: 12px; } .copy > p { font-size: 12px; } .copy .note { margin-top: 10px; } .eyebrow { margin-bottom: 10px; } .controls { margin: 16px 0; } .stage { height: 540px; } }

@@ -19,9 +19,9 @@ const notoSansMono = Noto_Sans_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "yun",
-  description: "yun interface for the pi coding agent",
-  applicationName: "yun",
+  title: "PI-YUN",
+  description: "PI-YUN interface for the pi coding agent",
+  applicationName: "PI-YUN",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "yun",
+    title: "PI-YUN",
   },
   formatDetection: {
     telephone: false,

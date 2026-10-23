@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { CloseIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { CloseIcon, FolderIcon, HomeIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { ChatWindow } from "./ChatWindow";
-import { NewSessionContextBar, type NewSessionContextControl } from "./NewSessionContextBar";
+import { NewSessionContextBar, type NewSessionContextControl, type NewSessionContextBarHandle } from "./NewSessionContextBar";
 import { PetWidget } from "./PetWidget";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
@@ -1101,7 +1100,7 @@ export function AppShell() {
     setRefreshKey((k) => k + 1);
     setExplorerRefreshKey((k) => k + 1);
 
-    if (end.aborted || selectedSession?.relation?.kind === "subagent") return;
+    if (end.aborted || end.failed || selectedSession?.relation?.kind === "subagent") return;
     if (!shouldShowBrowserNotification()) return;
     const targetSession = selectedSession;
     deliverSessionNotification({
@@ -1395,9 +1394,13 @@ export function AppShell() {
   const handleNewSessionBarFocusDone = useCallback(() => {
     newSessionBarFocusRef.current = null;
   }, []);
-  const newSessionContextBar = selectedSession === null && effectiveNewSessionCwd ? (
+  const newSessionContextBarRef = useRef<NewSessionContextBarHandle>(null);
+  const freshContext = effectiveNewSessionCwd ? contextForCwd(sidebarNewSessionContext, effectiveNewSessionCwd, newSessionMoveRef.current) : null;
+  const newSessionProjectName = freshContext ? freshContext.project.alias || getFileName(freshContext.project.root) || freshContext.project.root : undefined;
+  const newSessionContextBar = selectedSession === null && freshContext ? (
     <NewSessionContextBar
-      context={contextForCwd(sidebarNewSessionContext, effectiveNewSessionCwd, newSessionMoveRef.current)}
+      handleRef={newSessionContextBarRef}
+      context={freshContext}
       mobile={isMobile}
       initialFocus={newSessionBarFocusRef.current}
       onInitialFocusDone={handleNewSessionBarFocusDone}
@@ -1481,7 +1484,7 @@ export function AppShell() {
   // Subagent work tabs: like files, only the active one is mounted.
   const activeAgentTab = agentTabs.find((tab) => `agent:${tab.sessionId}` === activeFileTabId) ?? null;
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
-  const windowTitle = activeCwdName ? `${activeCwdName} - yun` : "yun";
+  const windowTitle = activeCwdName ? `${activeCwdName} - PI-YUN` : "PI-YUN";
 
   useEffect(() => {
     const syncWindowTitle = () => {
@@ -1496,7 +1499,12 @@ export function AppShell() {
 
   const settingsNavigation = (
     <nav className={`workbench-settings-navigation${isMobile ? " is-mobile" : ""}`} aria-label={translate("common.settings")} inert={rightPanelFullWidth}>
-      {!isMobile && <div className="workbench-rail-brand" aria-hidden="true"><Image src="/icons/yun-mark.svg" width={30} height={30} alt="" priority /></div>}
+      {!isMobile && <button type="button" className="workbench-home-button" title={translate("navigation.home")} aria-label={translate("navigation.home")}
+        aria-current={selectedSession === null && showChat ? "page" : undefined} onClick={() => {
+          if (selectedSession && activeCwd) sidebarControlRef.current?.startNewSessionIn({ cwd: activeCwd });
+          else if (!showChat) sidebarControlRef.current?.openFolderForNewSession((target) => sidebarControlRef.current?.startNewSessionIn(target), null);
+          else chatInputRef.current?.focus();
+        }}><HomeIcon size={18} /></button>}
       <button type="button" onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))} title={translate("common.settings")} aria-label={translate("common.settings")} aria-pressed={Boolean(settingsSection)}>
         <SettingsSectionIcon section="general" size={19} strokeWidth={1.7} />
         <span className="workbench-settings-label">{translate("common.settings")}</span>
@@ -1516,6 +1524,7 @@ export function AppShell() {
         selectedSessionId={selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        onOpenSettings={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))}
         controlRef={sidebarControlRef}
         onNewSessionContextChange={handleSidebarNewSessionContext}
         initialSessionId={initialSessionId}
@@ -2599,6 +2608,8 @@ export function AppShell() {
               newSessionCwd={effectiveNewSessionCwd}
               newSessionDraftKey={newSessionDraftKey}
               newSessionContextBar={newSessionContextBar}
+              newSessionProjectName={newSessionProjectName}
+              onChooseNewSessionProject={(opener) => newSessionContextBarRef.current?.openProjectMenu(opener)}
               initialNewSessionChoices={selectedSession === null ? carriedNewSessionChoices : null}
               onNewSessionChoicesChange={handleNewSessionChoicesChange}
               onAgentEnd={handleAgentEnd}

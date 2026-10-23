@@ -20,7 +20,7 @@ const handler = new Script(ts.transpileModule(`((event) => { switch (event.type)
 function setup() {
   const banner = { current: null };
   const context = createContext({
-    agentRunningRef: { current: true }, sdkAgentActiveRef: { current: true }, sessionIdRef: { current: null },
+    agentRunningRef: { current: true }, sdkAgentActiveRef: { current: true }, turnFailedRef: { current: false }, sessionIdRef: { current: null },
     setRetryInfo: (value) => { banner.current = value; },
     cancelEventStreamGrace() {}, setAgentRunning() {}, setAgentPhase() {}, dispatch() {},
   });

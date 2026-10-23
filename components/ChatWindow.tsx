@@ -1,6 +1,5 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
-import Image from "next/image";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage } from "@/lib/types";
@@ -17,11 +16,13 @@ import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } fro
 import { MessageView } from "./MessageView";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import { WelcomeMark } from "./WelcomeMark";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { AnsiText } from "./AnsiText";
 import { useI18n } from "@/hooks/useI18n";
 import { phaseLabel } from "@/lib/chat-phase-label";
+import { petChatActivity, type PetChatPhase } from "@/lib/pet-chat-activity";
 import { useAgentSession, type AgentEndInfo, type NewSessionChoices, type NoticeItem } from "@/hooks/useAgentSession";
 import { selectHasStreamingContent, selectIsStreaming, selectStreamingMessage, useStreamingSelector } from "@/hooks/useStreamingSelector";
 import type { StreamingStore } from "@/lib/streaming-message";
@@ -55,6 +56,8 @@ interface Props {
   newSessionDraftKey: string | null;
   /** Shown above the composer while a fresh composer is still empty: where its session starts. */
   newSessionContextBar?: ReactNode;
+  newSessionProjectName?: string;
+  onChooseNewSessionProject?: (opener: HTMLElement) => void;
   /** A fresh composer's model and reasoning picks, carried from the composer it replaces. */
   initialNewSessionChoices?: NewSessionChoices | null;
   onNewSessionChoicesChange?: (choices: NewSessionChoices) => void;
@@ -179,7 +182,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cacheMis
   );
 }
 
-export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, sessionStatsControl, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
+export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, newSessionProjectName, onChooseNewSessionProject, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, sessionStatsControl, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -193,13 +196,15 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const extensionDialogShownRef = useRef(false);
+  const [companionOwner] = useState(() => Symbol("active-chat"));
   const wrappedOnAgentEnd = useCallback((end: AgentEndInfo) => {
+    petChatActivity.finish(companionOwner, end.aborted ? "stopped" : end.failed ? "error" : "complete");
     // A run someone stopped did not finish anything.
-    if (completionNotificationsEnabled && soundEnabledRef.current && !end.aborted) {
+    if (completionNotificationsEnabled && soundEnabledRef.current && !end.aborted && !end.failed) {
       playDoneSoundRef.current();
     }
     onAgentEnd?.(end);
-  }, [completionNotificationsEnabled, onAgentEnd]);
+  }, [companionOwner, completionNotificationsEnabled, onAgentEnd]);
 
   const initialScrollPositionRef = useRef(searchTarget ? null : initialScrollPosition ?? null);
   const [pendingScrollRestore, setPendingScrollRestore] = useState<Extract<ChatScrollPosition, { atBottom: false }> | null>(() => {
@@ -244,6 +249,22 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const hasStreamingContent = useStreamingSelector(streamingStore, selectHasStreamingContent);
   const getStreamingMessage = useCallback(() => streamingStore.getState().streamingMessage, [streamingStore]);
   const sessionBusy = agentRunning || bashRunning;
+  const companionPhase: PetChatPhase = extensionDialog || extensionCustomUi ? "waiting"
+    : isCompacting || bashRunning || agentPhase?.kind === "running_tools" || agentPhase?.kind === "running_command" ? "working"
+    : sessionBusy ? isStreaming && hasStreamingContent ? "replying" : "sending" : "idle";
+  useEffect(() => {
+    petChatActivity.update(companionOwner, session?.id ?? sessionIdRef.current, companionPhase);
+  }, [companionOwner, session?.id, sessionIdRef, companionPhase]);
+  useEffect(() => () => petChatActivity.release(companionOwner), [companionOwner]);
+  const companionNoticesRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const notice of notices) {
+      if (notice.type === "error" && !companionNoticesRef.current.has(notice.id)) {
+        petChatActivity.finish(companionOwner, "error");
+      }
+    }
+    companionNoticesRef.current = new Set(notices.map((notice) => notice.id));
+  }, [companionOwner, notices]);
   // While this session's run is under way its chime may come with the phone
   // locked, where a suspended context cannot start again (#1157).
   useEffect(() => {
@@ -771,6 +792,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const isEmptyNew = isNew && messages.length === 0 && !isStreaming && !sessionBusy;
   useScrollbarVisibility(scrollContainerRef, Boolean(session?.id) || !isEmptyNew);
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
+  const [welcomeStart, welcomeEnd] = t("chat.newSessionProjectWelcome").split("{project}");
   const promptAnchorSpacerRef = useRef<HTMLDivElement | null>(null);
   const promptAnchorSpacerHeightRef = useRef(0);
   const promptAnchorMeasureFrameRef = useRef<number | null>(null);
@@ -1413,19 +1435,17 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             </button>
           </div>
         )}
-        {/* The yun brand mark and name, then the
-            project/worktree row right above the composer, all on the
-            composer's left edge (.new-session-brand and
-            .new-session-context in app/globals.css; the side padding and
-            width are inline here). */}
+        {/* A quiet welcome above the composer; the project/worktree row
+            keeps the composer's left edge and its existing controls. */}
         {isEmptyNew && (
           <div className="new-session-hero" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
             <div className="new-session-hero-inner" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
-              <div className="new-session-brand">
-                <Image src="/icons/yun-mark.svg" width={40} height={40} alt="" priority className="new-session-logo" />
-                <div className="new-session-brand-text">
-                  <span className="new-session-brand-name">yun</span>
-                </div>
+              <div className="new-session-intro">
+                <WelcomeMark />
+                <h1 className="new-session-welcome">{newSessionProjectName ? <>
+                  {welcomeStart}<button type="button" className="new-session-welcome-project" title={t("workspace.newSessionContext")}
+                    onClick={(event) => onChooseNewSessionProject?.(event.currentTarget)}>{newSessionProjectName}</button>{welcomeEnd}
+                </> : t("chat.newSessionWelcome")}</h1>
               </div>
               {newSessionContextBar}
             </div>

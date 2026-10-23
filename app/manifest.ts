@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-dynamic";
 
 export default function manifest(): MetadataRoute.Manifest {
-  const appName = process.env.PI_WEB_APP_NAME?.trim() || "yun";
+  const appName = process.env.PI_WEB_APP_NAME?.trim() || "PI-YUN";
   return {
     id: "/",
     name: appName,

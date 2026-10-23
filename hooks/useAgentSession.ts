@@ -171,6 +171,8 @@ export type BuiltinSlashCommandResult =
 export interface AgentEndInfo {
   /** The run was stopped (Esc, Stop, another client's abort), not finished: nothing to announce. */
   aborted: boolean;
+  /** The final attempt or extension prompt failed; consumers must not celebrate success. */
+  failed?: boolean;
 }
 
 export interface UseAgentSessionOptions {
@@ -422,6 +424,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const sessionToolsPinnedRef = useRef(false);
   const agentRunningRef = useRef(false);
   const sdkAgentActiveRef = useRef(false);
+  const turnFailedRef = useRef(false);
   const rpcPromptPendingRef = useRef(false);
   const notifiedPromptRunIdRef = useRef(-1);
   const bashRunningRef = useRef(false);
@@ -1210,7 +1213,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const notifyPromptStage = useCallback((runId: number, aborted = false) => {
     if (notifiedPromptRunIdRef.current === runId) return false;
     notifiedPromptRunIdRef.current = runId;
-    onAgentEnd?.({ aborted });
+    onAgentEnd?.({ aborted, ...(turnFailedRef.current ? { failed: true } : {}) });
     return true;
   }, [onAgentEnd]);
 
@@ -1294,7 +1297,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (promptWasPending) {
         notifyPromptStage(runId);
       } else if (agentWasActive && wasRunning) {
-        onAgentEnd?.({ aborted: false });
+        onAgentEnd?.({ aborted: false, ...(turnFailedRef.current ? { failed: true } : {}) });
       }
       if (sid) scheduleEventStreamClose(sid);
     }
@@ -1449,6 +1452,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       }
       case "agent_start":
+        turnFailedRef.current = false;
         cancelEventStreamGrace();
         sdkAgentActiveRef.current = true;
         agentRunningRef.current = true;
@@ -1501,7 +1505,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           void loadSession(sid);
           scheduleEventStreamClose(sid);
         }
-        if (wasRunning) onAgentEnd?.({ aborted: event.aborted === true });
+        if (wasRunning) onAgentEnd?.({ aborted: event.aborted === true, ...(turnFailedRef.current ? { failed: true } : {}) });
         break;
       }
       case "prompt_done":
@@ -1525,6 +1529,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         break;
       case "prompt_error":
+        turnFailedRef.current = true;
         addNotice({ type: "error", message: (event.errorMessage as string | undefined) ?? "Command failed" });
         break;
       case "extension_error":
@@ -1598,6 +1603,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             return [...prev, delivered];
           });
         } else if (completed) {
+          if (completed.role === "assistant") turnFailedRef.current = completed.stopReason === "error";
           // pi's showCacheMissNotices (#1265): the wrapper sends them beside the message.
           const notices = Array.isArray(event.transcriptNotices) ? event.transcriptNotices as TranscriptNotice[] : undefined;
           setMessages((prev) => [...prev, withTranscriptNotices(normalizeToolCalls(completed), notices)]);
@@ -1753,6 +1759,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
 
     const promptRunId = promptRunIdRef.current + 1;
+    turnFailedRef.current = false;
     cancelEventStreamGrace();
     rpcPromptPendingRef.current = true;
 

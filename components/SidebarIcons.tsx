@@ -38,6 +38,10 @@ export function PlusIcon(props: SidebarIconProps) {
   return <SidebarIcon {...props}><path d="M12 5v14M5 12h14" /></SidebarIcon>;
 }
 
+export function HomeIcon(props: SidebarIconProps) {
+  return <SidebarIcon {...props}><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2Z" fill="currentColor" strokeWidth="1.4" /></SidebarIcon>;
+}
+
 /** Horizontal dots: the "⋯" of a row or group. */
 export function MoreIcon(props: SidebarIconProps) {
   return (

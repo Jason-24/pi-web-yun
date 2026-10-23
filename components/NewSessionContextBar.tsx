@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import type { NewSessionContext, NewSessionTarget, ProjectChoice } from "@/lib/new-session-context";
 import { focusIfLost } from "@/lib/stacked-dialog";
@@ -8,8 +8,12 @@ import { ProjectWorktreePicker, type ProjectWorktreeControl, type ProjectWorktre
 
 /** The bar's two controls. A move names the one it came from, which takes focus in the bar that replaces this one. */
 export type NewSessionContextControl = ProjectWorktreeControl;
+export interface NewSessionContextBarHandle {
+  openProjectMenu(opener: HTMLElement): void;
+}
 
 interface Props {
+  handleRef?: Ref<NewSessionContextBarHandle>;
   context: NewSessionContext;
   /** A phone: the menus open as bottom sheets. */
   mobile: boolean;
@@ -47,7 +51,7 @@ function loadHomeDir(): Promise<string> {
 
 /**
  * The project and worktree a fresh composer starts its session in: a row of
- * its own in the empty new-session page's header, under the brand and right
+ * its own in the empty new-session page's header, under the welcome and right
  * above the composer. The files tab's picker
  * (components/ProjectWorktreePicker.tsx) laid out inline: the project's name
  * and the worktree's branch as text, its group named by the label alone (no
@@ -56,6 +60,7 @@ function loadHomeDir(): Promise<string> {
  * picks), so this bar only reports what was chosen; the sidebar keeps the cwd.
  */
 export function NewSessionContextBar({
+  handleRef,
   context,
   mobile,
   initialFocus,
@@ -69,6 +74,7 @@ export function NewSessionContextBar({
   const { t } = useI18n();
   const [homeDir, setHomeDir] = useState(() => homeDirFound);
   const pickerRef = useRef<ProjectWorktreePickerHandle>(null);
+  useImperativeHandle(handleRef, () => ({ openProjectMenu: (opener) => pickerRef.current?.openMenu("project", opener) }), []);
   const initialFocusRef = useRef(initialFocus);
   const onInitialFocusDoneRef = useRef(onInitialFocusDone);
   onInitialFocusDoneRef.current = onInitialFocusDone;
