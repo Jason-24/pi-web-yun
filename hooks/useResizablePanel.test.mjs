@@ -8,7 +8,7 @@ import { createJiti } from "jiti";
 // localStorage, so what each path shows and saves can be played out.
 const shimPath = fileURLToPath(new URL("./__fixtures__/react-hook-shim.mjs", import.meta.url));
 const jiti = createJiti(import.meta.url, { tsconfigPaths: true, alias: { react: shimPath } });
-const { renderHook } = await import(shimPath);
+const { renderHook } = await import(new URL("./__fixtures__/react-hook-shim.mjs", import.meta.url).href);
 const { useResizablePanel } = await jiti.import("./useResizablePanel.ts");
 
 function emitter(extra = {}) {
@@ -37,13 +37,14 @@ globalThis.document = emitter({ body: { style: { cursor: "", userSelect: "" } } 
 // One panel at a time: the previous test's stops listening to the window.
 let mounted = null;
 
-function mount({ storedHeight, persistClamp, room }) {
+function mount({ storedHeight, persistClamp, room, ...extra }) {
   mounted?.unmount();
   stored.clear();
   if (storedHeight !== undefined) stored.set(KEY, String(storedHeight));
   const space = { room };
   const widthRef = { current: 0 };
   const view = renderHook(() => useResizablePanel({
+    ...extra,
     ariaLabel: "Resize",
     axis: "vertical",
     cssVariable: "--test-height",
@@ -159,4 +160,32 @@ test("without persistClamp a click on the separator saves nothing", () => {
   assert.equal(panel.saved(), "400", "not the short window's clamp");
   panel.resize(1000);
   assert.equal(panel.shown(), 400, "back to the user's size");
+});
+
+
+test("a completed collapse drag preserves the expanded size for restoration", () => {
+  let collapsed = 0;
+  const panel = mount({ room: 800, collapseAt: 80, onCollapse: () => collapsed++ });
+  panel.view.result.separatorProps.onPointerDown(pointer(300));
+  panel.view.flush();
+  panel.view.result.separatorProps.onPointerMove(pointer(100));
+  panel.view.result.separatorProps.onPointerUp(pointer(100));
+  panel.view.flush();
+  assert.equal(collapsed, 1);
+  assert.equal(panel.shown(), 240);
+  assert.equal(panel.saved(), "240");
+  assert.equal(document.body.style.cursor, "");
+});
+
+test("pointer cancellation below the collapse threshold never collapses a panel", () => {
+  let collapsed = 0;
+  const panel = mount({ room: 800, collapseAt: 80, onCollapse: () => collapsed++ });
+  panel.view.result.separatorProps.onPointerDown(pointer(300));
+  panel.view.flush();
+  panel.view.result.separatorProps.onPointerMove(pointer(100));
+  panel.view.result.separatorProps.onPointerCancel(pointer(100));
+  panel.view.flush();
+  assert.equal(collapsed, 0);
+  assert.equal(panel.shown(), 120);
+  assert.equal(document.body.style.cursor, "");
 });

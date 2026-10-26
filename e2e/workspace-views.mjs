@@ -1,0 +1,416 @@
+// Run against an existing dev server: E2E_BROWSER_CHANNEL=chrome node e2e/workspace-views.mjs
+import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { chromium } from "playwright";
+
+export async function checkWorkspaceViews({ browser, base, artifacts }) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const page = await context.newPage();
+  const cwd = "D:/workspace/project";
+  const session = { id: "workspace-views", path: "", cwd, projectRoot: cwd, projectKey: cwd,
+    name: "检查工作区的导航与视图切换", firstMessage: "检查工作区", messageCount: 2,
+    created: "2026-10-26T00:00:00Z", modified: "2026-10-26T00:00:00Z" };
+  const other = { ...session, id: "workspace-other", name: "另一项项目任务" };
+  const messages = [
+    { role: "user", content: "检查工作区的导航与视图切换", timestamp: 1792972800000 },
+    { role: "assistant", content: [{ type: "text", text: "会话已经加载。\n\n" + "保持当前对话与草稿，切换视图时继续接收会话事件。\n\n".repeat(40) }], timestamp: 1792972801000, stopReason: "stop" },
+  ];
+  const contextPage = { messages, entryIds: ["user", "answer"], oldestEntryId: "user", hasMore: true, turnsBefore: 0, thinkingLevel: "off", model: null };
+  const tree = [1, 2].map(index => ({ entry: { type: "message", id: `branch-${index}`, parentId: null,
+    timestamp: session.modified, message: { role: "user", content: `可选分支 ${index}` } }, children: [] }));
+  const errors = [];
+  const commands = [];
+  const branchReads = [];
+  const branchTargets = [];
+  let sessionReads = 0;
+  let olderReads = 0;
+  let popups = 0;
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("popup", popup => { popups++; void popup.close(); });
+  await context.addInitScript(() => localStorage.setItem("pi-locale", "zh-CN"));
+  await page.route("**/api/**", async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const reply = json => route.fulfill({ json });
+    if (path === "/api/sessions") return reply({ sessions: [session, other], sessionListVersion: 1, runningSessionIds: [], awaitingInputSessionIds: [] });
+    if (path === "/api/sessions/ui-state") return reply({ state: { version: 1, revision: 1, sessions: {}, projects: {}, projectOrder: [cwd] } });
+    if (path === "/api/agent/running") return reply({ runningSessionIds: [], awaitingInputSessionIds: [], sessionUiStateRevision: 1, sessionListVersion: 1 });
+    if (path === "/api/worktrees") return reply({ projectRoot: cwd, projectKey: cwd, isGit: false, worktrees: [] });
+    if (path === "/api/project-trust") return reply({ cwd, requiresTrust: false, trusted: true, mcpServers: [] });
+    if (path === "/api/models") return reply({ models: [], modelList: [], defaultModel: null });
+    if (path === "/api/git/status") return reply({ isGit: false, files: [] });
+    if (path.startsWith("/api/files/")) {
+      const type = url.searchParams.get("type");
+      if (type === "list") return reply({ entries: [{ name: "example.ts", isDir: false, size: 48 }] });
+      if (type === "read") return reply({ content: "export const layout = 'content left, directory right';", language: "typescript", size: 53, nextOffset: 53, truncated: false });
+      if (type === "meta") return reply({ size: 53, mtimeMs: 1 });
+      if (type === "watch") return route.fulfill({ contentType: "text/event-stream", body: "" });
+    }
+    if (path === "/api/home") return reply({ home: "C:/Users/test" });
+    if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
+    if (path === "/api/cache-miss-notices") return reply({ enabled: true });
+    if (path === "/api/web-auth") return reply({ enabled: false });
+    if (path === `/api/sessions/${session.id}/context`) {
+      const leafId = url.searchParams.get("leafId");
+      if (leafId) branchReads.push(leafId);
+      if (leafId === "branch-2") return reply({ context: { ...contextPage,
+        messages: [{ role: "user", content: "第二条分支的独立对话内容", timestamp: 1792972800000 }], entryIds: ["branch-2"], hasMore: false } });
+      if (url.searchParams.has("before")) {
+        olderReads++;
+        return reply({ context: { ...contextPage, messages: [{ role: "user", content: "更早的一条历史消息", timestamp: 1792886400000 }], entryIds: ["older"], oldestEntryId: "older", hasMore: false } });
+      }
+      return reply({ context: contextPage });
+    }
+    if (path === `/api/sessions/${session.id}` || path === `/api/sessions/${other.id}`) {
+      sessionReads++;
+      const isOther = path.endsWith(other.id);
+      return reply({ sessionId: isOther ? other.id : session.id, info: isOther ? other : session, context: contextPage, filePath: "", tree: isOther ? tree.slice(0, 1) : tree, leafId: "branch-1", totalActiveMs: 0 });
+    }
+    if (path.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: 'data: {"type":"connected","isStreaming":false}\n\n' });
+    if (path.startsWith("/api/agent/") && request.method() === "POST") {
+      const command = request.postDataJSON() ?? {};
+      commands.push(command.type);
+      if (command.type === "navigate_tree") branchTargets.push(command.targetId);
+      return reply({ success: true, data: command.type === "get_state" ? { systemPrompt: "内嵌系统提示词测试" }
+        : command.type === "get_tools" ? [{ name: "read", active: true, description: "读取项目文件", parameters: { type: "object", properties: { path: { type: "string" } } } }] : {} });
+    }
+    return reply({});
+  });
+
+  try {
+    await page.goto(`${base}/?session=${session.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
+    const nav = page.getByRole("navigation", { name: "工作区导航" });
+    const toggleSidebar = async () => {
+      if (page.viewportSize().width <= 640) return page.locator(".workspace-sidebar-toggle").click();
+      const restore = page.locator("[data-sidebar-restore]");
+      if (await restore.count()) return restore.click();
+      return page.locator('[data-resize-handle="sidebar"]').dblclick();
+    };
+    const view = id => nav.locator(`[data-workspace-view="${id}"]`);
+    const input = page.locator(".workspace-chat-view textarea").first();
+    await input.waitFor({ timeout: 90000 });
+    const conversationHeader = page.locator(".workspace-chat-header");
+    assert.equal(await conversationHeader.locator(".workspace-sidebar-toggle").count(), 0, "desktop sidebar control lives outside the reading header");
+    assert.equal(await conversationHeader.locator(":scope > div").first().evaluate(el => getComputedStyle(el).borderBottomWidth), "0px", "no divider cuts across the transcript");
+    assert.equal(await nav.locator(".workspace-sidebar-toggle").count(), 0);
+    const frame = page.locator(".workspace-frame");
+    const frameBox = await frame.boundingBox();
+    const railBox = await nav.boundingBox();
+    assert.ok(frameBox.y >= 8 && frameBox.x >= railBox.x + railBox.width, "the desktop workbench is inset beside the outer navigation");
+    assert.equal(await frame.evaluate(el => getComputedStyle(el).borderTopLeftRadius), "14px");
+    assert.ok(Math.abs(frameBox.y + frameBox.height - 952) < 1, "the workbench preserves a bottom margin");
+    const sidebar = page.locator("#session-sidebar");
+    const boundary = page.locator('[data-resize-handle="sidebar"]');
+    const expandedWidth = Math.round((await sidebar.boundingBox()).width);
+    const boundaryBox = await boundary.boundingBox();
+    await page.mouse.move(boundaryBox.x + boundaryBox.width / 2, boundaryBox.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(boundaryBox.x + boundaryBox.width / 2 - expandedWidth + 90, boundaryBox.y + 120, { steps: 8 });
+    await page.mouse.up();
+    const restoreEdge = page.locator("[data-sidebar-restore]");
+    await restoreEdge.waitFor();
+    assert.equal(await page.evaluate(() => localStorage.getItem("pi-sidebar-width")), String(expandedWidth), "collapsing by dragging preserves the expanded width");
+    await restoreEdge.click();
+    await page.waitForFunction(width => Math.abs(document.querySelector("#session-sidebar").getBoundingClientRect().width - width) < 1, expandedWidth);
+    await boundary.press("ArrowRight");
+    const resizedWidth = Number(await boundary.getAttribute("aria-valuenow"));
+    assert.ok(resizedWidth > expandedWidth, "boundary resizing still works");
+    await boundary.press("Enter");
+    await restoreEdge.waitFor();
+    await page.mouse.move(900, 100);
+    await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().width < 1);
+    const collapsedConversation = await page.locator(".workspace-conversation").boundingBox();
+    const peek = page.locator("[data-sidebar-peek]");
+    await restoreEdge.hover();
+    await page.waitForTimeout(180);
+    assert.equal(await peek.count(), 0, "the restore edge no longer triggers a hover preview");
+    await view("home").hover();
+    await peek.waitFor();
+    assert.equal(new URL(page.url()).searchParams.get("session"), session.id, "hovering Home keeps the current conversation");
+    await peek.getByRole("heading", { name: "最近会话", exact: true }).waitFor();
+    assert.equal(await sidebar.evaluate(el => getComputedStyle(el).position), "absolute", "the collapsed preview floats over the conversation");
+    const previewConversation = await page.locator(".workspace-conversation").boundingBox();
+    assert.equal(previewConversation.x, collapsedConversation.x);
+    assert.equal(previewConversation.width, collapsedConversation.width, "hover preview never shifts the conversation");
+    assert.ok((await peek.boundingBox()).width <= 260, "the preview uses a compact width");
+    assert.equal(await peek.evaluate(el => getComputedStyle(el).borderTopLeftRadius), "8px");
+    await peek.getByRole("heading", { name: "项目", exact: true }).hover();
+    await page.screenshot({ path: resolve(artifacts, "workspace-sidebar-hover-preview.png") });
+    await page.mouse.move(900, 100);
+    await peek.waitFor({ state: "detached" });
+    assert.equal((await sidebar.boundingBox()).width, 0, "closing the floating preview never animates a sidebar back into the layout");
+    assert.equal((await page.locator(".workspace-conversation").boundingBox()).width, collapsedConversation.width);
+    await view("home").hover();
+    await peek.waitFor();
+    await sidebar.locator(".sidebar-brand").click();
+    const sidebarMenu = page.locator(".sidebar-menu");
+    await sidebarMenu.waitFor();
+    await sidebarMenu.hover();
+    await page.waitForTimeout(350);
+    assert.equal(await peek.count(), 1, "a portaled sidebar menu keeps the preview usable");
+    await page.locator(".workspace-chat-view textarea").click();
+    await peek.waitFor({ state: "detached" });
+    await view("home").hover();
+    await peek.waitFor();
+    await peek.locator(`[data-row-key="recent:${other.id}"] a`).click();
+    await page.waitForURL(`**/?session=${other.id}`);
+    await peek.waitFor({ state: "detached" });
+    assert.equal(await sidebar.evaluate(el => el.classList.contains("sidebar-closed")), true, "choosing a preview row keeps the sidebar collapsed");
+    await view("home").hover();
+    await peek.waitFor();
+    await peek.locator(`[data-row-key="recent:${session.id}"] a`).click();
+    await page.waitForURL(`**/?session=${session.id}`);
+    await view("home").hover();
+    await peek.waitFor();
+    await page.keyboard.press("Escape");
+    await peek.waitFor({ state: "detached" });
+    const collapsedNewChat = page.locator("[data-collapsed-new-chat]");
+    await collapsedNewChat.waitFor();
+    await page.screenshot({ path: resolve(artifacts, "workspace-sidebar-collapsed-new-chat.png") });
+    await collapsedNewChat.click();
+    await page.waitForURL(url => url.searchParams.get("cwd") === cwd);
+    await input.waitFor();
+    assert.equal(await input.inputValue(), "", "the collapsed-header action opens a fresh composer");
+    assert.equal(await sidebar.evaluate(el => el.classList.contains("sidebar-closed")), true);
+    await view("home").hover();
+    await peek.waitFor();
+    await peek.locator(`[data-row-key="recent:${session.id}"] a`).click();
+    await page.waitForURL(`**/?session=${session.id}`);
+    await restoreEdge.press("Enter");
+    await page.waitForFunction(width => Math.abs(document.querySelector("#session-sidebar").getBoundingClientRect().width - width) < 1, resizedWidth);
+    await sidebar.getByRole("heading", { name: "项目", exact: true }).waitFor();
+    await sidebar.getByRole("heading", { name: "最近会话", exact: true }).waitFor();
+    const header = sidebar.locator(".sidebar-header");
+    const brandBox = await header.locator(".sidebar-brand").boundingBox();
+    const newBox = await header.getByRole("button", { name: "新建会话", exact: true }).boundingBox();
+    assert.ok(newBox.y >= brandBox.y + brandBox.height, "New chat has its own row below the brand");
+    assert.ok(newBox.width >= (await header.boundingBox()).width - 20, "New chat fills the sidebar action row");
+    const projectToggle = sidebar.locator(".session-tree-group-toggle").first();
+    assert.equal(await projectToggle.locator(".session-tree-chevron").count(), 0, "project toggles have no expansion arrow");
+    if (await projectToggle.getAttribute("aria-expanded") === "true") await projectToggle.click();
+    assert.equal(await projectToggle.getAttribute("aria-expanded"), "false");
+    await sidebar.locator(`[data-row-key="recent:${other.id}"] a`).click();
+    await page.waitForURL(`**/?session=${other.id}`);
+    await sidebar.locator(`[data-row-key="recent:${session.id}"] a`).click();
+    await page.waitForURL(`**/?session=${session.id}`);
+    await input.waitFor();
+    if (await projectToggle.getAttribute("aria-expanded") === "false") await projectToggle.click();
+    await sidebar.locator(".session-tree-session").filter({ hasText: session.name }).waitFor();
+    await page.screenshot({ path: resolve(artifacts, "workspace-sidebar-sections.png") });
+    await input.fill("切换视图后仍然保留的草稿");
+    await input.evaluate(element => { element.dataset.instance = "original"; });
+    const scroller = page.locator(".workspace-chat-view .overflow-y-auto").first();
+    await scroller.evaluate(element => { element.scrollTop = 120; });
+    const scrollPosition = await scroller.evaluate(element => element.scrollTop);
+    const positions = await nav.locator("button").evaluateAll(elements => elements.map(el => ({ view: el.dataset.workspaceView ?? el.dataset.workspaceAction, y: el.getBoundingClientRect().y })));
+    assert.equal(positions.length, 9);
+    const originalReads = sessionReads;
+    const checkEmbedded = async id => {
+      await view(id).click();
+      const panel = page.locator(`[data-workspace-page="${id}"]`);
+      await panel.waitFor();
+      assert.equal(await view(id).getAttribute("aria-current"), "page");
+      const rects = await panel.evaluate(element => ({ panel: element.getBoundingClientRect().toJSON(), host: element.closest(".workspace-content").getBoundingClientRect().toJSON(), position: getComputedStyle(element).position }));
+      assert.equal(rects.position, "static");
+      assert.ok(Math.abs(rects.panel.x - rects.host.x) < 1);
+      assert.ok(Math.abs(rects.panel.width - rects.host.width) < 1);
+      assert.ok(rects.panel.height >= rects.host.height - 1);
+      assert.equal(await input.getAttribute("data-instance"), "original");
+      return panel;
+    };
+    await checkEmbedded("system");
+    await page.getByText("内嵌系统提示词测试", { exact: true }).waitFor();
+    await page.screenshot({ path: resolve(artifacts, "workspace-system.png") });
+    await checkEmbedded("tools");
+    await page.locator(".tool-definitions-item").filter({ hasText: "read" }).waitFor();
+    await page.screenshot({ path: resolve(artifacts, "workspace-tools.png") });
+    assert.equal(sessionReads, originalReads, "system/tools switching keeps the chat mounted");
+    assert.ok(Math.abs(await scroller.evaluate(element => element.scrollTop) - scrollPosition) < 2, "switching inspectors preserves the reading position");
+    await checkEmbedded("branches");
+    await page.getByText("可选分支 1", { exact: true }).waitFor();
+    const branchPage = page.locator('[data-workspace-page="branches"]');
+    await branchPage.getByRole("button").filter({ hasText: "可选分支 2" }).click();
+    await page.locator(".workspace-chat-view").getByText("第二条分支的独立对话内容", { exact: true }).waitFor();
+    assert.equal(await branchPage.count(), 0, "selecting a branch reveals its conversation");
+    assert.equal(await view("chat").getAttribute("aria-current"), "page");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    await checkEmbedded("branches");
+    await Promise.all([
+      page.waitForResponse(response => response.url().includes(`/api/agent/${session.id}`) && response.request().method() === "POST" && response.request().postDataJSON()?.targetId === "branch-1"),
+      branchPage.getByRole("button").filter({ hasText: "可选分支 1" }).press("Enter"),
+    ]);
+    await page.locator(".workspace-chat-view").getByText("会话已经加载。", { exact: false }).waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-workspace-view="chat"]').getAttribute("aria-current") === "page");
+    assert.deepEqual(branchReads.slice(0, 2), ["branch-2", "branch-1"]);
+    assert.deepEqual(branchTargets, ["branch-2", "branch-1"]);
+    await checkEmbedded("agents");
+    const history = await checkEmbedded("history");
+    await history.getByText("会话已经加载。", { exact: false }).waitFor();
+    await history.getByRole("button", { name: "加载更多", exact: false }).click();
+    await history.getByText("更早的一条历史消息", { exact: true }).waitFor();
+    assert.equal(olderReads, 1);
+    assert.equal(popups, 0, "history opens in the workspace");
+    await page.screenshot({ path: resolve(artifacts, "workspace-history.png") });
+    await page.keyboard.press("Escape");
+    assert.equal(await view("chat").getAttribute("aria-current"), "page");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    await view("settings").click();
+    const settings = page.locator(".settings-dialog-backdrop.is-embedded");
+    await settings.waitFor();
+    assert.equal(await settings.getAttribute("role"), "region");
+    assert.equal(await settings.getAttribute("aria-modal"), null);
+    assert.equal(await settings.evaluate(el => getComputedStyle(el).position), "static");
+    await page.screenshot({ path: resolve(artifacts, "workspace-settings.png") });
+    await view("chat").click();
+    assert.equal(await input.getAttribute("data-instance"), "original");
+    // Content stays to the left of the directory; both separators grow leftward.
+    await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
+    const filePanel = page.locator("#file-panel");
+    const directory = page.locator("#workbench-file-tree");
+    const preview = page.locator(".workbench-file-preview");
+    await directory.getByText("example.ts", { exact: true }).waitFor();
+    assert.equal(await preview.isVisible(), false, "a directory-only workspace reserves no empty preview");
+    await directory.getByText("example.ts", { exact: true }).click();
+    await preview.getByText("export const layout", { exact: false }).waitFor();
+    const assertFileOrder = async () => {
+      await page.waitForFunction(() => document.querySelector(".workbench-file-preview").getBoundingClientRect().width >= 275);
+      const contentBox = await preview.boundingBox();
+      const treeBox = await directory.boundingBox();
+      assert.ok(contentBox.width >= 275, `the file content keeps a readable minimum width: ${JSON.stringify({ contentBox, treeBox, panel: await filePanel.boundingBox() })}`);
+      assert.ok(contentBox.x + contentBox.width <= treeBox.x + 1, "file content is left of the directory");
+      assert.ok(Math.abs(treeBox.x + treeBox.width - (await filePanel.boundingBox()).x - (await filePanel.boundingBox()).width) < 2);
+    };
+    await page.screenshot({ path: resolve(artifacts, "workspace-file-split.png") });
+    await assertFileOrder();
+    await filePanel.getByRole("button", { name: "全宽展示文件面板", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector("#file-panel").getBoundingClientRect().width >= innerWidth - 1);
+    const separator = page.locator(".workbench-tree-resizer");
+    const originalTreeWidth = (await directory.boundingBox()).width;
+    await separator.press("ArrowLeft");
+    assert.ok((await directory.boundingBox()).width > originalTreeWidth, "ArrowLeft grows the right directory");
+    await separator.press("ArrowRight");
+    assert.equal((await directory.boundingBox()).width, originalTreeWidth);
+    const handle = await separator.boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handle.x - 50, handle.y + handle.height / 2, { steps: 5 });
+    await page.mouse.up();
+    assert.ok((await directory.boundingBox()).width >= originalTreeWidth + 45, "dragging left grows the directory");
+    await assertFileOrder();
+    await page.screenshot({ path: resolve(artifacts, "workspace-file-layout.png") });
+    await filePanel.getByRole("button", { name: "还原文件面板宽度", exact: true }).click();
+    await page.setViewportSize({ width: 1024, height: 960 });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector("#workbench-file-tree")).display === "none");
+    assert.equal(await preview.isVisible(), true, "narrow screens retain the file preview");
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await directory.getByText("example.ts", { exact: true }).waitFor();
+    await assertFileOrder();
+    await filePanel.getByRole("tab").getByRole("button", { name: "关闭 example.ts", exact: true }).click();
+    assert.equal(await preview.isVisible(), false, "closing the final file returns to directory-only layout");
+    await filePanel.getByRole("button", { name: "隐藏文件面板", exact: true }).click();
+
+    // The companion is a floating utility, never a workspace destination.
+    const petToggle = nav.locator('[data-workspace-action="pet"]');
+    const pet = page.locator("body > [data-pet-companion]");
+    await petToggle.click();
+    await pet.waitFor();
+    await pet.locator("canvas").waitFor({ state: "attached" });
+    assert.equal(await view("chat").getAttribute("aria-current"), "page");
+    assert.equal(await petToggle.getAttribute("aria-pressed"), "true");
+    assert.equal(await input.getAttribute("data-instance"), "original");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    assert.equal(await page.locator('[data-workspace-page="pet"]').count(), 0);
+    assert.equal(await pet.evaluate(el => getComputedStyle(el).position), "fixed");
+    const petBox = await pet.boundingBox();
+    await pet.getByRole("button", { name: "移动桌宠", exact: true }).press("ArrowLeft");
+    assert.ok((await pet.boundingBox()).x < petBox.x);
+    await pet.getByRole("button", { name: "桌宠互动", exact: true }).click();
+    await pet.getByRole("button", { name: "打招呼", exact: true }).click();
+    await page.screenshot({ path: resolve(artifacts, "workspace-companion.png") });
+    await view("settings").click();
+    assert.equal(await pet.isVisible(), true, "the floating companion survives view switching");
+    await view("chat").click();
+    await petToggle.click();
+    assert.equal(await pet.count(), 0);
+    assert.equal(await petToggle.getAttribute("aria-pressed"), "false");
+    const after = await nav.locator("button").evaluateAll(elements => elements.map(el => ({ view: el.dataset.workspaceView ?? el.dataset.workspaceAction, y: el.getBoundingClientRect().y })));
+    assert.deepEqual(after, positions, "navigation positions are stable across views");
+    await toggleSidebar();
+    await checkEmbedded("system");
+    assert.equal(await nav.isVisible(), true, "navigation remains available with the project sidebar collapsed");
+    await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+    await page.screenshot({ path: resolve(artifacts, "workspace-dark.png") });
+    await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+    await toggleSidebar();
+    await view("home").click();
+    await page.locator(".home-view").waitFor();
+    assert.equal(await nav.locator("button").count(), 9);
+    await view("chat").click();
+    await page.waitForURL(`**/?session=${session.id}`);
+    await input.waitFor();
+    await view("branches").click();
+    await page.locator(".session-tree-session").filter({ hasText: other.name }).click();
+    await page.waitForURL(`**/?session=${other.id}`);
+    assert.equal(await view("chat").getAttribute("aria-current"), "page");
+    await view("branches").click();
+    await page.getByText("此会话没有分支", { exact: true }).waitFor();
+    await page.getByText("在对话中找到一条你的消息，选择“从此处编辑”并发送修改后的消息，即可创建新的会话分支。", { exact: true }).waitFor();
+    await page.screenshot({ path: resolve(artifacts, "workspace-branches-empty.png") });
+    await view("home").click();
+    await page.locator(".home-view").waitFor();
+    await page.waitForURL("**/?home=1");
+    await view("branches").click();
+    await page.waitForURL(`**/?session=${other.id}`);
+    await page.getByText("此会话没有分支", { exact: true }).waitFor();
+    assert.equal(await input.count(), 1, "opening a session inspector from Home remounts its conversation");
+    await view("chat").click();
+    await page.waitForURL(`**/?session=${other.id}`);
+    await petToggle.click();
+    await pet.waitFor();
+    const savedPosition = await page.evaluate(() => localStorage.getItem("pi-yun-pet-pos"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await pet.waitFor();
+    assert.equal(await petToggle.getAttribute("aria-pressed"), "true", "reload restores companion visibility");
+    assert.equal(await page.evaluate(() => localStorage.getItem("pi-yun-pet-pos")), savedPosition, "reload preserves the companion position");
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await frame.evaluate(el => getComputedStyle(el).borderTopLeftRadius), "0px", "mobile uses the full viewport");
+    await page.waitForFunction(() => {
+      const rect = document.querySelector("body > [data-pet-companion]")?.getBoundingClientRect();
+      return rect && rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
+    });
+    await pet.getByRole("button", { name: "桌宠互动", exact: true }).click();
+    await pet.getByRole("button", { name: "暂时隐藏", exact: true }).click();
+    assert.equal(await pet.count(), 0, "the floating menu can hide the companion on mobile");
+    await toggleSidebar();
+    await view("settings").click();
+    await settings.waitFor();
+    await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().right <= 1);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: resolve(artifacts, "workspace-mobile-settings.png") });
+    await settings.locator(".settings-dialog-close").click();
+    await page.locator("[data-mobile-toolbar-more]").click();
+    await page.locator("[data-mobile-toolbar-action=system]").click();
+    await page.locator("[data-workspace-page=system]").waitFor();
+    assert.equal(await page.locator("[data-mobile-toolbar-actions]").count(), 0);
+    await page.screenshot({ path: resolve(artifacts, "workspace-mobile-system.png") });
+    assert.equal(commands.some(type => type === "prompt" || type === "abort"), false);
+    assert.deepEqual(errors, []);
+    console.log("PASS: fixed navigation, embedded system/tools/history/settings/branches/agents, floating companion, left content/right directory and resizing, history paging, no popups, mounted chat and draft preservation, session switching, mobile width, no prompt/abort or browser errors.");
+  } catch (error) {
+    await page.screenshot({ path: resolve(artifacts, "workspace-failure.png") });
+    console.error({ url: page.url(), branchReads, branchTargets, errors,
+      views: await page.locator('[aria-current="page"]').evaluateAll(elements => elements.map(el => el.getAttribute("data-workspace-view"))) });
+    throw error;
+  } finally { await context.close(); }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const artifacts = resolve("test-results/workspace-views");
+  mkdirSync(artifacts, { recursive: true });
+  const browser = await chromium.launch({ headless: true, channel: process.env.E2E_BROWSER_CHANNEL || undefined });
+  try { await checkWorkspaceViews({ browser, base: process.env.E2E_BASE_URL || "http://127.0.0.1:30141", artifacts }); }
+  finally { await browser.close(); }
+}

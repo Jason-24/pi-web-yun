@@ -17,7 +17,7 @@ function handleSessionDeletedBody() {
 // Runs the actual callback in a vm sandbox. `capturedSelectedSession` models
 // the stale state the closure captured at the delete click; `active` is what
 // the render-synced ref holds when the DELETE finally completes.
-function runHandleSessionDeleted(capturedSelectedSession, active) {
+function runHandleSessionDeleted(capturedSelectedSession, active, initialPanel = null) {
   const state = {
     setSelectedSession: [],
     setNewSessionCwd: [],
@@ -25,6 +25,7 @@ function runHandleSessionDeleted(capturedSelectedSession, active) {
     sessionKey: 0,
     routerReplaced: null,
     refreshBumped: false,
+    panel: initialPanel,
   };
   const context = vm.createContext({
     crypto: globalThis.crypto,
@@ -47,7 +48,7 @@ function runHandleSessionDeleted(capturedSelectedSession, active) {
     setSystemPrompt() {},
     setSystemTools() {},
     setSystemInfoLoading() {},
-    setActiveTopPanel() {},
+    setActiveTopPanel(value) { state.panel = typeof value === "function" ? value(state.panel) : value; },
     useCallback: (callback) => callback,
   });
   vm.runInContext(stripTypeScriptTypes(`${handleSessionDeletedBody()}
@@ -77,4 +78,12 @@ test("a delete completing while the user is still on it falls back to the empty 
   assert.ok(state.newSessionDraftId);
   assert.equal(state.sessionKey, 1, "chat remounts as a fresh composer");
   assert.equal(state.routerReplaced, `?cwd=${encodeURIComponent("/project-a")}`);
+});
+
+test("deleting the conversation beneath the archive page keeps the archive open", () => {
+  const session = { id: "gone-session", cwd: "/project-a", projectKey: "/project-a" };
+  const state = runHandleSessionDeleted(session, session, "archive");
+  assert.equal(state.panel, "archive");
+  assert.deepEqual(state.setSelectedSession, [null]);
+  assert.equal(state.sessionKey, 1);
 });

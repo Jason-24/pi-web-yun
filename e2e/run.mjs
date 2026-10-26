@@ -18,6 +18,9 @@ import { checkModelContext } from "./model-context.mjs";
 import { checkFilesPlacement, showSidebarSessions } from "./sidebar.mjs";
 import { checkSessionNavigation } from "./session-navigation.mjs";
 import { checkProjectNavigation, createProjectNavigationFixtures } from "./project-navigation.mjs";
+import { checkWorkspaceViews } from "./workspace-views.mjs";
+import { checkArchiveWorkspace } from "./archive-workspace.mjs";
+import { checkChatMinimap } from "./chat-minimap.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -268,7 +271,7 @@ try {
     // The minimap numbers turns from the session's first, not the loaded page's (#791):
     // e0..e4949 hold 2475 user messages, so the turn asking text(4998) is 2500.
     const readMinimapTurn = async (screenshot) => {
-      const node = page.locator("[data-minimap-node-index='0']");
+      const node = page.locator("[data-minimap-node-index]").last();
       await node.waitFor();
       const rect = await node.boundingBox();
       assert.ok(rect);
@@ -489,8 +492,8 @@ try {
       await page.locator(".markdown-code-block pre").waitFor();
       await checkChatAppearance(page);
       await page.setViewportSize(viewport);
-      // Returning from the mobile breakpoint restores the desktop sidebar preference in an effect, so wait for the toggle to settle.
-      const hideSidebar = page.getByRole("button", { name: "Hide sidebar", exact: true });
+      // Returning from mobile restores the desktop preference; wait for its boundary or restore edge.
+      const hideSidebar = page.locator('[data-resize-handle="sidebar"]').or(page.getByRole("button", { name: "Hide sidebar", exact: true }));
       const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
       await hideSidebar.or(showSidebar).waitFor({ state: "visible" });
       if (await showSidebar.isVisible()) await showSidebar.click();
@@ -527,6 +530,9 @@ try {
     },
   });
   await checkProjectNavigation({ browser, base, artifacts, fixture: projectNavigation, otherSessionId: BRANCH, api, post });
+  await checkWorkspaceViews({ browser, base, artifacts });
+  await checkArchiveWorkspace({ browser, base, artifacts });
+  await checkChatMinimap({ browser, base, artifacts });
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

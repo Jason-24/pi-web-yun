@@ -927,7 +927,6 @@ const GroupRowView = memo(function GroupRowView({
       >
         {/* The chevron and folder identify the project; session titles
             below align with the project name. Icons are decorative. */}
-        <ChevronIcon size={12} strokeWidth={3} className={`session-tree-chevron${expanded ? " is-open" : ""}`} />
         <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
         {project.pinned && <PinIcon size={10} className="session-tree-group-pin" label={t("sidebar.pinnedProject")} />}
@@ -983,6 +982,24 @@ const PlainRowView = memo(function PlainRowView({
   const style = rowStyle(top, height);
 
   switch (row.kind) {
+    case "section":
+      return <div className="session-tree-row session-tree-section" style={style} data-row-key={row.key} role="heading" aria-level={2}>
+        {t(row.label === "projects" ? "sidebar.projects" : "sidebar.recents")}
+      </div>;
+    case "recent": {
+      const title = sessionRowTitle(row.family.root);
+      return <div className={`session-tree-row session-tree-recent${row.status.selected ? " is-selected" : ""}`} style={style} data-row-key={row.key}>
+        <a className="session-tree-main" href={sessionDeepLink(row.family.root.id)}
+          title={`${title} · ${row.project.name}`} aria-current={row.status.selected ? "page" : undefined}
+          onClick={(event) => {
+            if (!isPlainActivation(event)) return;
+            event.preventDefault(); handlers.current.onSelectFamily(row.family);
+          }}>
+          <span className="session-tree-title">{title}</span>
+          {(row.status.running || row.status.unread) && <ActivitySummary running={row.status.running ? 1 : 0} unread={row.status.unread ? 1 : 0} t={t} />}
+        </a>
+      </div>;
+    }
     case "pinned-header":
       return (
         <div className="session-tree-row session-tree-pinned-header" style={style} data-row-key={row.key}>

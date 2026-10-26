@@ -26,6 +26,8 @@
 ## Workbench settings entry points
 - AppShell has its primary Settings entry in the 52px rail at the far left on desktop (`app/navigation-rail.css`), available even when the session sidebar is collapsed. Models, Skills and the other categories remain in SettingsPanel's navigation; do not duplicate them as rail shortcuts. The entry opens the last available settings section, keeps its tooltip and accessible name, and stays active for any open settings section. Project requirements are checked inside SettingsPanel.
 - Phones render the same navigation once as a labelled row at the bottom of the session drawer; do not add a second set of interactive buttons. Desktop panel width limits reserve the rail's 52px.
-- Desktop session actions share the rail below a divider after Settings; these are conversation controls, not extra settings entries. Mobile session actions stay in the chat header/overflow menu, leaving only the single Settings entry in the drawer.
+- Desktop rail entries are fixed workspace destinations, plus a separate companion visibility toggle that never navigates away from the current view. Generate title stays beside the conversation title. Mobile session actions remain in the chat header/overflow and enter the same embedded views.
 
-- The PI-YUN application dropdown also links to the existing Settings dialog through the same shell setter; it adds no settings panel, category or persistence of its own.
+- The PI-YUN application dropdown links to the same embedded Settings page through the shell setter; it adds no category or persistence of its own.
+
+- AppShell mounts `SettingsPanel embedded` inside the central workspace, with `role="region"`, no modal backdrop/geometry and the existing section tabs. The default nonembedded component remains available to other callers. Escape and focus restoration still protect a running conversation, and nested trust/sign-in dialogs retain their stacking behavior. Leaving Settings through any rail entry refreshes the model catalogue, just as Close does. The project/session sidebar remains interactive.

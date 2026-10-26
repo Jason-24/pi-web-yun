@@ -8,6 +8,8 @@ import { useI18n } from "@/hooks/useI18n";
 import type { SessionInfo } from "@/lib/types";
 
 interface Props {
+  /** The main session's history reuses the same paged, read-only transcript. */
+  variant?: "subagent" | "history";
   sessionId: string;
   /** Label from the subagent tool call (`description || profile`), used until the session info loads. */
   fallbackLabel: string;
@@ -43,7 +45,7 @@ function toTranscript(page: Partial<SubagentTranscript>): SubagentTranscript {
  * subagent run. Entry-level granularity: pi appends each finished entry
  * synchronously, so a 2 s poll shows the run at message/tool-call resolution.
  */
-export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }: Props) {
+export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile, variant = "subagent" }: Props) {
   const { t, locale } = useI18n();
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [label, setLabel] = useState(fallbackLabel);
@@ -54,6 +56,7 @@ export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Session info on open, when the run starts or ends (the persisted status
@@ -107,6 +110,7 @@ export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }
         }
       } finally {
         inFlight = false;
+        if (!cancelled) setLoading(false);
       }
     };
     void load();
@@ -184,7 +188,7 @@ export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minWidth: 0 }}>
       <div
         style={{
-          display: "flex",
+          display: variant === "history" ? "none" : "flex",
           alignItems: "center",
           gap: 8,
           padding: "6px 12px",
@@ -236,13 +240,15 @@ export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }
         style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "10px 0" }}
         lang={locale}
       >
-        {notFound ? (
+        {variant === "history" && loading && messages.length === 0 ? (
+          <div className="workspace-empty" role="status" style={{ padding: "24px 16px" }}>{t("history.loading")}</div>
+        ) : notFound ? (
           <div style={{ padding: "24px 16px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>
-            {running ? t("subagent.viewer.starting") : t("subagent.viewer.error")}
+            {variant === "history" ? t("history.unavailable") : running ? t("subagent.viewer.starting") : t("subagent.viewer.error")}
           </div>
         ) : error && messages.length === 0 ? (
           <div role="alert" style={{ padding: "24px 16px", color: "#dc2626", fontSize: 12, textAlign: "center" }}>
-            {t("subagent.viewer.error")}
+            {t(variant === "history" ? "history.unavailable" : "subagent.viewer.error")}
             <div style={{ marginTop: 6, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{error}</div>
           </div>
         ) : (
@@ -277,7 +283,7 @@ export function SubagentViewer({ sessionId, fallbackLabel, running, onOpenFile }
             ))}
             {messages.length === 0 && !error && (
               <div style={{ padding: "24px 16px", color: "var(--text-dim)", fontSize: 12, textAlign: "center" }}>
-                {t("subagent.viewer.empty")}
+                {t(variant === "history" ? "history.empty" : "subagent.viewer.empty")}
               </div>
             )}
           </>

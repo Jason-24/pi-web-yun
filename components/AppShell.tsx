@@ -4,15 +4,21 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { CloseIcon, FolderIcon, HomeIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { CloseIcon, ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { useSidebarPeek } from "@/hooks/useSidebarPeek";
 import { ChatWindow } from "./ChatWindow";
+import { HomeView } from "./HomeView";
+import { ArchiveView } from "./ArchiveView";
+import type { ArchiveSnapshot } from "@/lib/session-archive";
+import { WorkspaceNavigation, WORKSPACE_VIEW_LABELS, type WorkspacePanel, type WorkspaceView } from "./WorkspaceNavigation";
+import { sessionDisplayTitle } from "@/lib/session-fork-name";
+import { listenForPanelEscape } from "@/lib/stacked-dialog";
 import { NewSessionContextBar, type NewSessionContextControl, type NewSessionContextBarHandle } from "./NewSessionContextBar";
-import { PetWidget } from "./PetWidget";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
 import { TabBar, type Tab } from "./TabBar";
 import { openFileTab, saveFileViewerState, saveParkedFileViewerState, switchFileWorkspace, type ParkedFileWorkspace } from "./file-tab-state";
-import { SettingsPanel, SettingsSectionIcon } from "./SettingsPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { ProjectTrustDialog, type ProjectTrustFailure } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
@@ -86,7 +92,6 @@ type AutoNameStatus =
   | { kind: "error"; message: string };
 
 const TOP_BAR_ICON_BUTTON_SIZE = 36;
-const AGENT_PANEL_WIDTH = 420;
 // pi's built-in tools that never change a file; any other tool may (#1144).
 const READ_ONLY_TOOL_NAMES = new Set(PRESET_READ_ONLY);
 const TOOL_END_REFRESH_MS = 1000;
@@ -105,6 +110,7 @@ export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [initialNavigation, setInitialNavigation] = useState(() => getInitialNavigation(searchParams));
+  const [homeOpen, setHomeOpen] = useState(() => !initialNavigation.sessionId && !initialNavigation.requestedCwd);
   // Keep the system-theme subscription mounted for the lifetime of the app.
   useTheme();
   // Restore fonts even when Settings and the chat composer have not been opened.
@@ -154,6 +160,12 @@ export function AppShell() {
   const selectedSessionRef = useRef(selectedSession);
   selectedSessionRef.current = selectedSession;
   const [sessionCatalog, setSessionCatalog] = useState<SessionInfo[]>([]);
+  const [archiveSnapshot, setArchiveSnapshot] = useState<ArchiveSnapshot>({ entries: [], loaded: false, error: null });
+  const [archiveProjectKey, setArchiveProjectKey] = useState<string | null>(null);
+  const homeSessions = useMemo(() => {
+    const archivedIds = new Set(archiveSnapshot.entries.map((entry) => entry.session.id));
+    return sessionCatalog.filter((session) => !archivedIds.has(session.id));
+  }, [archiveSnapshot.entries, sessionCatalog]);
   const handleSessionsChange = useCallback((sessions: SessionInfo[]) => {
     setSessionCatalog(sessions);
     // The sidebar hydrates metadata after the selected session has already
@@ -226,12 +238,19 @@ export function AppShell() {
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
+  const settingsWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (settingsWasOpenRef.current && !settingsSection) setModelsRefreshKey((key) => key + 1);
+    settingsWasOpenRef.current = settingsSection !== null;
+  }, [settingsSection]);
   const [projectTrust, setProjectTrust] = useState<ProjectTrustStatus | null>(null);
   const [projectTrustDialogOpen, setProjectTrustDialogOpen] = useState(false);
   const [projectTrustBusy, setProjectTrustBusy] = useState(false);
   const [projectTrustError, setProjectTrustError] = useState<ProjectTrustFailure | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => !initialNavigation.sidebarCollapsed);
   const desktopSidebarOpenRef = useRef(!initialNavigation.sidebarCollapsed);
+  const sidebarRestoreRef = useRef<HTMLButtonElement>(null);
+  const sidebarHomeRef = useRef<HTMLButtonElement>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const treeOnly = isWorkbenchDesktop && activeFileTabId === null;
@@ -256,7 +275,7 @@ export function AppShell() {
     () => typeof window === "undefined"
       ? SIDEBAR_MAX_WIDTH
       : getSidebarMaxWidth({
-        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 52 : 0),
+        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 62 : 0),
         rightPanelOpen: fileWorkspaceOpen,
         rightPanelWidth: treeOnly ? fileTreeWidthRef.current : rightPanelWidthRef.current,
       }),
@@ -266,7 +285,7 @@ export function AppShell() {
     () => typeof window === "undefined"
       ? RIGHT_PANEL_MAX_WIDTH
       : getRightPanelMaxWidth({
-        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 52 : 0),
+        viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 62 : 0),
         sidebarOpen,
         sidebarWidth: sidebarWidthRef.current,
       }),
@@ -280,6 +299,11 @@ export function AppShell() {
     growthDirection: "right",
     maxWidth: SIDEBAR_MAX_WIDTH,
     minWidth: SIDEBAR_MIN_WIDTH,
+    collapseAt: 120,
+    onCollapse: useCallback(() => {
+      desktopSidebarOpenRef.current = false;
+      setSidebarOpen(false);
+    }, []),
     storageKey: "pi-sidebar-width",
     widthRef: sidebarWidthRef,
   });
@@ -296,20 +320,22 @@ export function AppShell() {
     widthRef: rightPanelWidthRef,
   });
   const fileTreeResizer = useResizablePanel({
-    ariaLabel: translate("sidebar.resizeFiles"),
+    ariaLabel: translate("layout.resizeFileTree"),
     cssVariable: "--workbench-tree-width",
     defaultWidth: 320,
     minWidth: 200,
     maxWidth: 640,
     getMaxWidth: useCallback(() => Math.max(200, Math.min(640, treeOnly
-      ? window.innerWidth - sidebarWidthRef.current - 52 - 420
+      ? window.innerWidth - sidebarWidthRef.current - 62 - 420
       : rightPanelWidthRef.current - 280)), [treeOnly]),
-    growthDirection: treeOnly ? "left" : "right",
+    growthDirection: "left",
     persistClamp: false,
     storageKey: "pi-workbench-file-tree-width",
     widthRef: fileTreeWidthRef,
   });
   const fileTreePanelRef = fileTreeResizer.panelRef;
+  const sidebarPeek = useSidebarPeek(!isMobile && !sidebarOpen && !rightPanelFullWidth, sidebarResizer.panelRef, sidebarHomeRef);
+  const dismissSidebarPeek = sidebarPeek.dismiss;
   const filePanelRef = rightPanelResizer.panelRef;
   const attachFilePanel = useCallback((node: HTMLDivElement | null) => {
     filePanelRef.current = node;
@@ -353,8 +379,10 @@ export function AppShell() {
   }, []);
 
   const handleBranchLeafChange = useCallback((leafId: string | null) => {
-    branchLeafChangeFnRef.current?.(leafId);
-  }, []);
+    if (branchSwitchLocked || !branchLeafChangeFnRef.current) return;
+    branchLeafChangeFnRef.current(leafId);
+    setActiveTopPanel(null);
+  }, [branchSwitchLocked]);
 
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [systemTools, setSystemTools] = useState<ToolEntry[] | null>(null);
@@ -410,43 +438,46 @@ export function AppShell() {
     setContextUsage(usage);
   }, []);
 
-  // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | null>(null);
-  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number; above?: boolean } | null>(null);
+  // One embedded workspace view; the conversation stays mounted behind it.
+  const [activeTopPanel, setActiveTopPanel] = useState<WorkspacePanel | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const sessionStatsButtonRef = useRef<HTMLButtonElement>(null);
-  const sessionStatsPopoverRef = useRef<HTMLDivElement>(null);
+  const workspacePanelRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    if (activeTopPanel && !settingsSection) workspacePanelRef.current?.focus({ preventScroll: true });
+  }, [activeTopPanel, settingsSection]);
 
   useEffect(() => {
-    if (!sessionHasBranches) {
-      setActiveTopPanel((panel) => panel === "branches" ? null : panel);
-    }
-  }, [sessionHasBranches]);
+    if (!activeTopPanel || settingsSection) return;
+    return listenForPanelEscape(document, () => setActiveTopPanel(null));
+  }, [activeTopPanel, settingsSection]);
 
   useEffect(() => {
-    if (!hasSubagentSessions) {
-      setActiveTopPanel((panel) => panel === "agents" ? null : panel);
-    }
-  }, [hasSubagentSessions]);
+    if (!settingsSection) return;
+    setActiveTopPanel(null);
+    setMobileToolbarMoreOpen(false);
+    if (isMobile) setSidebarOpen(false);
+  }, [settingsSection, isMobile]);
 
   useEffect(() => {
     if (rightPanelFullWidth) setActiveTopPanel(null);
   }, [rightPanelFullWidth]);
 
   const toggleTopPanel = useCallback((
-    panel: "agents" | "branches" | "system" | "tools" | "session",
-    keepMobileToolbarOpen = false,
+    panel: WorkspacePanel,
   ) => {
     if (isMobile) setSidebarOpen(false);
+    setSettingsSection(null);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
-    if (isMobile && isNarrowMobile && keepMobileToolbarOpen) setMobileToolbarMoreOpen(true);
-  }, [isMobile, isNarrowMobile]);
+    setMobileToolbarMoreOpen(false);
+  }, [isMobile]);
 
   const handleSystemInfoToggle = useCallback((
     panel: "system" | "tools",
-    keepMobileToolbarOpen = false,
   ) => {
     const opening = activeTopPanel !== panel;
-    toggleTopPanel(panel, keepMobileToolbarOpen);
+    toggleTopPanel(panel);
     if (!opening || systemInfoLoading) return;
 
     const load = systemInfoLoaderRef.current;
@@ -470,12 +501,13 @@ export function AppShell() {
 
   // The composer opens Settings too: a bare /mcp opens Settings › MCP (useAgentSession).
   const openSettingsSection = useCallback((section: SettingsSection) => {
+    dismissSidebarPeek();
     setSettingsSection(section);
-  }, []);
+  }, [dismissSidebarPeek]);
 
   const handleSidebarToggle = useCallback(() => {
+    dismissSidebarPeek();
     if (isMobile) {
-      setActiveTopPanel(null);
       setMobileToolbarMoreOpen(false);
     }
     setSidebarOpen((open) => {
@@ -483,7 +515,7 @@ export function AppShell() {
       if (!isMobile) desktopSidebarOpenRef.current = next;
       return next;
     });
-  }, [isMobile]);
+  }, [dismissSidebarPeek, isMobile]);
 
   const handleMobileToolbarMoreToggle = useCallback(() => {
     setSidebarOpen(false);
@@ -537,67 +569,6 @@ export function AppShell() {
   useEffect(() => {
     setMobileToolbarMoreOpen(false);
   }, [isMobile, isNarrowMobile, selectedSession?.id, newSessionDraftId]);
-
-  useEffect(() => {
-    if (!activeTopPanel || !topBarRef.current) return;
-    const update = () => {
-      const topBarRect = topBarRef.current!.getBoundingClientRect();
-      if (activeTopPanel === "session" && !isMobile && sessionStatsButtonRef.current) {
-        const button = sessionStatsButtonRef.current;
-        const anchor = button.closest(".chat-composer-card") ?? button;
-        const rect = anchor.getBoundingClientRect();
-        const width = Math.max(0, Math.min(600, topBarRect.width - 24));
-        setTopPanelPos({
-          top: Math.max(12, rect.top - 8),
-          left: Math.max(topBarRect.left + 12, Math.min(rect.left + (rect.width - width) / 2, topBarRect.right - width - 12)),
-          width,
-          above: true,
-        });
-        return;
-      }
-      if (activeTopPanel === "agents") {
-        setTopPanelPos({
-          top: topBarRect.bottom,
-          left: topBarRect.left,
-          width: Math.min(AGENT_PANEL_WIDTH, topBarRect.width),
-        });
-        return;
-      }
-      setTopPanelPos({ top: topBarRect.bottom, left: topBarRect.left, width: topBarRect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(topBarRef.current);
-    const composer = sessionStatsButtonRef.current?.closest(".chat-composer-card");
-    if (composer) ro.observe(composer);
-    window.addEventListener("resize", update);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", update);
-    };
-  }, [activeTopPanel, isMobile]);
-
-  useEffect(() => {
-    if (activeTopPanel !== "session" || isMobile) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (sessionStatsButtonRef.current?.contains(target) || sessionStatsPopoverRef.current?.contains(target)) return;
-      setActiveTopPanel(null);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setActiveTopPanel(null);
-      sessionStatsButtonRef.current?.focus({ preventScroll: true });
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [activeTopPanel, isMobile]);
 
   // Files unmount when inactive; workspace terminals stay mounted until closed.
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
@@ -755,6 +726,7 @@ export function AppShell() {
     if (!requestedCwd) return;
 
     const controller = new AbortController();
+    const restoreToken = workspaceRestoreTokenRef.current;
     setInitialCwdStatus("validating");
     setInitialCwdError(null);
 
@@ -769,6 +741,7 @@ export function AppShell() {
         if (!response.ok || !data.cwd) {
           throw new Error(data.error ?? `HTTP ${response.status}`);
         }
+        if (controller.signal.aborted || restoreToken !== workspaceRestoreTokenRef.current) return;
 
         // The sidebar will notify us when it adopts this cwd. Avoid remounting
         // the just-created empty chat during that initial synchronization.
@@ -777,13 +750,14 @@ export function AppShell() {
         setNewSessionDraftId(draftId);
         activeNewSessionDraftKeyRef.current = `new:${draftId}:${data.cwd}`;
         setNewSessionCwd(data.cwd);
+        setHomeOpen(false);
         setInitialCwdStatus("ready");
         if (!new URLSearchParams(window.location.search).get("cwd")) {
           router.replace(`?cwd=${encodeURIComponent(data.cwd)}`, { scroll: false });
         }
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || restoreToken !== workspaceRestoreTokenRef.current) return;
         setInitialCwdError(error instanceof Error ? error.message : String(error));
         setInitialCwdStatus("error");
       });
@@ -912,12 +886,16 @@ export function AppShell() {
       changeFileWorkspace(currentProject, newProject);
       // Restore the workspace we switched to: its last open session, or keep
       // the default welcome page when none is remembered.
-      if (!skipWorkspaceRestore) restoreWorkspaceContext(newProject, cwd);
+      if (!homeOpen && !skipWorkspaceRestore) restoreWorkspaceContext(newProject, cwd);
     }
-    router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
-  }, [activeCwd, changeFileWorkspace, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
+    if (!homeOpen) router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
+  }, [activeCwd, changeFileWorkspace, homeOpen, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => {
+    if (!isRestore) dismissSidebarPeek();
+    setHomeOpen(false);
+    setActiveTopPanel(null);
+    setSettingsSection(null);
     setSearchTarget(entryId ? { sessionId: session.id, entryId, blockIndex } : null);
     invalidateWorkspaceRestore();
     const activeDraftKey = activeNewSessionDraftKeyRef.current;
@@ -937,7 +915,7 @@ export function AppShell() {
     // re-run the full load/positioning cycle. Only skip when the effective
     // cwd context already matches — otherwise a pending cwd move still needs
     // the full re-select flow.
-    if (!isRestore && selectedSession) {
+    if (!isRestore && !homeOpen && selectedSession) {
       const sameProject =
         workspaceKeyOf(selectedSession) === workspaceKeyOf(session);
       if (selectedSession.id === session.id && sameProject) {
@@ -971,9 +949,12 @@ export function AppShell() {
     if (!isRestore || new URLSearchParams(window.location.search).get("session") !== session.id) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [activeCwd, changeFileWorkspace, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession]);
+  }, [activeCwd, changeFileWorkspace, dismissSidebarPeek, homeOpen, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession]);
 
   const handleNewSession = useCallback((sessionId: string, cwd: string, projectKey?: string | null, options?: NewSessionOptions) => {
+    dismissSidebarPeek();
+    setHomeOpen(false);
+    setSettingsSection(null);
     invalidateWorkspaceRestore();
     const draftKey = `new:${sessionId}:${cwd}`;
     // Leaving a fresh composer for another cwd parks its draft there, as a
@@ -1015,7 +996,7 @@ export function AppShell() {
     setActiveTopPanel(null);
     if (isMobile) setSidebarOpen(false);
     router.replace(`?cwd=${encodeURIComponent(cwd)}`, { scroll: false });
-  }, [activeCwd, changeFileWorkspace, invalidateWorkspaceRestore, isMobile, newSessionCwd, router, selectedSession]);
+  }, [activeCwd, changeFileWorkspace, dismissSidebarPeek, invalidateWorkspaceRestore, isMobile, newSessionCwd, router, selectedSession]);
 
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
   useGlobalKeyboardShortcuts({
@@ -1240,7 +1221,7 @@ export function AppShell() {
       setSystemPrompt(null);
       setSystemTools(null);
       setSystemInfoLoading(false);
-      setActiveTopPanel(null);
+      setActiveTopPanel((panel) => panel === "archive" ? panel : null);
       router.replace(cwd ? `?cwd=${encodeURIComponent(cwd)}` : (typeof window !== "undefined" ? window.location.pathname : "/"), { scroll: false });
     }
   }, [invalidateWorkspaceRestore, router]);
@@ -1343,12 +1324,11 @@ export function AppShell() {
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
-    window.open(
-      `/api/sessions/${encodeURIComponent(selectedSession.id)}/export?inline=1`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }, [selectedSession]);
+    setSettingsSection(null);
+    setActiveTopPanel("history");
+    setMobileToolbarMoreOpen(false);
+    if (isMobile) setSidebarOpen(false);
+  }, [selectedSession, isMobile]);
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
   const effectiveNewSessionCwd = newSessionCwd ?? (selectedSession === null && activeCwd ? activeCwd : null);
@@ -1356,8 +1336,8 @@ export function AppShell() {
     ? `new:${newSessionDraftId}:${effectiveNewSessionCwd}`
     : null;
   useLayoutEffect(() => {
-    activeNewSessionDraftKeyRef.current = newSessionDraftKey;
-  }, [newSessionDraftKey]);
+    activeNewSessionDraftKeyRef.current = homeOpen ? null : newSessionDraftKey;
+  }, [homeOpen, newSessionDraftKey]);
 
   // The bar above a fresh composer. Only a fresh composer moves, and only
   // somewhere else: the folder in use would remount it for nothing. The
@@ -1411,7 +1391,7 @@ export function AppShell() {
       onCreateWorktree={handleCreateNewSessionWorktree}
     />
   ) : null;
-  const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
+  const showChat = !homeOpen && (selectedSession !== null || effectiveNewSessionCwd !== null);
   const projectTrustCwd = selectedSession?.cwd ?? effectiveNewSessionCwd;
   // While restoring initial session from URL, don't show the placeholder
   const showPlaceholder = initialSessionRestored && !showChat;
@@ -1497,31 +1477,72 @@ export function AppShell() {
     return () => observer.disconnect();
   }, [windowTitle]);
 
-  const settingsNavigation = (
-    <nav className={`workbench-settings-navigation${isMobile ? " is-mobile" : ""}`} aria-label={translate("common.settings")} inert={rightPanelFullWidth}>
-      {!isMobile && <button type="button" className="workbench-home-button" title={translate("navigation.home")} aria-label={translate("navigation.home")}
-        aria-current={selectedSession === null && showChat ? "page" : undefined} onClick={() => {
-          if (selectedSession && activeCwd) sidebarControlRef.current?.startNewSessionIn({ cwd: activeCwd });
-          else if (!showChat) sidebarControlRef.current?.openFolderForNewSession((target) => sidebarControlRef.current?.startNewSessionIn(target), null);
-          else chatInputRef.current?.focus();
-        }}><HomeIcon size={18} /></button>}
-      <button type="button" onClick={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))} title={translate("common.settings")} aria-label={translate("common.settings")} aria-pressed={Boolean(settingsSection)}>
-        <SettingsSectionIcon section="general" size={19} strokeWidth={1.7} />
-        <span className="workbench-settings-label">{translate("common.settings")}</span>
-      </button>
-      {!isMobile && showChat && <>
-        <div className="workbench-rail-divider" role="separator" />
-        {renderChatToolbarActions(false, true)}
-      </>}
-      <PetWidget />
-    </nav>
-  );
+  const currentView: WorkspaceView = settingsSection ? "settings" : activeTopPanel ?? (homeOpen ? "home" : "chat");
+  const openArchiveWorkspace = useCallback((projectKey?: string) => {
+    dismissSidebarPeek();
+    setSettingsSection(null);
+    setActiveTopPanel("archive");
+    setArchiveProjectKey(projectKey ?? null);
+    setMobileToolbarMoreOpen(false);
+    if (isMobile) setSidebarOpen(false);
+  }, [dismissSidebarPeek, isMobile]);
+  const navigateWorkspace = (view: WorkspaceView) => {
+    dismissSidebarPeek();
+    if (view === "home") {
+      invalidateWorkspaceRestore();
+      const draftKey = activeNewSessionDraftKeyRef.current;
+      if (draftKey && effectiveNewSessionCwd) {
+        const parkedKey = parkedNewSessionDraftKey(effectiveNewSessionCwd);
+        if (chatInputRef.current) chatInputRef.current.rekeyDraft(draftKey, parkedKey);
+        else rekeyDraft(draftKey, parkedKey);
+      }
+      activeNewSessionDraftKeyRef.current = null;
+      setHomeOpen(true);
+      setSettingsSection(null);
+      setActiveTopPanel(null);
+      setRightPanelOpen(false);
+      if (isMobile) setSidebarOpen(false);
+      router.replace("?home=1", { scroll: false });
+      return;
+    }
+    if (view === "settings") {
+      setSettingsSection(getLastSettingsSection(projectTrustCwd));
+      return;
+    }
+    setSettingsSection(null);
+    if (view === "chat") {
+      if (!selectedSession && newSessionDraftKey && effectiveNewSessionCwd && !getDraft(newSessionDraftKey)) {
+        rekeyDraft(parkedNewSessionDraftKey(effectiveNewSessionCwd), newSessionDraftKey);
+      }
+      setHomeOpen(false);
+      setActiveTopPanel(null);
+      if (selectedSession) router.replace(`?session=${encodeURIComponent(selectedSession.id)}`, { scroll: false });
+      else if (effectiveNewSessionCwd) router.replace(`?cwd=${encodeURIComponent(effectiveNewSessionCwd)}`, { scroll: false });
+    } else if (view === "system" || view === "tools") {
+      if (activeTopPanel !== view) handleSystemInfoToggle(view);
+    } else {
+      if (view !== "archive") {
+        setHomeOpen(false);
+        if (homeOpen && selectedSession) router.replace(`?session=${encodeURIComponent(selectedSession.id)}`, { scroll: false });
+      }
+      setActiveTopPanel(view);
+    }
+    setMobileToolbarMoreOpen(false);
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  const settingsNavigation = <WorkspaceNavigation activeView={currentView}
+    conversationAvailable={Boolean(selectedSession || effectiveNewSessionCwd)} inspectionAvailable={showChat} sessionAvailable={Boolean(selectedSession)} mobile={isMobile}
+    covered={rightPanelFullWidth} homeButtonRef={sidebarHomeRef} onHomeHover={sidebarPeek.show} onHomeLeave={sidebarPeek.scheduleHide} onNavigate={navigateWorkspace} />;
 
   const sidebarContent = (
     <>
       <SessionSidebar
+        onOpenArchive={openArchiveWorkspace}
+        archiveActive={currentView === "archive"}
+        onArchiveStateChange={setArchiveSnapshot}
         fileExplorerTarget={isWorkbenchDesktop ? fileExplorerDock : null}
-        selectedSessionId={selectedSession?.id ?? null}
+        selectedSessionId={homeOpen ? null : selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
         onOpenSettings={() => setSettingsSection(getLastSettingsSection(projectTrustCwd))}
@@ -1615,7 +1636,6 @@ export function AppShell() {
           type="button"
           onClick={() => {
             handleViewFullHistory();
-            if (mobile && isNarrowMobile) setMobileToolbarMoreOpen(true);
           }}
           disabled={!selectedSession}
           title={selectedSession ? translate("history.full") : translate("history.unsaved")}
@@ -1753,7 +1773,7 @@ export function AppShell() {
         {hasSubagentSessions && (
           <button
             type="button"
-            onClick={() => toggleTopPanel("agents", mobile)}
+            onClick={() => toggleTopPanel("agents")}
             title={translate("agentSwitcher.title")}
             aria-label={translate("agentSwitcher.title")}
             aria-pressed={activeTopPanel === "agents"}
@@ -1789,10 +1809,10 @@ export function AppShell() {
             </span>
           </button>
         )}
-        {sessionHasBranches && (iconOnly ? (
+        {sessionHasBranches && (
           <button
             type="button"
-            onClick={() => toggleTopPanel("branches", mobile)}
+            onClick={() => toggleTopPanel("branches")}
             title={translate("i18n.branches")}
             aria-label={translate("i18n.branches")}
             aria-pressed={activeTopPanel === "branches"}
@@ -1815,23 +1835,11 @@ export function AppShell() {
               <path d="M18 9a9 9 0 0 1-9 9" />
             </svg>
           </button>
-        ) : (
-          <BranchNavigator
-            tree={branchTree}
-            activeLeafId={branchActiveLeafId}
-            onLeafChange={handleBranchLeafChange}
-            locked={branchSwitchLocked}
-            inline
-            containerRef={topBarRef}
-            open={activeTopPanel === "branches"}
-            onToggle={() => toggleTopPanel("branches")}
-            hasSession
-          />
-        ))}
+        )}
         <button
           ref={systemBtnRef}
           type="button"
-          onClick={() => handleSystemInfoToggle("system", mobile)}
+          onClick={() => handleSystemInfoToggle("system")}
           disabled={mobile && !showChat}
           title={translate("system.prompt")}
           aria-label={translate("system.prompt")}
@@ -1868,7 +1876,7 @@ export function AppShell() {
         </button>
         <button
           type="button"
-          onClick={() => handleSystemInfoToggle("tools", mobile)}
+          onClick={() => handleSystemInfoToggle("tools")}
           disabled={mobile && !showChat}
           title={translate("tools.title")}
           aria-label={translate("tools.title")}
@@ -1957,7 +1965,7 @@ export function AppShell() {
         aria-pressed={activeTopPanel === "session"}
         aria-hidden={covered ? true : undefined}
         className={mobile ? "mobile-session-stats" : "composer-session-stats"}
-        aria-controls="session-stats-panel"
+        aria-controls="workspace-usage-page"
         aria-expanded={activeTopPanel === "session"}
         data-mobile-toolbar-stats={mobile ? "true" : undefined}
         style={{
@@ -2093,65 +2101,6 @@ export function AppShell() {
   return (
     <>
     <style>{`
-      @keyframes session-info-pop {
-        0% {
-          opacity: 0;
-          transform: translateY(-24px);
-          filter: blur(6px);
-          box-shadow: 0 2px 8px rgba(0,0,0,0);
-        }
-        55% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel));
-          box-shadow: 0 18px 44px rgba(37,99,235,0.16);
-        }
-        100% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: var(--bg-panel);
-          box-shadow: 0 10px 28px rgba(0,0,0,0.10);
-        }
-      }
-      @keyframes session-info-light-wash {
-        0% {
-          opacity: 0;
-          transform: translateX(-110%) skewX(-16deg);
-        }
-        24% {
-          opacity: 0.42;
-        }
-        100% {
-          opacity: 0;
-          transform: translateX(115%) skewX(-16deg);
-        }
-      }
-      .session-info-popover {
-        position: relative;
-        overflow: hidden;
-        transform-origin: top right;
-        animation: session-info-pop 360ms ease-out both;
-        will-change: transform, opacity, filter, background, box-shadow;
-      }
-      .session-info-popover::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 44%;
-        pointer-events: none;
-        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 24%, transparent), transparent);
-        animation: session-info-light-wash 620ms ease-out both;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .session-info-popover,
-        .session-info-popover::after {
-          animation: none;
-        }
-      }
       .mobile-session-stats {
         container-type: inline-size;
       }
@@ -2186,6 +2135,7 @@ export function AppShell() {
       background: "var(--bg)",
     }}>
       {!isMobile && settingsNavigation}
+      <div className="workspace-frame">
       {/* Mobile overlay backdrop */}
       <div
         className={`sidebar-overlay-backdrop${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
@@ -2205,8 +2155,12 @@ export function AppShell() {
       <div
         ref={sidebarResizer.panelRef}
         id="session-sidebar"
-        inert={rightPanelFullWidth}
-        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`}
+        inert={rightPanelFullWidth || (!isMobile && !sidebarOpen && !sidebarPeek.open)}
+        data-sidebar-peek={sidebarPeek.open ? "" : undefined}
+        onPointerEnter={sidebarPeek.cancel}
+        onPointerLeave={sidebarPeek.scheduleHide}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) sidebarPeek.scheduleHide(); }}
+        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${sidebarPeek.open ? " is-peeking" : ""}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`}
         style={{
           "--sidebar-width": `${sidebarResizer.width}px`,
           background: "var(--bg-panel)",
@@ -2216,28 +2170,45 @@ export function AppShell() {
           flexShrink: 0,
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
-          zIndex: 200,
+          zIndex: sidebarPeek.open ? 230 : 200,
         } as React.CSSProperties}
       >
         {sidebarContent}
       </div>
-      {sidebarOpen && (
+      {!isMobile && sidebarOpen && (
         <div
           {...sidebarResizer.separatorProps}
+          onDoubleClick={handleSidebarToggle}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault(); handleSidebarToggle();
+            } else sidebarResizer.separatorProps.onKeyDown(event);
+          }}
           inert={rightPanelFullWidth}
           aria-controls="session-sidebar"
           className={`panel-resize-handle sidebar-resize-handle${sidebarResizer.isResizing ? " is-resizing" : ""}`}
           data-resize-handle="sidebar"
-          title={`${translate("layout.resizeSidebar")}: ${translate("layout.resizeHint")}`}
+          title={translate("sidebar.resizeAndCollapseHint")}
         />
       )}
+      {!isMobile && !sidebarOpen && <button ref={sidebarRestoreRef} type="button" className="sidebar-edge-restore"
+        data-sidebar-restore="" inert={rightPanelFullWidth} aria-label={translate("sidebar.show")}
+        title={translate("sidebar.show")} aria-controls="session-sidebar" aria-expanded={false}
+        onClick={handleSidebarToggle} />}
 
       {/* Center: chat */}
-      <div inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        {/* Top bar with sidebar toggle */}
+      <div className="workspace-conversation" inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+        {/* Conversation title and mobile drawer toggle */}
         <div ref={topBarRef} className="workspace-chat-header" style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
-          <button
+          {!isMobile && !sidebarOpen && <button type="button" className="workspace-new-session" data-collapsed-new-chat=""
+            title={translate("sidebar.newChat")} aria-label={translate("sidebar.newChat")}
+            onClick={(event) => {
+              dismissSidebarPeek();
+              if (activeCwd) sidebarControlRef.current?.startNewSessionIn({ cwd: activeCwd });
+              else sidebarControlRef.current?.openFolderForNewSession((target) => sidebarControlRef.current?.startNewSessionIn(target), event.currentTarget);
+            }}><ComposeIcon size={16} /></button>}
+          {isMobile ? <button
             type="button"
             onClick={handleSidebarToggle}
             className="workspace-sidebar-toggle"
@@ -2255,7 +2226,17 @@ export function AppShell() {
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             <SidebarToggleIcon size={18} open={sidebarOpen} />
-          </button>
+          </button> : <span className="workspace-title-folder" aria-hidden="true"><FolderIcon size={17} /></span>}
+          <div className="workspace-location" data-view={currentView}>
+            <span>{translate(WORKSPACE_VIEW_LABELS[currentView])}</span>
+            {selectedSession && <strong title={sessionDisplayTitle(selectedSession)}>{sessionDisplayTitle(selectedSession)}</strong>}
+          </div>
+          {!isMobile && currentView === "chat" && selectedSession && <button type="button" className="workspace-title-action"
+            onClick={() => void handleAutoName()} disabled={selectedSession.transient || autoNameStatus.kind === "naming" || !((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0)}
+            title={autoNameStatus.kind === "error" ? autoNameStatus.message : translate("title.generateSession")}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4ZM20 2v4m-2-2h4" /></svg>
+            <span>{translate(autoNameStatus.kind === "naming" ? "title.generating" : autoNameStatus.kind === "success" ? "title.updated" : autoNameStatus.kind === "error" ? "title.failed" : "title.generate")}</span>
+          </button>}
           {isMobile && (
             <div
               ref={mobileToolbarRef}
@@ -2269,7 +2250,8 @@ export function AppShell() {
                 height: "100%",
               }}
             >
-              {isNarrowMobile && (
+              {currentView !== "chat" && <span className="workspace-mobile-location">{translate(WORKSPACE_VIEW_LABELS[currentView])}</span>}
+              {isNarrowMobile && currentView === "chat" && (
                 <button
                   type="button"
                   onClick={handleMobileToolbarMoreToggle}
@@ -2300,10 +2282,10 @@ export function AppShell() {
                   )}
                 </button>
               )}
-              {!isNarrowMobile && renderChatToolbarActions(true)}
-              {renderSessionStatsButton(true)}
+              {!isNarrowMobile && currentView === "chat" && renderChatToolbarActions(true)}
+              {currentView === "chat" && renderSessionStatsButton(true)}
               {renderMainFileToggle(true)}
-              {isNarrowMobile && mobileToolbarMoreOpen && (
+              {isNarrowMobile && currentView === "chat" && mobileToolbarMoreOpen && (
                 <div
                   id="mobile-toolbar-actions"
                   role="toolbar"
@@ -2334,39 +2316,56 @@ export function AppShell() {
             </>
           )}
           {!isMobile && renderMainFileToggle(false)}
-          {sessionHasBranches && (
-            <BranchNavigator
-              tree={branchTree}
-              activeLeafId={branchActiveLeafId}
-              onLeafChange={handleBranchLeafChange}
-              locked={branchSwitchLocked}
-              inline
-              compact
-              containerRef={topBarRef}
-              open={activeTopPanel === "branches"}
-              onToggle={() => toggleTopPanel("branches")}
-              hasSession={showChat}
-              hideInlineButton
+
+
+        </div>
+        {isMobile && renderProjectTrustWarning(true)}
+        </div>
+
+        {/* Embedded views share the conversation workspace. */}
+        <div className="workspace-content" style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+          {settingsSection && (
+            <SettingsPanel embedded
+              cwd={projectTrustCwd}
+              sessionId={selectedSession?.id ?? null}
+              initialSection={settingsSection}
+              quoteSelectionEnabled={quoteSelectionEnabled}
+              onQuoteSelectionChange={handleQuoteSelectionChange}
+              onClose={() => {
+                setSettingsSection(null);
+              }}
+              onSessionReloaded={() => setSessionKey((key) => key + 1)}
+              projectTrust={projectTrust}
+              onOpenTrustDialog={openProjectTrustDialog}
+              onProjectTrustChanged={handleProjectTrustChanged}
             />
           )}
-          {/* Top panel dropdown — shared, only one active at a time */}
-          {activeTopPanel && topPanelPos && (
-            <div
-              ref={activeTopPanel === "session" ? sessionStatsPopoverRef : undefined}
-              id={activeTopPanel === "session" ? "session-stats-panel" : undefined}
-              className={topPanelPos.above ? "composer-session-popover" : undefined}
-              role={activeTopPanel === "session" ? "region" : undefined}
-              aria-label={activeTopPanel === "session" ? translate("session.title") : undefined}
-              style={{
-              position: "fixed",
-              top: topPanelPos.top,
-              left: topPanelPos.left,
-              width: topPanelPos.width,
-              maxHeight: topPanelPos.above ? Math.max(0, topPanelPos.top - 12) : `calc(100dvh - ${topPanelPos.top}px)`,
-              transform: topPanelPos.above ? "translateY(-100%)" : undefined,
-              overflowY: "auto",
-              zIndex: 500,
-            }}>
+          {activeTopPanel && !settingsSection && <section className="workspace-page" ref={workspacePanelRef} tabIndex={-1}
+            id={activeTopPanel === "session" ? "workspace-usage-page" : undefined}
+            data-workspace-page={activeTopPanel} aria-label={translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}>
+            <header className="workspace-page-header">
+              <div><h1>{translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}</h1>
+                <p>{activeTopPanel === "archive" ? translate("archive.subtitle") : selectedSession ? sessionDisplayTitle(selectedSession) : activeCwdName}</p>
+              </div>
+              {activeTopPanel === "history" && selectedSession && <>
+                <button type="button" className="workspace-page-back" onClick={() => setHistoryRefreshKey((key) => key + 1)}>{translate("i18n.refresh")}</button>
+                <a className="workspace-page-export" href={"api/sessions/" + encodeURIComponent(selectedSession.id) + "/export"} download>{translate("navigation.exportHistory")}</a>
+              </>}
+              <button type="button" className="workspace-page-back" onClick={() => setActiveTopPanel(null)}>
+                {translate(homeOpen ? "navigation.backHome" : "navigation.backChat")}
+              </button>
+            </header>
+            <div className="workspace-page-content">
+              {activeTopPanel === "archive" && <ArchiveView snapshot={archiveSnapshot} projectKey={archiveProjectKey}
+                onProjectChange={setArchiveProjectKey} onSelectSession={handleSelectSession}
+                onRestore={(sessionId) => sidebarControlRef.current?.restoreArchivedSession(sessionId) ?? Promise.resolve(false)}
+                onDelete={(sessionId) => sidebarControlRef.current?.deleteArchivedSession(sessionId) ?? Promise.resolve(false)}
+                onRefresh={() => { void sidebarControlRef.current?.refreshArchive(); }} />}
+              {activeTopPanel === "history" && selectedSession && <SubagentViewer key={`${selectedSession.id}:${historyRefreshKey}`} variant="history"
+                sessionId={selectedSession.id} fallbackLabel={sessionDisplayTitle(selectedSession)}
+                running={runningSessionIds.has(selectedSession.id)} onOpenFile={handleOpenLinkedFile} />}
+              {activeTopPanel === "branches" && <BranchNavigator embedded tree={branchTree} activeLeafId={branchActiveLeafId}
+                onLeafChange={handleBranchLeafChange} locked={branchSwitchLocked} hasSession={Boolean(selectedSession)} />}
               {activeTopPanel === "agents" && activeSessionFamily && selectedSession && (
                 <AgentSessionPanel
                   rootSession={activeSessionFamily.root}
@@ -2393,7 +2392,7 @@ export function AppShell() {
                 />
               )}
               {activeTopPanel === "session" && (
-                <div className="session-info-popover" style={{
+                <div className="session-info-page" style={{
                   background: "var(--bg-panel)",
                   borderBottom: "1px solid var(--border)",
                   boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
@@ -2429,7 +2428,7 @@ export function AppShell() {
                     ];
                     const ctx = contextUsage ?? sessionStats.contextUsage;
                     const extraTokenRows = [
-                       ...(sessionStats.cost > 0 ? [[translate("session.cost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
+                       ...(sessionStats.cost > 0 ? [[translate("session.cost"), `${sessionStats.cost.toFixed(4)}`]] : []),
                        ...(ctx?.contextWindow ? [[translate("session.context"), `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompactCount(ctx.contextWindow)}`]] : []),
                        // Cache hit rate = cache reads / (input + cache writes + cache reads) — the denominator covers all input-class tokens.
                        ...(sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite > 0 && sessionStats.tokens.cacheRead + sessionStats.tokens.cacheWrite + sessionStats.tokens.input > 0
@@ -2588,15 +2587,22 @@ export function AppShell() {
                 </div>
               )}
             </div>
-          )}
-
-        </div>
-        {isMobile && renderProjectTrustWarning(true)}
-        </div>
-
-        {/* Chat content */}
-        <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-          {showChat ? (
+          </section>}
+          <div className={"workspace-chat-view" + (activeTopPanel || settingsSection ? " is-covered" : "")}
+            inert={Boolean(activeTopPanel || settingsSection)} aria-hidden={activeTopPanel || settingsSection ? true : undefined}>
+          {homeOpen ? (
+            <HomeView
+              sessions={homeSessions}
+              runningSessionIds={runningSessionIds}
+              cwd={activeCwd}
+              onSelectSession={handleSelectSession}
+              onNewSession={() => {
+                if (activeCwd) sidebarControlRef.current?.startNewSessionIn({ cwd: activeCwd });
+                else sidebarControlRef.current?.openFolderForNewSession((target) => sidebarControlRef.current?.startNewSessionIn(target), null);
+              }}
+              onOpenProject={() => sidebarControlRef.current?.openFolderForNewSession((target) => sidebarControlRef.current?.startNewSessionIn(target), null)}
+            />
+          ) : showChat ? (
             <ChatWindow
               key={sessionKey}
               session={selectedSession}
@@ -2682,6 +2688,7 @@ export function AppShell() {
               </div>
             )
           ) : null}
+          </div>
         </div>
       </div>
 
@@ -2769,8 +2776,6 @@ export function AppShell() {
         </div>
 
         <div className="workbench-files-body">
-        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" />
-        <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
         <div className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {activeFileTab?.filePath ? (
@@ -2826,26 +2831,13 @@ export function AppShell() {
             />
           )}
         </div>
+        <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
+        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" />
         </div>
       </div>
+      </div>
     </div>
-    {settingsSection && (
-      <SettingsPanel
-        cwd={projectTrustCwd}
-        sessionId={selectedSession?.id ?? null}
-        initialSection={settingsSection}
-        quoteSelectionEnabled={quoteSelectionEnabled}
-        onQuoteSelectionChange={handleQuoteSelectionChange}
-        onClose={() => {
-          setSettingsSection(null);
-          setModelsRefreshKey((key) => key + 1);
-        }}
-        onSessionReloaded={() => setSessionKey((key) => key + 1)}
-        projectTrust={projectTrust}
-        onOpenTrustDialog={openProjectTrustDialog}
-        onProjectTrustChanged={handleProjectTrustChanged}
-      />
-    )}
+
     {/* After Settings, so it opens above it (z-index 1100 over 1000) when Settings › MCP asks for it. */}
     {projectTrustDialogOpen && projectTrustCwd && (
       <ProjectTrustDialog

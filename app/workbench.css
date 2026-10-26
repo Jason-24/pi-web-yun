@@ -202,3 +202,118 @@
   .workspace-shell .session-tree-footer-button,
   .workspace-chat-header button { transition: none !important; }
 }
+
+/* A separate action row and labelled navigation sections keep the sidebar scannable. */
+.workspace-shell .session-sidebar .sidebar-header {
+  display: grid; grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-rows: 36px 36px; gap: 6px 4px;
+  height: auto; min-height: 94px; padding: 8px;
+}
+.workspace-shell .sidebar-header .sidebar-brand,
+.workspace-shell .sidebar-header .sidebar-tabs-list { grid-column: 1; grid-row: 1; justify-self: start; }
+.workspace-shell .sidebar-header .sidebar-header-spacer { display: none; }
+.workspace-shell .sidebar-header .sidebar-search-toggle { grid-column: 2; grid-row: 1; }
+.workspace-shell .sidebar-header .sidebar-new-button {
+  grid-column: 1 / -1; grid-row: 2; justify-content: flex-start;
+  width: 100%; min-width: 0; height: 36px; padding: 0 10px; gap: 9px;
+  color: var(--text); font-size: 13px; font-weight: 400;
+}
+.workspace-shell .sidebar-header[data-fit] .sidebar-new-label { display: inline; position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+.workspace-shell .session-tree-section {
+  padding: 12px 14px 6px; color: var(--text-dim); font-size: 12px; font-weight: 500;
+}
+.workspace-shell .session-tree-group-toggle { padding-left: 8px; gap: 8px; font-weight: 400; }
+.workspace-shell .session-tree-group-icon { margin-right: 0; }
+.workspace-shell .session-tree-session { padding-left: 30px; }
+.workspace-shell .session-tree-group-empty,
+.workspace-shell .session-tree-more { padding-left: 36px; }
+.workspace-shell .session-tree-recent {
+  left: 6px; right: var(--session-tree-inset-right); padding: 0 8px;
+  border-radius: 8px; color: var(--text-muted);
+}
+.workspace-shell .session-tree-recent .session-tree-main { gap: 8px; }
+.workspace-shell .session-tree-recent:hover,
+.workspace-shell .session-tree-recent.is-selected { background: var(--bg-selected); color: var(--text); }
+.workspace-shell .session-tree-recent .session-tree-title { font-size: 13px; font-weight: 400; }
+.workspace-shell .session-tree-recent a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+/* The outer navigation sits on a quiet backdrop around one inset workspace. */
+.workspace-shell { background: color-mix(in srgb, var(--bg-panel) 84%, var(--border)) !important; }
+.workspace-frame {
+  position: relative; display: flex; flex: 1; min-width: 0; min-height: 0;
+  margin: 8px 8px 8px 0; overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px; background: var(--bg);
+  box-shadow: 0 1px 4px rgb(0 0 0 / .025);
+}
+.workspace-shell > .workbench-settings-navigation {
+  padding-top: calc(16px + env(safe-area-inset-top));
+  border-right: 0; background: transparent;
+}
+.workspace-frame > .sidebar-container {
+  background: color-mix(in srgb, var(--bg-panel) 55%, var(--bg)) !important;
+  border-right-color: color-mix(in srgb, var(--border) 58%, transparent) !important;
+}
+.workspace-shell .sidebar-brand { font-size: 16px; letter-spacing: 0; font-weight: 600; }
+.workspace-shell .session-tree-section { color: var(--text-muted); }
+.workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming) {
+  box-shadow: none; background: var(--bg-selected);
+}
+.workspace-shell .session-tree-session.is-selected .session-tree-title { font-weight: 500; }
+.workspace-conversation { background: var(--bg); }
+.workspace-location[data-view="chat"] > span { display: none; }
+.workspace-location[data-view="chat"] > strong { border-left: 0; padding-left: 0; font-size: 13px; font-weight: 600; }
+.workspace-title-action { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 8px; }
+.workspace-title-action > span { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.workspace-shell .chat-input-shell { padding-bottom: 14px !important; }
+.workspace-shell .chat-composer-card {
+  border-radius: 22px; border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / .035);
+}
+.workspace-shell .chat-composer-card:focus-within {
+  border-color: color-mix(in srgb, var(--text-muted) 26%, var(--border));
+  box-shadow: 0 2px 12px rgb(0 0 0 / .045);
+}
+.workspace-shell .composer-session-stats { color: var(--text-dim) !important; }
+.workspace-shell #file-panel { background: var(--bg); }
+.workspace-shell .workbench-file-tree { border-left-color: color-mix(in srgb, var(--border) 65%, transparent); }
+@media (max-width: 640px) {
+  .workspace-frame { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .workspace-shell .chat-input-shell { padding-bottom: 8px !important; }
+  .workspace-shell .chat-composer-card { border-radius: 18px; }
+}
+
+/* The reading header flows into the transcript without a horizontal rule. */
+.workspace-chat-header > div:first-child { border-bottom: 0 !important; }
+.workspace-title-folder { display: flex; align-items: center; justify-content: center; flex: 0 0 28px; height: 32px; color: var(--text-muted); }
+
+/* The sidebar boundary is the desktop collapse/restore affordance. */
+.sidebar-edge-restore {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 220;
+  width: 12px; padding: 0; border: 0; background: transparent; cursor: e-resize;
+}
+.sidebar-edge-restore::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: transparent; }
+.sidebar-edge-restore:hover::after, .sidebar-edge-restore:focus-visible::after {
+  background: color-mix(in srgb, var(--text-muted) 70%, var(--border));
+}
+.sidebar-edge-restore:focus-visible { outline: none; }
+
+/* Hovering Home previews the collapsed sidebar without taking layout space. */
+.workspace-frame > .sidebar-container.sidebar-closed:not(.is-peeking) { transition: none; }
+.workspace-shell .workspace-frame > .sidebar-container.is-peeking {
+  position: absolute; top: 6px; bottom: 6px; left: 6px;
+  width: min(var(--sidebar-width, 260px), 260px); min-width: 0;
+  max-width: calc(100% - 12px); height: auto;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent) !important; border-radius: 8px;
+  background: var(--bg) !important;
+  box-shadow: 0 2px 12px rgb(0 0 0 / .055);
+  transition: none;
+}
+.sidebar-edge-restore { z-index: 240; }
+
+.workspace-frame > .sidebar-container.is-peeking > .session-sidebar { width: 100%; min-width: 0; }
+.workspace-shell .sidebar-container.is-peeking .sidebar-header {
+  min-height: 84px; grid-template-rows: 32px 32px; padding: 6px 8px; gap: 8px 4px;
+}
+.workspace-shell .sidebar-container.is-peeking .sidebar-brand { font-size: 15px; }
+.workspace-new-session { display: flex; align-items: center; justify-content: center; flex: 0 0 30px; width: 30px; padding: 0; color: var(--text-muted); background: transparent; cursor: pointer; }

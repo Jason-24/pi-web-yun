@@ -8,6 +8,7 @@ import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { newSessionDeepLink, sessionDeepLink } from "@/lib/session-links";
 import { getProjectActivity, getRecentProjects } from "@/lib/project-groups";
 import { workspaceKeyOf } from "@/lib/workspace-memory";
+import { getArchivedSessions, type ArchiveSnapshot } from "@/lib/session-archive";
 import {
   adjacentProjectMove,
   archivedFamilyIds,
@@ -198,6 +199,10 @@ export interface SelectSessionOptions {
 }
 
 interface Props {
+  /** The application hosts archived sessions in the central workspace. */
+  onOpenArchive?: (projectKey?: string) => void;
+  archiveActive?: boolean;
+  onArchiveStateChange?: (snapshot: ArchiveSnapshot) => void;
   fileExplorerTarget?: HTMLElement | null;
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => void;
@@ -240,6 +245,9 @@ interface Props {
  * move goes through here, as the sidebar's own "+" buttons do.
  */
 export interface SessionSidebarControl {
+  restoreArchivedSession(sessionId: string): Promise<boolean>;
+  deleteArchivedSession(sessionId: string): Promise<boolean>;
+  refreshArchive(): Promise<void>;
   /** Identity, then the sidebar's cwd, then `onNewSession`, as any new session. */
   startNewSessionIn(target: NewSessionTarget): void;
   /**
@@ -494,7 +502,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
   return { kind: "rect", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, align };
 }
 
-export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, onOpenSettings, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchiveStateChange, fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, onOpenSettings, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -661,6 +669,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     apply: applyUiStateRequest,
     snapshot: snapshotUiState,
     noteRevision: noteUiRevision,
+    refresh: refreshUiState,
   } = useSessionUiState();
 
   // The explorer's scroll container is always mounted (empty without a cwd),
@@ -1322,8 +1331,13 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   // The handle below is made once: it calls the newest closure.
   const startNewSessionInRef = useRef(startNewSessionIn);
   startNewSessionInRef.current = startNewSessionIn;
+  const restoreArchivedSessionRef = useRef<(sessionId: string) => Promise<boolean>>(async () => false);
+  const deleteArchivedSessionRef = useRef<(sessionId: string) => Promise<boolean>>(async () => false);
 
   useImperativeHandle(controlRef, () => ({
+    restoreArchivedSession: (sessionId) => restoreArchivedSessionRef.current(sessionId),
+    deleteArchivedSession: (sessionId) => deleteArchivedSessionRef.current(sessionId),
+    refreshArchive: refreshUiState,
     startNewSessionIn: (target) => startNewSessionInRef.current(target),
     openFolderForNewSession: (onPicked, returnFocusTo) => {
       folderPickRef.current = onPicked;
@@ -1338,7 +1352,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     },
     refreshWorktrees,
     createWorktree,
-  }), [createWorktree, refreshWorktrees]);
+  }), [createWorktree, refreshWorktrees, refreshUiState]);
 
   // Header "+": a new session in the sidebar's current cwd (worktree).
   const handleNewSession = useCallback(() => {
@@ -1353,6 +1367,11 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     () => new Map(sessionFamilies.map((family) => [family.root.id, family])),
     [sessionFamilies],
   );
+
+  const archivedSessions = useMemo(() => getArchivedSessions(allSessions, uiState, runningSessionIds), [allSessions, uiState, runningSessionIds]);
+  useEffect(() => {
+    onArchiveStateChange?.({ entries: archivedSessions, loaded: uiStateLoaded && !loading, error: uiStateError });
+  }, [archivedSessions, uiStateLoaded, loading, uiStateError, onArchiveStateChange]);
 
   // Every session id of an archived family (search tags them), and how many
   // families each project has in the archive.
@@ -1423,6 +1442,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     [groupExpansion, keptOpenGroups],
   );
   const model = useMemo(() => buildSessionTree({
+    sections: true,
     sessions: allSessions,
     uiState,
     runningIds: runningSessionIds,
@@ -1434,6 +1454,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     moreShown,
     pinnedCollapsed,
   }), [allSessions, uiState, runningSessionIds, awaitingInputSessionIds, unreadSessionIds, selectedSessionId, currentProject, shownGroupExpansion, moreShown, pinnedCollapsed]);
+  const mainRows = useMemo(() => onOpenArchive ? model.rows.filter((row) => row.kind !== "footer-archived") : model.rows, [model.rows, onOpenArchive]);
   // Built while the archive view is rendered, its way out included: it
   // leaves as it was, not empty.
   const archiveMounted = archiveMotion.archiveMounted;
@@ -1641,6 +1662,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   // stay as they were.
   const openArchiveView = useCallback((projectKey?: string) => {
     setMenu(null);
+    if (onOpenArchive) { onOpenArchive(projectKey); return; }
     setArchiveView(true);
     // Search results would cover it.
     setSessionSearchOpen(false);
@@ -1653,7 +1675,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
     }
     treeRevealIdRef.current += 1;
     setArchiveReveal({ id: treeRevealIdRef.current, at: Date.now(), rowKey: `archive:${projectKey}`, block: "start" });
-  }, [archiveCollapsed, setArchiveView, switchTab]);
+  }, [archiveCollapsed, onOpenArchive, setArchiveView, switchTab]);
 
   // Opening the archive hides the tree that held focus (the footer link, a
   // menu's opener, the toast's View) and Back removes the archive's own
@@ -1817,6 +1839,13 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   }, [applyUiState, familyRowButton, focusAfterCommit, showToast, snapshotUiState, t]);
 
   const restoreFamily = useCallback((family: SessionFamily) => restoreFamilies([family]), [restoreFamilies]);
+  restoreArchivedSessionRef.current = async (sessionId) => {
+    const family = familyByRootId.get(sessionId);
+    if (!family || !isFamilyArchived(family, uiState, runningSessionIds)) return true;
+    const ok = await applyUiState({ action: "set", ids: [family.root.id], archived: false });
+    if (ok) showToast(t("sidebar.restoredToast", { title: shortTitle(sessionRowTitle(family.root), TOAST_TITLE_MAX) }));
+    return ok;
+  };
 
   const startRename = useCallback((family: SessionFamily) => {
     if (family.root.transient) return;
@@ -2083,7 +2112,8 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
   const deletingRunsRef = useRef(new Set<string>());
   const deleteFamilyIds = useCallback(async (runKey: string, ids: readonly string[], focusTarget: () => HTMLElement | null) => {
     setMenu(null);
-    if (ids.length === 0 || deletingRunsRef.current.has(runKey)) return;
+    if (ids.length === 0) return true;
+    if (deletingRunsRef.current.has(runKey)) return false;
     deletingRunsRef.current.add(runKey);
     showToast(t("sidebar.deletingSessions"));
     try {
@@ -2091,19 +2121,30 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
       for (const id of outcome.deleted) onSessionDeleted?.(id);
       // A group goes with its last session (in the tree, unless it is
       // current or pinned): focus that fell to the page with it moves on.
-      void loadSessions().then(() => focusAfterCommit(focusTarget));
+      await loadSessions();
+      focusAfterCommit(focusTarget);
       if (outcome.error !== null) {
         showToast(t("sidebar.deleteFailed", { error: outcome.error }));
-        return;
+        return false;
       }
       const count = outcome.deletedRoots.length;
       const parts = [count === 1 ? t("sidebar.deletedOneToast") : t("sidebar.deletedManyToast", { count })];
       if (outcome.running.length > 0) parts.push(t("sidebar.keptRunningToast", { count: outcome.running.length }));
       showToast(parts.join(" · "));
+      return ids.every((id) => outcome.deletedRoots.includes(id));
     } finally {
       deletingRunsRef.current.delete(runKey);
     }
   }, [focusAfterCommit, loadSessions, onSessionDeleted, showToast, t]);
+
+  deleteArchivedSessionRef.current = async (sessionId) => {
+    const family = familyByRootId.get(sessionId);
+    if (!family) return true;
+    if (!isFamilyArchived(family, uiState, runningSessionIds)) return false;
+    const ok = await deleteFamilyIds(`archive-session:${sessionId}`, [family.root.id], () => null);
+    if (ok) await refreshUiState();
+    return ok;
+  };
 
   const deleteAllProjectSessions = useCallback((project: SidebarProject) => {
     const { ids } = familiesToDelete(treeSelectionInput, project.key);
@@ -2859,7 +2900,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
           title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
         >
           <ComposeIcon size={15} />
-          <span className="sidebar-new-label">{t("sidebar.new")}</span>
+          <span className="sidebar-new-label">{t("sidebar.newChat")}</span>
         </button>
         <button
           ref={searchButtonRef}
@@ -2936,7 +2977,7 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
             <div className="sidebar-sessions-view" hidden={archiveMotion.mainHidden} inert={archiveMotion.mainInert}>
               <SessionTree
                 {...treeProps}
-                rows={model.rows}
+                rows={mainRows}
                 emptyLabel={t("sidebar.noSessions")}
                 reveal={treeReveal}
                 onRevealHandled={handleRevealHandled}
@@ -2987,6 +3028,11 @@ export function SessionSidebar({ fileExplorerTarget, selectedSessionId, onSelect
             )}
           </div>
         </SessionSearch>
+        {onOpenArchive && <button type="button" className="sidebar-archive-entry" data-archive-entry=""
+          aria-label={t("sidebar.archivedCount", { count: archivedCount })} aria-current={archiveActive ? "page" : undefined}
+          onClick={() => openArchiveView()}>
+          <ArchiveIcon size={15} /><span>{t("sidebar.archived")}</span><span className="sidebar-archive-entry-count" aria-hidden="true">{archivedCount}</span>
+        </button>}
       </div>
 
       {/* Below the sessions, the separator: drag, arrows, Home/End, Enter

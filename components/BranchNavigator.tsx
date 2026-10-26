@@ -5,6 +5,8 @@ import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 
 interface Props {
+  /** Render the branch list in the workspace, without a floating trigger or overlay. */
+  embedded?: boolean;
   tree: SessionTreeNode[];
   activeLeafId: string | null;
   onLeafChange: (leafId: string | null) => void;
@@ -143,6 +145,9 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
     <div>
       {/* This node row */}
       <div
+        role="button"
+        tabIndex={onSelect ? 0 : -1}
+        aria-disabled={!onSelect}
         style={{
           display: "flex",
           alignItems: "center",
@@ -150,6 +155,11 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
           cursor: onSelect ? "pointer" : "default",
         }}
         onClick={onSelect ? () => onSelect(rep.entry.id) : undefined}
+        onKeyDown={onSelect ? (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onSelect(rep.entry.id);
+        } : undefined}
       >
         {/* Indent guide lines */}
         {parentLines.map((hasLine, i) => (
@@ -257,7 +267,7 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
   );
 }
 
-export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton, locked = false }: Props) {
+export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, embedded = false, containerRef, open: openProp, onToggle, hasSession, compact, hideInlineButton, locked = false }: Props) {
   const { t } = useI18n();
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
@@ -318,6 +328,19 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
     </svg>
   );
 
+
+  if (embedded) {
+    return <div className="workspace-branch-list">
+      <p className="workspace-branch-description">{t("branches.description")}</p>
+      {lockedNotice}
+      {hasContent ? topLevel.map((child, index) => <TreeNodeView key={child.entry.id} node={child} activePathIds={activePathIds}
+        depth={0} isLast={index === topLevel.length - 1} parentLines={[]} onSelect={selectBranch} />)
+        : <div className="workspace-branch-empty">
+          <strong>{noBranchReason}</strong>
+          {hasSession && <p>{t("branches.createHint", { action: t("i18n.editFromHere") })}</p>}
+        </div>}
+    </div>;
+  }
 
   if (inline) {
     return (

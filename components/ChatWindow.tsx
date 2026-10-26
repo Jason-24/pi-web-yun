@@ -1014,8 +1014,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         style={{
           position: "absolute",
           top: 12,
-          left: 0,
-          right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+          left: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+          right: 0,
           zIndex: 40,
           display: "flex",
           // Toasts live in the top-right corner
@@ -1413,8 +1413,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             style={{
               position: "absolute",
               bottom: "100%",
-              left: 0,
-              right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+              left: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+              right: 0,
               display: "flex",
               justifyContent: "center",
               paddingBottom: 10,
@@ -1438,7 +1438,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         {/* A quiet welcome above the composer; the project/worktree row
             keeps the composer's left edge and its existing controls. */}
         {isEmptyNew && (
-          <div className="new-session-hero" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+          <div className="new-session-hero" style={{ paddingLeft: isMobile ? 16 : 52, paddingRight: 16 }}>
             <div className="new-session-hero-inner" style={{ maxWidth: "var(--chat-content-max-width, 820px)" }}>
               <div className="new-session-intro">
                 <WelcomeMark />

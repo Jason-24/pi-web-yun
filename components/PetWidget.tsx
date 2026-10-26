@@ -14,16 +14,16 @@ const POSITION_KEY = "pi-yun-pet-pos";
 const SMALL_KEY = "pi-yun-pet-small";
 type Mood = "idle" | "busy" | "waiting";
 type Position = { x: number; y: number };
-type PetIcon = "person" | "wave" | "heart" | "cheer" | "moon" | "size" | "close" | "more";
+type PetIcon = "paw" | "wave" | "heart" | "cheer" | "moon" | "size" | "close" | "more";
 
 function Icon({ name }: { name: PetIcon }) {
   const paths: Record<PetIcon, React.ReactNode> = {
-    person: <>
-      <path d="M4 10a8 8 0 0 1 16 0v3a8 8 0 0 1-16 0Z" />
-      <path d="M4 10c3.5 0 6-1.8 8-4 2 2.2 4.5 4 8 4" />
-      <circle cx="9" cy="12.5" r="0.8" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="12.5" r="0.8" fill="currentColor" stroke="none" />
-      <path d="M9.5 16q2.5 2 5 0" />
+    paw: <>
+      <ellipse cx="8.5" cy="5.5" rx="1.8" ry="2.5" transform="rotate(-15 8.5 5.5)" />
+      <ellipse cx="15.5" cy="5.5" rx="1.8" ry="2.5" transform="rotate(15 15.5 5.5)" />
+      <ellipse cx="4.5" cy="10" rx="1.6" ry="2.2" transform="rotate(-30 4.5 10)" />
+      <ellipse cx="19.5" cy="10" rx="1.6" ry="2.2" transform="rotate(30 19.5 10)" />
+      <path d="M12 11c-2 0-2.8 2.1-4.7 3.7C4.7 17 6 20.6 9 19.5a8.4 8.4 0 0 1 6 0c3 1.1 4.3-2.5 1.7-4.8C14.8 13.1 14 11 12 11Z" />
     </>,
     wave: <path d="m8 12-2-5a1.5 1.5 0 0 1 3-1l2 5-1-7a1.5 1.5 0 0 1 3 0l1 7 1-5a1.5 1.5 0 0 1 3 .5L17 14l2-2c2-2 4 0 2 2l-4 6c-4 4-9 1-11-2l-3-5c-1-2 1-3 2-2l3 3M3 3 1 1m19 3 2-2" />,
     heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
@@ -33,8 +33,8 @@ function Icon({ name }: { name: PetIcon }) {
     close: <path d="m6 6 12 12M6 18 18 6" />,
     more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   };
-  const size = name === "person" ? 20 : 17;
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === "person" ? 1.7 : 1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+  const size = name === "paw" ? 20 : 17;
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === "paw" ? 1.7 : 1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function storePreference(key: string, value: string) {
@@ -253,11 +253,11 @@ export function PetWidget() {
   const status = asleep ? "sleeping" : mood;
 
   return <>
-    <button ref={toggleRef} type="button" onClick={() => {
+    <button ref={toggleRef} type="button" className="workbench-view-button workbench-utility-start" data-workspace-action="pet" onClick={() => {
       if (visible) { hide(); return; }
       wake(); setVisible(true); storePreference(VISIBLE_KEY, "1"); speak("pet.welcome", "wave");
     }} title={t("pet.title")} aria-label={t("pet.title")} aria-pressed={visible}>
-      <Icon name="person" /><span className="workbench-settings-label">{t("pet.title")}</span>
+      <Icon name="paw" /><span className="workbench-settings-label">{t("pet.title")}</span>
     </button>
     {visible && createPortal(
       <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide}

@@ -9,6 +9,8 @@ import "./settings.css";
 import "./sidebar.css";
 import "./workbench.css";
 import "./navigation-rail.css";
+import "./home.css";
+import "./workspace-pages.css";
 import "./file-workspace.css";
 import "./sidebar-menu.css";
 

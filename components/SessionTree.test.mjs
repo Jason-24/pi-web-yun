@@ -139,9 +139,9 @@ test("a collapsed group shows its running and unread counts and labelled actions
   }), "group:/work/app");
   assert.match(html, /^<div class="session-tree-row session-tree-group" style="top:0;height:28px"/);
   assert.match(html, /<button type="button" class="session-tree-group-toggle" aria-expanded="false" title="\/work\/app">/);
-  // The chevron leads, inside the toggle (the whole header still toggles)
-  // and hidden from its accessible name; then the folder, name, pin and summary.
-  assert.match(html, /title="\/work\/app"><svg width="12" height="12"[^>]*stroke-width="3"[^>]*class="session-tree-chevron" aria-hidden="true"><path[^>]*><\/path><\/svg><svg width="14" height="14"[^>]*class="session-tree-group-icon" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">app<\/span>/, "the chevron and decorative folder precede the name");
+  // The folder leads, hidden from the accessible name; the whole header
+  // still toggles without an expansion arrow.
+  assert.match(html, /title="\/work\/app"><svg width="14" height="14"[^>]*class="session-tree-group-icon" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">app<\/span>/, "only the decorative folder precedes the name");
   assert.match(html, /<span class="session-tree-group-name">app<\/span><svg[^>]*class="session-tree-group-pin"[\s\S]*?<\/svg><span class="session-tree-summary">/);
   // Project decoration must not change the toggle's accessible name.
   assert.match(html, /class="session-tree-group-icon" aria-hidden="true"/);
@@ -326,7 +326,7 @@ test("rename mode swaps the row for a field seeded with the title", () => {
 test("a named project shows its name as plain text in its header, the path as the tooltip", () => {
   const named = { name: "Thermal <b>Models</b>", customName: "Thermal <b>Models</b>" };
   const raw = renderToStaticMarkup(h(I18nProvider, null, h(SessionTree, { ...defaults, rows: [groupRow({}, named)] })));
-  assert.match(raw, /title="\/work\/app"><svg[^>]*class="session-tree-chevron is-open"[\s\S]*?<\/svg><svg[^>]*class="session-tree-group-icon is-open" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
+  assert.match(raw, /title="\/work\/app"><svg[^>]*class="session-tree-group-icon is-open" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">Thermal &lt;b&gt;Models&lt;\/b&gt;<\/span>/);
   assert.doesNotMatch(raw, /<b>/, "never markup");
   const html = render({ rows: [groupRow({}, named)] });
   assert.match(html, /aria-label="New session in Thermal <b>Models<\/b>"/);
@@ -539,7 +539,7 @@ test("project names and sessions share a content column, with section labels bef
   // One rhythm: session rows, every header (a project's, the pinned
   // section's, the archive's projects), the empty note and the footer are
   // one height, 28px (44px on a phone); only "show more" is shorter.
-  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 });
+  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { section: 38, recent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 });
   for (const [layout, height] of [["desktop", 28], ["mobile", 44]]) {
     for (const kind of ["session", "group", "pinned-header", "group-empty", "footer-open", "footer-archived", "archive-group"]) {
       assert.equal(SIDEBAR_ROW_HEIGHTS[layout][kind], height, `${layout} ${kind}`);

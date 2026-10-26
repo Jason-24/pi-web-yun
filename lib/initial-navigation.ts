@@ -1,6 +1,7 @@
 import type { TabOpen } from "./tab-session";
 
 export interface InitialNavigation {
+  home?: boolean;
   requestedCwd: string | null;
   sessionId: string | null;
   /** `sessionId` is this tab's memory (`withTabOpen`), not the URL's `?session=`. */
@@ -11,6 +12,9 @@ export interface InitialNavigation {
 export function getInitialNavigation(
   searchParams: Pick<URLSearchParams, "get">,
 ): InitialNavigation {
+  if (searchParams.get("home") === "1") {
+    return { home: true, requestedCwd: null, sessionId: null, sidebarCollapsed: searchParams.get("sidebar") === "collapsed" };
+  }
   const requestedCwd = searchParams.get("cwd")?.trim() || null;
 
   return {
@@ -38,7 +42,7 @@ export function withTabOpen(
   navigation: InitialNavigation,
   tabOpen: TabOpen | null,
 ): InitialNavigation {
-  if (navigation.requestedCwd || navigation.sessionId || !tabOpen) {
+  if (navigation.home || navigation.requestedCwd || navigation.sessionId || !tabOpen) {
     return navigation;
   }
   if (tabOpen.kind === "session") {

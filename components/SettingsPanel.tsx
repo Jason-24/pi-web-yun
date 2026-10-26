@@ -37,6 +37,7 @@ import { ConfigButton, ConfigSwitch } from "./SettingsUi";
 import { FontSettings } from "./FontSettings";
 
 interface Props {
+  embedded?: boolean;
   cwd: string | null;
   sessionId: string | null;
   initialSection: SettingsSection;
@@ -503,6 +504,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
 }
 
 export function SettingsPanel({
+  embedded = false,
   cwd,
   sessionId,
   initialSection,
@@ -572,12 +574,12 @@ export function SettingsPanel({
   return (
     <div
       ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
+      role={embedded ? "region" : "dialog"}
+      aria-modal={embedded ? undefined : true}
       aria-label={t("settings.title")}
       tabIndex={-1}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="settings-dialog-backdrop"
+      onClick={(event) => { if (!embedded && event.target === event.currentTarget) onClose(); }}
+      className={`settings-dialog-backdrop${embedded ? " is-embedded" : ""}`}
     >
       <div className="settings-dialog-surface">
         <div className="settings-dialog-header">

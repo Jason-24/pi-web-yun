@@ -15,6 +15,7 @@ interface DragState {
   pointerId: number;
   startPosition: number;
   startWidth: number;
+  requestedWidth: number;
   target: HTMLDivElement;
   previousCursor: string;
   previousUserSelect: string;
@@ -30,6 +31,9 @@ interface UseResizablePanelOptions {
   growthDirection: "left" | "right" | "up" | "down";
   maxWidth: number;
   minWidth: number;
+  /** Collapse only on a completed drag past this size; keep the expanded size. */
+  collapseAt?: number;
+  onCollapse?: () => void;
   /**
    * False keeps the size the user chose (the stored one, or the last a drag, a
    * key or a reset committed) apart from the one shown: a window too small for
@@ -75,6 +79,8 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     growthDirection,
     maxWidth,
     minWidth,
+    collapseAt,
+    onCollapse,
     persistClamp = true,
     storageKey,
     widthRef,
@@ -134,7 +140,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     document.body.style.userSelect = drag.previousUserSelect;
   }, []);
 
-  const finishResize = useCallback((pointerId: number) => {
+  const finishResize = useCallback((pointerId: number, cancelled = false) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== pointerId) return;
     dragRef.current = null;
@@ -142,7 +148,12 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     setIsResizing(false);
     // Kept apart from the size shown, the user's size changes only when the
     // drag moved: a plain click would save what a short window clamped it to.
-    commitWidth(widthRef.current, { forcePersist: persistClamp || widthRef.current !== drag.startWidth });
+    if (!cancelled && onCollapse && collapseAt !== undefined && drag.requestedWidth < collapseAt) {
+      commitWidth(drag.startWidth, { forcePersist: true });
+      onCollapse();
+    } else {
+      commitWidth(widthRef.current, { forcePersist: persistClamp || widthRef.current !== drag.startWidth });
+    }
 
     try {
       if (drag.target.hasPointerCapture(pointerId)) {
@@ -151,7 +162,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     } catch {
       // The browser may have already released capture after pointer cancellation.
     }
-  }, [commitWidth, persistClamp, restoreBodyState, widthRef]);
+  }, [collapseAt, commitWidth, onCollapse, persistClamp, restoreBodyState, widthRef]);
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -159,7 +170,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     event.stopPropagation();
 
     const activeDrag = dragRef.current;
-    if (activeDrag) finishResize(activeDrag.pointerId);
+    if (activeDrag) finishResize(activeDrag.pointerId, true);
 
     const target = event.currentTarget;
     target.focus({ preventScroll: true });
@@ -168,6 +179,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
       pointerId: event.pointerId,
       startPosition: axis === "vertical" ? event.clientY : event.clientX,
       startWidth: widthRef.current,
+      requestedWidth: widthRef.current,
       target,
       previousCursor: document.body.style.cursor,
       previousUserSelect: document.body.style.userSelect,
@@ -188,7 +200,8 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
 
     const direction = growthDirection === "right" || growthDirection === "down" ? 1 : -1;
     const position = axis === "vertical" ? event.clientY : event.clientX;
-    const nextWidth = clampWidth(drag.startWidth + ((position - drag.startPosition) * direction));
+    drag.requestedWidth = drag.startWidth + ((position - drag.startPosition) * direction);
+    const nextWidth = clampWidth(drag.requestedWidth);
     applyLiveWidth(nextWidth);
     event.currentTarget.setAttribute("aria-valuenow", String(nextWidth));
     event.currentTarget.setAttribute("aria-valuetext", `${nextWidth} px`);
@@ -199,11 +212,11 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
   }, [finishResize]);
 
   const onPointerCancel = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    finishResize(event.pointerId);
+    finishResize(event.pointerId, true);
   }, [finishResize]);
 
   const onLostPointerCapture = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    finishResize(event.pointerId);
+    finishResize(event.pointerId, true);
   }, [finishResize]);
 
   const resetWidth = useCallback(() => {
@@ -274,7 +287,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     if (!isResizing) return;
     const cancelResize = () => {
       const drag = dragRef.current;
-      if (drag) finishResize(drag.pointerId);
+      if (drag) finishResize(drag.pointerId, true);
     };
     const onVisibilityChange = () => {
       if (document.visibilityState !== "visible") cancelResize();

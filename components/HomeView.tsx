@@ -1,0 +1,74 @@
+"use client";
+
+import { useI18n } from "@/hooks/useI18n";
+import { getFileName } from "@/lib/file-paths";
+import { sessionDisplayTitle } from "@/lib/session-fork-name";
+import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
+import type { SessionInfo } from "@/lib/types";
+import { ComposeIcon, FolderIcon, MessageIcon } from "./SidebarIcons";
+import { WelcomeMark } from "./WelcomeMark";
+
+interface Props {
+  sessions: SessionInfo[];
+  runningSessionIds: Set<string>;
+  cwd: string | null;
+  onSelectSession(session: SessionInfo): void;
+  onNewSession(): void;
+  onOpenProject(): void;
+}
+
+export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, onNewSession, onOpenProject }: Props) {
+  const { t, locale } = useI18n();
+  const recent = sessions
+    .filter((session) => session.relation?.kind !== "subagent")
+    .sort((a, b) => Date.parse(b.modified) - Date.parse(a.modified))
+    .slice(0, 8);
+  const dateFormat = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
+
+  return (
+    <div className="home-view" role="region" aria-label={t("navigation.home")}>
+      <div className="home-content">
+        <div className="home-intro">
+          <WelcomeMark />
+          <h1>{t("chat.newSessionWelcome")}</h1>
+          <p>{t("home.description")}</p>
+        </div>
+        <div className="home-actions">
+          <button type="button" className="home-new-task" onClick={onNewSession}>
+            <ComposeIcon size={20} />
+            <span><strong>{t("home.newTask")}</strong><small title={cwd ?? undefined}>{cwd ? getFileName(cwd) || cwd : t("home.chooseProject")}</small></span>
+            <span className="home-action-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button type="button" className="home-open-project" onClick={onOpenProject}>
+            <FolderIcon size={18} /><span>{t("home.openProject")}</span>
+          </button>
+        </div>
+        <section className="home-recent" aria-labelledby="home-recent-title">
+          <h2 id="home-recent-title">{t("home.recentTasks")}</h2>
+          {recent.length ? <div className="home-session-list">
+            {recent.map((session) => {
+              const modified = new Date(session.modified);
+              const title = sessionDisplayTitle(session);
+              return (
+                <a key={session.id} className="home-session" href={sessionDeepLink(session.id)}
+                  onClick={(event) => {
+                    if (!isPlainActivation(event)) return;
+                    event.preventDefault();
+                    onSelectSession(session);
+                  }}>
+                  <MessageIcon size={17} />
+                  <span className="home-session-details">
+                    <span className="home-session-title" title={title}>{title}</span>
+                    <span className="home-session-project" title={session.cwd}>{getFileName(session.projectRoot || session.cwd) || session.cwd}</span>
+                  </span>
+                  {runningSessionIds.has(session.id) ? <span className="home-running">{t("home.running")}</span>
+                    : Number.isFinite(modified.getTime()) && <time dateTime={modified.toISOString()}>{dateFormat.format(modified)}</time>}
+                </a>
+              );
+            })}
+          </div> : <p className="home-empty">{t("home.noTasks")}</p>}
+        </section>
+      </div>
+    </div>
+  );
+}

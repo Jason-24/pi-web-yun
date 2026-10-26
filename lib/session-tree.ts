@@ -25,7 +25,7 @@ import { workspaceKeyOf } from "./workspace-memory";
 export type SidebarLayout = "desktop" | "mobile";
 export type SidebarRowKind =
   | "pinned-header" | "session" | "pinned-more" | "group" | "group-more" | "group-empty"
-  | "spacer" | "footer-open" | "footer-archived" | "archive-group";
+  | "spacer" | "footer-open" | "footer-archived" | "archive-group" | "section" | "recent";
 
 /**
  * Per-kind row heights: one rhythm. Session rows, the section headers (a
@@ -36,8 +36,8 @@ export type SidebarRowKind =
  * footer; groups themselves sit right on each other, with none between them.
  */
 export const SIDEBAR_ROW_HEIGHTS: Record<SidebarLayout, Record<SidebarRowKind, number>> = {
-  desktop: { "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 },
-  mobile: { "pinned-header": 44, session: 44, "pinned-more": 36, group: 44, "group-more": 36, "group-empty": 44, spacer: 8, "footer-open": 44, "footer-archived": 44, "archive-group": 44 },
+  desktop: { section: 38, recent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 },
+  mobile: { section: 44, recent: 44, "pinned-header": 44, session: 44, "pinned-more": 36, group: 44, "group-more": 36, "group-empty": 44, spacer: 8, "footer-open": 44, "footer-archived": 44, "archive-group": 44 },
 };
 export const GROUP_VISIBLE_LIMIT = 6;
 export const PINNED_VISIBLE_LIMIT = 8;
@@ -54,6 +54,8 @@ export interface SidebarProject { key: string; root: string; name: string; custo
 export interface SidebarFamilyStatus { running: boolean; awaiting: boolean; unread: boolean; selected: boolean; transient: boolean }
 
 export type SidebarRow =
+  | { kind: "section"; key: "section-projects" | "section-recents"; label: "projects" | "recents" }
+  | { kind: "recent"; key: string; family: SessionFamily; project: SidebarProject; status: SidebarFamilyStatus }
   | { kind: "pinned-header"; key: "pinned-header"; count: number; collapsed: boolean; running: number; unread: number }
   | { kind: "session"; key: string; family: SessionFamily; context: "pinned" | "group" | "archive"; project: SidebarProject; status: SidebarFamilyStatus; archivedAt: number | null }
   | { kind: "pinned-more"; key: "pinned-more"; hidden: number; canShowLess: boolean; nextShown: number }
@@ -66,6 +68,8 @@ export type SidebarRow =
   | { kind: "archive-group"; key: string; project: SidebarProject; count: number; expanded: boolean };
 
 export interface SessionTreeInput {
+  /** Show labelled project groups and a separate recent-conversation list. */
+  sections?: boolean;
   /** The full catalog (allSessions), subagents included. */
   sessions: readonly SessionInfo[];
   uiState: SessionUiState;
@@ -509,6 +513,7 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
     .filter((project) => !rank.has(project.key) && recordable(project))
     .map((project) => project.key);
 
+  if (input.sections) rows.push({ kind: "section", key: "section-projects", label: "projects" });
   for (const project of orderedProjects) {
     const groupFamilies = projectFamilies.get(project.key) ?? [];
     const expanded = isGroupExpanded(project, input.groupExpansion);
@@ -537,6 +542,14 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
   // the footer, as one parts the pinned section from them.
   if (orderedProjects.length > 0) rows.push({ kind: "spacer", key: "footer-spacer" });
   rows.push({ kind: "footer-open", key: "footer-open" });
+  if (input.sections) {
+    const recent = families.filter((family) => !family.root.transient && !isFamilyArchived(family, uiState, runningIds)).slice(0, 10);
+    if (recent.length > 0) {
+      rows.push({ kind: "section", key: "section-recents", label: "recents" });
+      for (const family of recent) rows.push({ kind: "recent", key: `recent:${family.root.id}`, family,
+        project: resolver.get(familyProjectKey(family)), status: familyStatus(family, input) });
+    }
+  }
   if (archivedCount > 0) rows.push({ kind: "footer-archived", key: "footer-archived", count: archivedCount });
 
   return { rows, projects: orderedProjects, archivedCount, unorderedKeysByBand, projectKeysToRecord };
