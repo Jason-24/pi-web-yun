@@ -366,7 +366,7 @@ test("below the sessions the picker is one row under the header row, lined up wi
   const belowHead = sidebarRule(".session-sidebar.is-files-below .sidebar-files-head");
   const [, , headBottom, headLeft] = px(belowHead, "padding");
   const [scrollTop] = px(sidebarRule(".session-sidebar.is-files-below .sidebar-files-scroll"), "padding-top");
-  const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!fileSearchOpen \|\| !hasSearchQuery\) && \(\s*<div style=\{\{ padding: "(\d+)px \d+px" \}\}>/)[1]);
+  const treeTop = Number(explorerSource.match(/\(changesCollapsed \|\| gitFiles\.length === 0\) && \(!searchEnabled \|\| !hasSearchQuery\) && \(\s*<div style=\{\{ padding: "(\d+)px \d+px" \}\}>/)[1]);
   assert.equal(headBottom + scrollTop + treeTop, 4, "the tree's first row 4px under the boxes");
   // The paths start in the text column (the chevron column's 6px + 5px, the
   // 12px chevron, a 3px gap), after the box's 1px line and 10px padding.

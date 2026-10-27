@@ -26,6 +26,8 @@ import { CodeBlock, MermaidBlock } from "./MermaidBlock";
 import { DelimitedTable } from "./DelimitedTable";
 import { isDelimitedTablePath } from "@/lib/delimited-table";
 import { FrontmatterCard } from "./FrontmatterCard";
+import { FileSearch } from "./FileSearch";
+import { FileBreadcrumb } from "./FileBreadcrumb";
 import { parseUnifiedPatch } from "@/lib/patch";
 import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
@@ -554,8 +556,9 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const formatSizeStr = size != null ? formatSize(size) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="file-viewer-shell file-media-viewer" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div
+        className="file-viewer-toolbar file-media-toolbar"
         style={{
           display: "flex",
           alignItems: "center",
@@ -568,9 +571,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <FileBreadcrumb filePath={filePath} cwd={cwd} />
         <span style={{ marginLeft: "auto" }}>{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
@@ -724,8 +725,9 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="file-viewer-shell file-media-viewer" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div
+        className="file-viewer-toolbar file-media-toolbar"
         style={{
           display: "flex",
           alignItems: "center",
@@ -738,9 +740,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <FileBreadcrumb filePath={filePath} cwd={cwd} />
         <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
@@ -877,8 +877,9 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="file-viewer-shell file-media-viewer" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div
+        className="file-viewer-toolbar file-media-toolbar"
         style={{
           display: "flex",
           alignItems: "center",
@@ -891,9 +892,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <FileBreadcrumb filePath={filePath} cwd={cwd} />
         <span style={{ marginLeft: "auto" }}>{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
@@ -1065,8 +1064,9 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
   }, [filePath, isPdf, sourceSessionId, watchEnabled]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="file-viewer-shell file-media-viewer" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div
+        className="file-viewer-toolbar file-media-toolbar"
         style={{
           display: "flex",
           alignItems: "center",
@@ -1079,9 +1079,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
           flexShrink: 0,
         }}
       >
-        <span style={{ fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <FileBreadcrumb filePath={filePath} cwd={cwd} />
         <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
@@ -1648,9 +1646,7 @@ function TextFileViewer({
           flexShrink: 0,
         }}
       >
-        <span className="file-viewer-path" style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
-          {getRelativeFilePath(filePath, cwd)}
-        </span>
+        <FileBreadcrumb filePath={filePath} cwd={cwd} />
 
         <span className="file-viewer-meta" title={metadata}>{metadata}</span>
         {!isDeletedDiff && (
@@ -1691,6 +1687,17 @@ function TextFileViewer({
           )}
 
           <div className="file-viewer-actions">
+            <FileSearch
+              contentRef={contentRef}
+              enabled={watchEnabled}
+              partial={Boolean(data?.truncated) && effectiveDisplayMode !== "diff"}
+              mode={effectiveDisplayMode === "preview" && (isHtml || isDelimitedTable) ? "embedded" : effectiveDisplayMode}
+              prepareSearch={() => {
+                // Search actual file contents rather than an iframe's document
+                // or only the mounted rows of a virtualized table.
+                if (effectiveDisplayMode === "preview" && (isHtml || isDelimitedTable)) updateDisplayMode("source");
+              }}
+            />
             {(onAtMention || onMentionLines) && (
               <button
                 type="button"
@@ -1780,6 +1787,12 @@ function TextFileViewer({
       <div
         ref={contentRef}
         className="file-viewer-content"
+        tabIndex={0}
+        onPointerDown={(event) => {
+          if (!(event.target as Element).closest("button, a, input, textarea, select, [contenteditable='true']")) {
+            event.currentTarget.focus({ preventScroll: true });
+          }
+        }}
         onScroll={(event) => {
           viewerStateRef.current.scrollTop = event.currentTarget.scrollTop;
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;

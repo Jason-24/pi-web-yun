@@ -58,6 +58,8 @@ interface Props {
   changesCollapsed: boolean;
   onChangesCountChange?: (count: number) => void;
   fileSearchOpen?: boolean;
+  /** Keep a passive filter field visible in the desktop file dock. */
+  searchAlwaysVisible?: boolean;
   onFileSearchOpenChange?: (open: boolean) => void;
   /** Also list what Git ignores, dimmed (the explorer bar's switch). */
   showHidden?: boolean;
@@ -739,6 +741,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
   changesCollapsed,
   onChangesCountChange,
   fileSearchOpen = false,
+  searchAlwaysVisible = false,
   onFileSearchOpenChange,
   showHidden = false,
 }, ref) {
@@ -771,10 +774,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
   const refreshToken = `${refreshKey ?? 0}:${treeRefreshKey}`;
   const uploadBusy = uploadPhase !== "idle";
   const hasSearchQuery = searchQuery.trim().length > 0;
+  const searchEnabled = fileSearchOpen || searchAlwaysVisible;
 
   // Reuse the cached, bounded file index used by @ mentions.
   useEffect(() => {
-    if (!fileSearchOpen) return;
+    if (!searchEnabled) return;
     const query = searchQuery.trim();
     if (!query) {
       setSearchPaths([]);
@@ -798,7 +802,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         .finally(() => { if (!controller.signal.aborted) setSearchLoading(false); });
     }, 150);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [cwd, fileSearchOpen, searchQuery]);
+  }, [cwd, searchEnabled, searchQuery]);
 
   // Focus the search input whenever the search panel opens.
   useEffect(() => {
@@ -1234,18 +1238,25 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         </div>
       )}
 
-      {fileSearchOpen && (
-      <div style={{ padding: "2px 8px 6px" }}>
+      {searchEnabled && (
+      <div className="file-explorer-search" style={{ padding: "2px 8px 6px" }}>
         <div style={{ position: "relative" }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none" }}>
             <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
           </svg>
           <input
             ref={searchInputRef}
+            className="file-explorer-search-input"
             id="file-search-input"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Escape") onFileSearchOpenChange?.(false); }}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (searchAlwaysVisible) setSearchQuery("");
+              else onFileSearchOpenChange?.(false);
+            }}
             placeholder={t("sidebar.searchFilesPlaceholder")}
             aria-label={t("sidebar.searchFiles")}
             style={{ width: "100%", boxSizing: "border-box", padding: "6px 24px", border: "1px solid var(--border)", borderRadius: 8, outline: "none", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: 11 }}
@@ -1334,7 +1345,8 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(function FileE
         </div>
       )}
 
-      {(changesCollapsed || gitFiles.length === 0) && (!fileSearchOpen || !hasSearchQuery) && (
+      {searchAlwaysVisible && !hasSearchQuery && <div className="file-explorer-tree-heading"><FolderIcon size={14} /><span>{t("workbench.allFiles")}</span></div>}
+      {(changesCollapsed || gitFiles.length === 0) && (!searchEnabled || !hasSearchQuery) && (
         <div style={{ padding: "2px 4px" }}>
           {loading ? (
             <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>Loading files...</div>

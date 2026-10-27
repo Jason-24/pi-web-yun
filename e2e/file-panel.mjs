@@ -10,8 +10,12 @@ export const filePanelFixture = `<!doctype html><html><body style="margin:20px;m
 export async function checkFilePanel(page, filePath) {
   const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
   if (await showSidebar.isVisible()) await showSidebar.click();
-  // The explorer lives in the sidebar's files: below the sessions, or its tab.
-  await showSidebarFiles(page);
+  if (page.viewportSize().width >= 1200) {
+    const files = page.locator(".workspace-files-toggle").filter({ visible: true }).first();
+    if (await files.getAttribute("aria-expanded") !== "true") await files.click();
+  } else {
+    await showSidebarFiles(page);
+  }
   // The DOM title normalizes Windows paths to forward slashes
   // (lib/file-paths.ts normalizeFilePathSlashes), so match in that form.
   await page.getByTitle(filePath.replace(/\\/g, "/"), { exact: true }).click();
@@ -31,25 +35,25 @@ export async function checkFilePanel(page, filePath) {
   const storedWidths = () => page.evaluate(() => [
     localStorage.getItem("pi-sidebar-width"), localStorage.getItem("pi-right-panel-width"),
   ]);
-  const toggle = panel.getByRole("button", { name: "Expand file panel", exact: true });
-  if (page.viewportSize().width <= 640) {
-    assert.equal(await toggle.isVisible(), false, "Mobile already uses full width");
+  const toggle = panel.getByRole("button", { name: "Expand file reading", exact: true });
+  if (page.viewportSize().width < 1200) {
+    assert.equal(await toggle.isVisible(), false, "Narrow layouts keep their existing file view");
   } else {
     // Include a manually resized split in the round trip.
     const separator = page.locator('[data-resize-handle="right-panel"]');
     if (await separator.isVisible()) await separator.press("ArrowLeft");
     const originalWidth = await width();
     const originalStored = await storedWidths();
-    const sessionInfo = page.getByRole("button", { name: "Session info", exact: true });
-    const sessionPopover = page.locator(".session-info-popover");
     for (let i = 0; i < 2; i++) {
-      await sessionInfo.click();
-      await sessionPopover.waitFor();
       await toggle.click();
-      assert.equal(await sessionPopover.count(), 0, "Full-width mode dismisses inert top-bar menus");
       assert.equal(await panel.getByRole("button", { name: "Restore file panel width", exact: true }).getAttribute("aria-pressed"), "true");
-      assert.equal(Math.round(await width()), page.viewportSize().width);
-      assert.equal(await page.locator("#session-sidebar").evaluate(el => el.inert), true);
+      const expandedWidth = await width();
+      assert.equal(Math.round(expandedWidth), Math.round((await page.locator(".workspace-main").boundingBox()).width));
+      assert.equal(await page.locator("#session-sidebar").evaluate(el => el.inert), false);
+      assert.equal(await page.locator("#workspace-conversation-content").evaluate(el => el.inert), true);
+      await page.locator(".workspace-context-tab").click();
+      assert.equal(await page.locator("#workspace-conversation-content").evaluate(el => el.inert), false);
+      await panel.getByRole("tab", { name: filePath.split(/[\\/]/).pop(), exact: true }).click();
       assert.equal(await frame.evaluate(() => window.previewInstance), instance);
       assert.equal(await frame.evaluate(() => scrollY), 120);
       assert.equal(await frame.locator("#notes").inputValue(), "Keep this note");

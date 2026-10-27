@@ -3064,7 +3064,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
         onScrollCapture={rememberScroll}
         onTransitionEnd={(event) => { if (event.target === event.currentTarget && event.propertyName === "height") endFilesFold(); }}
       >
-        {filesDocked && <div className="workbench-tree-heading"><span>{t("sidebar.tabFiles")}</span><button type="button" title={t("sidebar.searchFiles")} aria-label={t("sidebar.searchFiles")} aria-controls="file-search-input" aria-expanded={fileSearchOpen} onClick={() => setFileSearchOpen((open) => !open)}><SearchIcon size={14} /></button></div>}
         {/* Below the sessions, one row: the section's toggle (its label,
             then the count, give way first), then the files' keys at its
             right end, in the files tab's order with the search last. They
@@ -3188,6 +3187,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
                 changesCollapsed={changesCollapsed}
                 onChangesCountChange={setChangesCount}
                 fileSearchOpen={fileSearchOpen}
+                searchAlwaysVisible={filesDocked}
                 onFileSearchOpenChange={setFileSearchOpen}
                 showHidden={showIgnoredFiles}
               />

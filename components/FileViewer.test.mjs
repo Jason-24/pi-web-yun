@@ -4,7 +4,7 @@ import test from "node:test";
 import React from "react";
 import ts from "typescript";
 
-const source = await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8");
+const source = (await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 
 test("lightweight source rows are skipped for highlighted, diff, and preview views", () => {
   // Execute the source-view calculations without mounting the file-fetching component.

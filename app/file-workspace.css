@@ -1,26 +1,194 @@
 /* The file workspace shows content on the left and its directory on the right. */
 .workbench-files-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .workbench-file-preview { position: relative; }
-.workbench-file-tree, .workbench-tree-resizer { display: none; }
-.workbench-empty-tab { display: flex; align-items: center; height: 36px; padding: 0 14px; font-size: 12px; color: var(--text); }
-.workbench-file-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; color: var(--text-dim); }
-.workbench-file-empty strong { color: var(--text); font-size: 15px; font-weight: 500; }
-.workbench-file-empty span { font-size: 12px; line-height: 1.6; }
+.workbench-file-tree, .workbench-tree-boundary { display: none; }
+.workbench-file-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px; text-align: center; color: var(--text-dim); }
+.workbench-file-empty > svg { width: 48px; height: 48px; margin-bottom: 8px; opacity: .75; }
+.workbench-file-empty strong { color: var(--text); font-size: 18px; font-weight: 550; }
+.workbench-file-empty span { max-width: 200px; font-size: 13px; line-height: 1.65; color: var(--text-muted); }
 .is-files-docked #file-panel.right-panel-open { min-width: 520px; }
 .is-files-docked #file-panel > .workbench-files-body { width: 100%; min-width: 0; }
-.is-files-docked .workbench-file-tree { display: flex; flex-direction: column; flex: 0 0 auto; width: var(--workbench-tree-width, 320px); min-width: 200px; background: var(--bg); border-left: 1px solid var(--border); }
-.is-files-docked .workbench-tree-resizer { display: block; flex: 0 0 5px; margin-right: -5px; position: relative; z-index: 5; cursor: col-resize; touch-action: none; }
+.is-files-docked .workbench-file-tree { display: flex; flex-direction: column; flex: 0 0 auto; width: var(--workbench-tree-width, 320px); min-width: 0; overflow: hidden; background: var(--bg); border-left: 1px solid var(--border); transition: width 180ms ease, opacity 180ms ease; }
+.is-files-docked .workbench-file-tree > * { width: calc(var(--workbench-tree-width, 320px) - 1px); min-width: calc(var(--workbench-tree-width, 320px) - 1px); }
+.is-files-docked .workbench-tree-boundary { display: block; position: relative; flex: 0 0 0; z-index: 5; }
+.is-files-docked .workbench-tree-resizer { position: absolute; inset: 0 auto 0 -2px; width: 5px; cursor: col-resize; touch-action: none; }
 .is-files-docked .workbench-tree-resizer:hover, .is-files-docked .workbench-tree-resizer:focus-visible { background: color-mix(in srgb, var(--accent) 40%, transparent); }
-.workbench-tree-heading { height: 40px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; color: var(--text-muted); }
-.workbench-tree-heading button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; background: transparent; color: inherit; border-radius: 6px; cursor: pointer; }
-.workbench-tree-heading button:hover { background: var(--bg-hover); }
-.workbench-file-tree .sidebar-files-head { padding-top: 0; }
+.workbench-tree-collapse { position: absolute; top: 12px; right: -11px; display: grid; place-items: center; width: 22px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; opacity: 0; transform: translateX(3px); transition: opacity 150ms ease, transform 150ms ease; }
+.workbench-tree-boundary:hover .workbench-tree-collapse,
+.workbench-tree-boundary:focus-within .workbench-tree-collapse { opacity: 1; transform: none; }
+.workbench-tree-collapse:hover { color: var(--text); background: var(--bg-hover); }
+.file-tree-toggle { display: grid; place-items: center; width: 30px; height: 28px; flex-shrink: 0; margin-right: 5px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.file-tree-toggle:hover { background: var(--bg-hover); color: var(--text); }
+.file-tree-toggle:focus-visible, .workbench-tree-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.is-files-docked .is-tree-collapsed .workbench-file-tree { width: 0; border-left-width: 0; opacity: 0; pointer-events: none; }
+.is-files-docked .is-tree-collapsed .workbench-tree-boundary { visibility: hidden; }
+.right-panel-resizing .workbench-file-tree { transition: none; }
+.workbench-file-tree .sidebar-files-head { padding: 12px 12px 0; border-bottom: 0; }
+.workbench-file-tree .sidebar-files-actions { padding: 8px 0 4px; gap: 2px; }
+.workbench-file-tree .project-picker-button { border-radius: 8px; font-size: 12px; }
+.workbench-file-tree .file-explorer-search { position: sticky; top: 0; z-index: 2; padding: 8px 12px 12px !important; background: var(--bg); }
+.workbench-file-tree .file-explorer-search-input { height: 36px; padding: 7px 30px !important; border-radius: 999px !important; background: transparent !important; font-family: inherit !important; font-size: 12px !important; }
+.workbench-file-tree .file-explorer-search > div > svg { left: 12px !important; width: 14px; height: 14px; }
+.workbench-file-tree .file-explorer-tree-heading { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 16px 4px; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 
 
-/* A fresh workspace reserves only the directory width, not an empty preview. */
-.is-files-docked.is-preview-closed #file-panel.right-panel-open { width: var(--workbench-tree-width, 320px); min-width: 200px; }
-.is-files-docked.is-preview-closed #file-panel > * { width: 100%; min-width: 0; }
-.is-files-docked.is-preview-closed .workbench-file-preview,
-.is-files-docked.is-preview-closed .workbench-tree-resizer,
-.is-files-docked.is-preview-closed .file-panel-expand-button { display: none; }
-.is-files-docked.is-preview-closed .workbench-file-tree { border-left: 0; }
+@media (hover: none) { .workbench-tree-collapse { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .is-files-docked .workbench-file-tree, .workbench-tree-collapse { transition: none; }
+}
+
+/* Search floats above the file; opening it never shifts the reading position. */
+.file-find-bar { position: absolute; z-index: 30; top: 44px; right: 12px; width: min(360px, calc(100% - 24px)); padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); box-shadow: 0 6px 24px color-mix(in srgb, var(--text) 10%, transparent); }
+.file-find-row { display: flex; align-items: center; gap: 3px; }
+.file-find-row input { width: 0; min-width: 0; flex: 1; height: 28px; padding: 0 7px; border: 0; border-radius: 5px; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
+.file-find-row input::-webkit-search-cancel-button { display: none; }
+.file-find-bar:focus-within { border-color: var(--text-dim); }
+.file-find-count { min-width: 42px; padding: 0 3px; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.file-find-row button { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer; }
+.file-find-row button:hover { color: var(--text); background: var(--bg-hover); }
+.file-find-row button:disabled { opacity: .35; cursor: default; }
+.file-find-row button:focus-visible { outline: 2px solid var(--accent); }
+.file-find-scope { padding: 4px 7px 2px; color: var(--text-dim); font-size: 10px; line-height: 1.5; }
+.file-viewer-content:focus { outline: none; }
+.file-viewer-content:focus-visible { outline: 1px solid var(--border); outline-offset: -1px; }
+.file-find-highlights { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 4; }
+.file-find-highlights span { position: absolute; border-radius: 2px; background: var(--accent); opacity: .18; }
+.file-find-highlights span.is-current { opacity: .35; outline: 1px solid var(--accent); }
+
+/* A quiet tab shelf and a separate location row, shared by every file type. */
+.workspace-shell #file-panel > .file-panel-header {
+  height: calc(64px + env(safe-area-inset-top)) !important;
+  padding-right: 10px;
+  gap: 3px;
+  background: var(--bg) !important;
+  border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent) !important;
+}
+.file-panel-header > div:first-child { display: flex; align-self: stretch; min-width: 0; }
+.file-tab-strip { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 100%; padding: 10px 0 10px 12px; }
+.file-tab-list { display: flex; align-items: stretch; gap: 5px; min-width: 0; max-width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.file-tab { display: flex; align-items: center; flex: 0 0 auto; gap: 10px; min-width: 100px; max-width: 260px; padding: 0 8px 0 13px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--text-muted); font-size: 14px; cursor: pointer; white-space: nowrap; user-select: none; transition: background 120ms ease, border-color 120ms ease, color 120ms ease; }
+.file-tab:hover { background: var(--bg-hover); color: var(--text); }
+.file-tab.is-active { min-width: 240px; max-width: 300px; background: var(--bg-selected); border-color: color-mix(in srgb, var(--text-dim) 28%, var(--border)); color: var(--text); }
+.file-tab-icon { display: flex; align-items: center; flex: none; opacity: .7; }
+.file-tab.is-active .file-tab-icon { opacity: 1; }
+.file-tab-icon .catppuccin-file-icon { filter: grayscale(1); }
+.file-tab-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 450; }
+.file-tab.is-active .file-tab-label { font-weight: 550; }
+.file-tab-close, .file-tab-add { display: grid; place-items: center; flex: none; padding: 0; border: 0; background: transparent; color: var(--text-dim); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+.file-tab-close { width: 26px; height: 26px; margin-left: 6px; border-radius: 7px; opacity: .65; }
+.file-tab:hover .file-tab-close, .file-tab:focus-within .file-tab-close, .file-tab.is-active .file-tab-close { opacity: 1; }
+.file-tab-add { width: 34px; height: 34px; border-radius: 9px; }
+.file-tab-close:hover, .file-tab-add:hover { background: var(--bg-hover); color: var(--text); }
+.file-tab-close:disabled { opacity: .3; cursor: default; }
+.file-tab:focus-visible, .file-tab-close:focus-visible, .file-tab-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.workspace-shell .file-panel-header > .file-tree-toggle,
+.workspace-shell .file-panel-header > .file-panel-expand-button,
+.workspace-shell .file-panel-header > .file-panel-close-button { width: 32px !important; height: 32px !important; margin: 0 !important; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); }
+.workspace-shell .file-panel-header > button:hover { background: var(--bg-hover); color: var(--text); }
+.workspace-shell .file-panel-header > .file-panel-expand-button[aria-pressed="true"] { background: var(--bg-selected); color: var(--text); }
+
+.file-viewer-shell { container-type: inline-size; }
+.file-viewer-toolbar { flex-wrap: wrap; min-height: 68px; gap: 10px !important; padding: 14px 18px !important; border-bottom: 0 !important; }
+.file-viewer-path { display: flex; flex: 1 1 140px; min-width: 0; overflow: hidden; }
+.file-breadcrumb { display: inline-flex; align-items: center; gap: 0; max-width: 100%; min-width: 0; height: 36px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 999px; background: var(--bg-selected); color: var(--text-muted); font-family: inherit; font-size: 13px; line-height: 1.4; }
+.file-breadcrumb-parents { display: flex; align-items: center; flex: 0 2 auto; min-width: 0; overflow: hidden; }
+.file-breadcrumb-segment { display: inline-flex; align-items: center; gap: 9px; flex: none; padding-right: 9px; }
+.file-breadcrumb-segment svg { flex: none; opacity: .65; }
+.file-breadcrumb-current { flex: 0 1 auto; min-width: 48px; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; }
+.file-viewer-meta { display: none; font-size: 11px; color: var(--text-dim); }
+.file-viewer-live-indicator { width: 5px; height: 5px; flex-basis: 5px; background: var(--text-dim) !important; box-shadow: none !important; opacity: .45; }
+.file-viewer-controls { gap: 10px; margin-left: auto; }
+.file-viewer-actions { order: initial; height: 32px; gap: 3px; }
+.file-viewer-mode-switch { align-items: center; height: 34px; padding: 3px; gap: 2px; border: 0; border-radius: 999px; background: var(--bg-panel); }
+.file-viewer-mode-switch .file-viewer-mode-button { height: 28px; padding: 0 12px; border: 0; border-radius: 999px; font-size: 12px; }
+.file-viewer-toolbar .file-viewer-icon-button { width: 28px; height: 28px; flex-basis: 28px; border: 0; border-radius: 8px; }
+.file-media-toolbar > span { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.file-media-toolbar > span[title] { width: 7px; overflow: hidden; font-size: 0; gap: 0 !important; }
+.file-media-toolbar > span[title] > span { flex: 0 0 5px; width: 5px !important; height: 5px !important; background: var(--text-dim) !important; box-shadow: none !important; opacity: .45; }
+.file-find-bar { border-color: var(--border); box-shadow: 0 5px 20px color-mix(in srgb, var(--text) 8%, transparent); }
+@container (min-width: 900px) { .file-viewer-meta { display: inline; } }
+@container (max-width: 480px) {
+  .file-viewer-toolbar { padding: 12px !important; gap: 8px !important; }
+  .file-viewer-path { flex-basis: 100%; }
+  .file-viewer-live-indicator { display: none; }
+}
+@media (min-width: 641px) {
+  .workspace-chat-header > div:first-child { height: calc(64px + env(safe-area-inset-top)) !important; padding-inline: 16px; }
+  .workspace-location[data-view="chat"] > strong { color: var(--text-muted); font-size: 15px; font-weight: 500; }
+  .workspace-title-folder { color: var(--text-dim); }
+}
+@media (max-width: 640px) {
+  .workspace-shell #file-panel > .file-panel-header { min-height: 52px; height: calc(52px + env(safe-area-inset-top)) !important; padding-right: 6px; }
+  .file-tab-strip { padding: 8px 0 8px 8px; }
+  .file-tab { gap: 7px; min-width: 80px; max-width: 190px; padding-left: 10px; border-radius: 9px; font-size: 12px; }
+  .file-tab.is-active { min-width: 120px; max-width: 190px; }
+  .file-tab-close { margin-left: 2px; }
+  .file-breadcrumb { font-size: 12px; height: 32px; padding-inline: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .file-tab, .file-tab-close, .file-tab-add { transition: none; }
+}
+
+/* One desktop title shelf spans the conversation and its resource tabs.
+   Headers stay mounted in their original panes; only their containing block
+   changes, so chat, viewers, focus refs and tab ownership remain intact. */
+.workspace-main { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.workspace-main.has-unified-header {
+  --workspace-header-height: calc(64px + env(safe-area-inset-top));
+  --workspace-context-width: max(0px, calc(100% - var(--right-panel-width, 560px)));
+  padding-top: var(--workspace-header-height);
+}
+.workspace-unified-bar {
+  position: absolute; inset: 0 0 auto; height: var(--workspace-header-height);
+  background: var(--bg); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  pointer-events: none;
+}
+.has-unified-header .workspace-chat-header {
+  position: absolute; top: 0; left: 0; right: 0; height: var(--workspace-header-height);
+  z-index: 5; background: transparent !important;
+}
+.has-unified-header.is-files-open .workspace-chat-header { right: auto; width: var(--workspace-context-width); }
+.has-unified-header .workspace-chat-header { transition: width 200ms ease; }
+.has-unified-header.is-files-open .workspace-chat-header::after {
+  content: ""; position: absolute; right: 0; top: calc(20px + env(safe-area-inset-top)); bottom: 20px;
+  width: 1px; background: var(--border);
+}
+.has-unified-header .workspace-chat-header > div:first-child { background: transparent; }
+.has-unified-header.is-files-open .workspace-chat-header .workspace-files-toggle { width: 30px; padding: 0 !important; background: transparent !important; }
+.has-unified-header.is-files-open .workspace-chat-header .workspace-files-toggle > span { display: none; }
+.workspace-shell .has-unified-header #file-panel > .file-panel-header {
+  position: absolute; top: 0; left: var(--workspace-context-width); right: 0; z-index: 5;
+  width: auto; min-width: 0; height: var(--workspace-header-height) !important;
+  background: transparent !important; border-bottom: 0 !important;
+  transition: left 200ms ease;
+}
+.has-unified-header.is-focused-workspace { --workspace-context-width: clamp(260px, 30%, 360px); }
+.has-unified-header.is-panel-resizing .workspace-chat-header,
+.workspace-shell .has-unified-header.is-panel-resizing #file-panel > .file-panel-header { transition: none; }
+.has-unified-header .right-panel-closed > .file-panel-header { display: none !important; }
+/* Expanded panes share the main content area while their header entries remain
+   available. Keep both content trees mounted, at the same full-area geometry. */
+.is-files-docked #file-panel.right-panel-open.right-panel-reading-expanded {
+  width: 100%; min-width: 0; border-left: 0 !important;
+}
+.is-focused-workspace > .workspace-conversation { flex: 0 0 0 !important; width: 0; }
+.is-focused-workspace > .workspace-conversation > .workspace-content {
+  position: absolute !important; top: var(--workspace-header-height); left: 0; right: 0; bottom: 0;
+  z-index: 1;
+}
+.is-files-docked .is-focused-workspace #file-panel > .workbench-files-body {
+  position: absolute; top: var(--workspace-header-height); left: 0; right: 0; bottom: 0;
+  width: auto; min-width: 0; z-index: 1;
+}
+.is-file-focused .workspace-content,
+.is-conversation-focused .workbench-files-body { visibility: hidden; pointer-events: none; }
+.workspace-context-tab {
+  padding: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left;
+}
+.workspace-context-tab:disabled { cursor: default; opacity: 1; }
+.workspace-context-tab:not(:disabled) { cursor: pointer; }
+.workspace-context-tab[aria-pressed="true"] { background: var(--bg-selected); padding-inline: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .has-unified-header .workspace-chat-header,
+  .workspace-shell .has-unified-header #file-panel > .file-panel-header { transition: none; }
+}

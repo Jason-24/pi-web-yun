@@ -272,11 +272,14 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     const directory = page.locator("#workbench-file-tree");
     const preview = page.locator(".workbench-file-preview");
     await directory.getByText("example.ts", { exact: true }).waitFor();
-    assert.equal(await preview.isVisible(), false, "a directory-only workspace reserves no empty preview");
+    await preview.waitFor({ state: "visible" });
+    assert.equal(await preview.isVisible(), true, "the open-file picker reserves a preview beside the directory");
+    await filePanel.getByRole("tab", { name: "打开文件", exact: true }).waitFor();
     await directory.getByText("example.ts", { exact: true }).click();
     await preview.getByText("export const layout", { exact: false }).waitFor();
     const assertFileOrder = async () => {
       await page.waitForFunction(() => document.querySelector(".workbench-file-preview").getBoundingClientRect().width >= 275);
+      await directory.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {}))));
       const contentBox = await preview.boundingBox();
       const treeBox = await directory.boundingBox();
       assert.ok(contentBox.width >= 275, `the file content keeps a readable minimum width: ${JSON.stringify({ contentBox, treeBox, panel: await filePanel.boundingBox() })}`);
@@ -285,14 +288,14 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     };
     await page.screenshot({ path: resolve(artifacts, "workspace-file-split.png") });
     await assertFileOrder();
-    await filePanel.getByRole("button", { name: "全宽展示文件面板", exact: true }).click();
-    await page.waitForFunction(() => document.querySelector("#file-panel").getBoundingClientRect().width >= innerWidth - 1);
     const separator = page.locator(".workbench-tree-resizer");
     const originalTreeWidth = (await directory.boundingBox()).width;
     await separator.press("ArrowLeft");
+    await page.waitForFunction(width => document.querySelector("#workbench-file-tree").getBoundingClientRect().width >= width + 9, originalTreeWidth);
     assert.ok((await directory.boundingBox()).width > originalTreeWidth, "ArrowLeft grows the right directory");
     await separator.press("ArrowRight");
-    assert.equal((await directory.boundingBox()).width, originalTreeWidth);
+    await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < .1, originalTreeWidth);
+    assert.ok(Math.abs((await directory.boundingBox()).width - originalTreeWidth) < 1);
     const handle = await separator.boundingBox();
     await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
     await page.mouse.down();
@@ -301,15 +304,27 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.ok((await directory.boundingBox()).width >= originalTreeWidth + 45, "dragging left grows the directory");
     await assertFileOrder();
     await page.screenshot({ path: resolve(artifacts, "workspace-file-layout.png") });
+    await filePanel.getByRole("button", { name: "放大文件阅读", exact: true }).click();
+    await page.waitForFunction(() => Math.abs(document.querySelector("#file-panel").getBoundingClientRect().width - document.querySelector(".workspace-main").getBoundingClientRect().width) < 1);
+    await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+    assert.equal(await directory.evaluate(el => el.inert), true, "expanded reading temporarily hides the directory");
+    assert.equal(await input.isVisible(), false, "expanded reading fills the content area");
+    await page.locator(".workspace-context-tab").click();
+    assert.equal(await input.isVisible(), true, "the top context entry restores the conversation");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    await filePanel.getByRole("tab", { name: "example.ts", exact: true }).click();
+    assert.equal(await preview.isVisible(), true);
     await filePanel.getByRole("button", { name: "还原文件面板宽度", exact: true }).click();
     await page.setViewportSize({ width: 1024, height: 960 });
     await page.waitForFunction(() => getComputedStyle(document.querySelector("#workbench-file-tree")).display === "none");
+    assert.equal(await filePanel.locator(".file-panel-expand-button").count(), 0);
     assert.equal(await preview.isVisible(), true, "narrow screens retain the file preview");
     await page.setViewportSize({ width: 1440, height: 960 });
     await directory.getByText("example.ts", { exact: true }).waitFor();
     await assertFileOrder();
     await filePanel.getByRole("tab").getByRole("button", { name: "关闭 example.ts", exact: true }).click();
-    assert.equal(await preview.isVisible(), false, "closing the final file returns to directory-only layout");
+    assert.equal(await preview.locator(".workbench-file-empty").isVisible(), true, "closing the final file returns to the open-file picker");
+    await filePanel.getByRole("tab", { name: "打开文件", exact: true }).waitFor();
     await filePanel.getByRole("button", { name: "隐藏文件面板", exact: true }).click();
 
     // The companion is a floating utility, never a workspace destination.

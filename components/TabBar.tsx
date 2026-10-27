@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { getFileIcon } from "./FileIcons";
 import { useI18n } from "@/hooks/useI18n";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
@@ -24,27 +24,29 @@ interface Props {
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onOpenFiles?: () => void;
 }
 
-export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
+export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles }: Props) {
   const { t } = useI18n();
-  const [hoveredClose, setHoveredClose] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const revealActive = () => list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    revealActive();
+    const resize = new ResizeObserver(revealActive);
+    resize.observe(list);
+    return () => resize.disconnect();
+  }, [activeTabId]);
 
   return (
+    <div className="file-tab-strip">
     <div
+      ref={listRef}
       role="tablist"
-      style={{
-        // The tabs fill the scrollport, not a fixed 36px: once they overflow,
-        // the app's scrollbar (globals.css) takes its height out of the bar,
-        // and 36px tabs were pushed up past its top and clipped (#1225).
-        display: "flex",
-        alignItems: "stretch",
-        background: "var(--bg-panel)",
-        overflowX: "auto",
-        overflowY: "hidden",
-        flexShrink: 0,
-        height: 36,
-      }}
+      className="file-tab-list"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -52,6 +54,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
           <div
             key={tab.id}
             role="tab"
+            className={`file-tab${isActive ? " is-active" : ""}`}
             aria-label={tab.kind === "terminal" ? t("terminal.tabLabel", { name: tab.label }) : tab.kind === "agent" ? t("subagent.tabLabel", { name: tab.label }) : tab.label}
             aria-selected={isActive}
             tabIndex={isActive || (!activeTabId && tabs[0].id === tab.id) ? 0 : -1}
@@ -79,26 +82,8 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               e.stopPropagation();
               if (!tab.closing) onCloseTab(tab.id);
             }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              paddingLeft: 12,
-              paddingRight: 6,
-              borderRight: "1px solid var(--border)",
-              background: isActive ? "var(--bg)" : "var(--bg-panel)",
-              cursor: "pointer",
-              fontSize: 12,
-              color: isActive ? "var(--text)" : "var(--text-muted)",
-              whiteSpace: "nowrap",
-              maxWidth: 180,
-              minWidth: 80,
-              flexShrink: 0,
-              userSelect: "none",
-              transition: "background 0.1s, color 0.1s",
-            }}
           >
-            <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7, display: "flex", alignItems: "center" }}>
+            <span className="file-tab-icon">
               {tab.kind === "terminal" ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
@@ -107,36 +92,19 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
                 </svg>
-              ) : getFileIcon(tab.label, 13)}
+              ) : getFileIcon(tab.label, 17)}
             </span>
             <span
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                flex: 1,
-                fontWeight: isActive ? 500 : 400,
-              }}
+              className="file-tab-label"
               title={tab.filePath}
             >
               {tab.label}
             </span>
             <button
+              type="button"
+              className="file-tab-close"
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-              onMouseEnter={() => setHoveredClose(tab.id)}
-              onMouseLeave={() => setHoveredClose(null)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 24, height: 24,
-                background: hoveredClose === tab.id ? "var(--bg-hover)" : "transparent",
-                border: "none",
-                borderRadius: 4,
-                color: hoveredClose === tab.id ? "var(--text)" : "var(--text-dim)",
-                cursor: "pointer",
-                padding: 0,
-                flexShrink: 0,
-                transition: "background 0.1s, color 0.1s",
-              }}
                title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
                aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.label}`}
             >
@@ -148,6 +116,11 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
           </div>
         );
       })}
+    </div>
+    {onOpenFiles && <button type="button" className="file-tab-add" onClick={onOpenFiles}
+      title={t("files.chooseFile")} aria-label={t("files.chooseFile")}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
+    </button>}
     </div>
   );
 }

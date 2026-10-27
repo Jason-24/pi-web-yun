@@ -253,13 +253,25 @@ export function AppShell() {
   const sidebarHomeRef = useRef<HTMLButtonElement>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
-  const treeOnly = isWorkbenchDesktop && activeFileTabId === null;
+  const filePickerActive = isWorkbenchDesktop && activeFileTabId === null;
   const fileWorkspaceOpen = rightPanelOpen;
   const [rightPanelExpanded, setRightPanelExpanded] = useState(false);
-  const rightPanelFullWidth = fileWorkspaceOpen && rightPanelExpanded && !isMobile && !treeOnly;
+  const [expandedPane, setExpandedPane] = useState<"conversation" | "file">("file");
+  const rightPanelReadingExpanded = fileWorkspaceOpen && rightPanelExpanded && isWorkbenchDesktop;
+  const expandedFileVisible = rightPanelReadingExpanded && expandedPane === "file";
+  const expandedConversationVisible = rightPanelReadingExpanded && expandedPane === "conversation";
+  const canFocusWorkspace = isWorkbenchDesktop && fileWorkspaceOpen;
+  const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false);
+  const fileTreeHidden = isWorkbenchDesktop && !filePickerActive && (fileTreeCollapsed || rightPanelReadingExpanded);
+  const fileTreeToggleRef = useRef<HTMLButtonElement>(null);
+  const toggleFileTree = useCallback(() => {
+    if (rightPanelReadingExpanded) setRightPanelExpanded(false);
+    setFileTreeCollapsed(fileTreeHidden ? false : true);
+    fileTreeToggleRef.current?.focus({ preventScroll: true });
+  }, [fileTreeHidden, rightPanelReadingExpanded]);
   useEffect(() => {
-    if (!fileWorkspaceOpen || isMobile || treeOnly) setRightPanelExpanded(false);
-  }, [fileWorkspaceOpen, isMobile, treeOnly]);
+    if (!fileWorkspaceOpen || !isWorkbenchDesktop) setRightPanelExpanded(false);
+  }, [fileWorkspaceOpen, isWorkbenchDesktop]);
   const [mobileToolbarMoreOpen, setMobileToolbarMoreOpen] = useState(false);
   const [mobileSidebarReady, setMobileSidebarReady] = useState(false);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
@@ -277,9 +289,9 @@ export function AppShell() {
       : getSidebarMaxWidth({
         viewportWidth: window.innerWidth - (window.innerWidth > 640 ? 62 : 0),
         rightPanelOpen: fileWorkspaceOpen,
-        rightPanelWidth: treeOnly ? fileTreeWidthRef.current : rightPanelWidthRef.current,
+        rightPanelWidth: rightPanelWidthRef.current,
       }),
-    [fileWorkspaceOpen, treeOnly],
+    [fileWorkspaceOpen],
   );
   const getResponsiveRightPanelMaxWidth = useCallback(
     () => typeof window === "undefined"
@@ -325,20 +337,19 @@ export function AppShell() {
     defaultWidth: 320,
     minWidth: 200,
     maxWidth: 640,
-    getMaxWidth: useCallback(() => Math.max(200, Math.min(640, treeOnly
-      ? window.innerWidth - sidebarWidthRef.current - 62 - 420
-      : rightPanelWidthRef.current - 280)), [treeOnly]),
+    getMaxWidth: useCallback(() => Math.max(200, Math.min(640, rightPanelWidthRef.current - 280)), []),
     growthDirection: "left",
     persistClamp: false,
     storageKey: "pi-workbench-file-tree-width",
     widthRef: fileTreeWidthRef,
   });
   const fileTreePanelRef = fileTreeResizer.panelRef;
-  const sidebarPeek = useSidebarPeek(!isMobile && !sidebarOpen && !rightPanelFullWidth, sidebarResizer.panelRef, sidebarHomeRef);
+  const sidebarPeek = useSidebarPeek(!isMobile && !sidebarOpen, sidebarResizer.panelRef, sidebarHomeRef);
   const dismissSidebarPeek = sidebarPeek.dismiss;
   const filePanelRef = rightPanelResizer.panelRef;
   const attachFilePanel = useCallback((node: HTMLDivElement | null) => {
-    filePanelRef.current = node;
+    // The shared shelf and content divider consume the same live width.
+    filePanelRef.current = node?.parentElement as HTMLDivElement | null;
     fileTreePanelRef.current = node;
   }, [filePanelRef, fileTreePanelRef]);
   const attachFileExplorerDock = useCallback((node: HTMLDivElement | null) => { setFileExplorerDock(node); }, []);
@@ -359,7 +370,7 @@ export function AppShell() {
     if (!fileWorkspaceOpen) return;
     reclampSidebarWidth();
     reclampRightPanelWidth();
-  }, [reclampRightPanelWidth, reclampSidebarWidth, fileWorkspaceOpen, treeOnly, fileTreeResizer.width]);
+  }, [reclampRightPanelWidth, reclampSidebarWidth, fileWorkspaceOpen, fileTreeResizer.width]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const [pendingQuotePrompt, setPendingQuotePrompt] = useState<{ sessionId: string; text: string } | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -460,13 +471,10 @@ export function AppShell() {
     if (isMobile) setSidebarOpen(false);
   }, [settingsSection, isMobile]);
 
-  useEffect(() => {
-    if (rightPanelFullWidth) setActiveTopPanel(null);
-  }, [rightPanelFullWidth]);
-
   const toggleTopPanel = useCallback((
     panel: WorkspacePanel,
   ) => {
+    setExpandedPane("conversation");
     if (isMobile) setSidebarOpen(false);
     setSettingsSection(null);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
@@ -494,6 +502,7 @@ export function AppShell() {
   }, [activeTopPanel, systemInfoLoading, toggleTopPanel]);
 
   const openSessionStatsPanel = useCallback(() => {
+    setExpandedPane("conversation");
     if (isMobile) setSidebarOpen(false);
     setMobileToolbarMoreOpen(false);
     setActiveTopPanel("session");
@@ -501,6 +510,7 @@ export function AppShell() {
 
   // The composer opens Settings too: a bare /mcp opens Settings › MCP (useAgentSession).
   const openSettingsSection = useCallback((section: SettingsSection) => {
+    setExpandedPane("conversation");
     dismissSidebarPeek();
     setSettingsSection(section);
   }, [dismissSidebarPeek]);
@@ -540,6 +550,7 @@ export function AppShell() {
 
   const handleRightPanelExpandToggle = useCallback(() => {
     setActiveTopPanel(null);
+    setExpandedPane("file");
     setRightPanelExpanded((expanded) => !expanded);
   }, []);
 
@@ -892,6 +903,7 @@ export function AppShell() {
   }, [activeCwd, changeFileWorkspace, homeOpen, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => {
+    if (!isRestore) setExpandedPane("conversation");
     if (!isRestore) dismissSidebarPeek();
     setHomeOpen(false);
     setActiveTopPanel(null);
@@ -952,6 +964,7 @@ export function AppShell() {
   }, [activeCwd, changeFileWorkspace, dismissSidebarPeek, homeOpen, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession]);
 
   const handleNewSession = useCallback((sessionId: string, cwd: string, projectKey?: string | null, options?: NewSessionOptions) => {
+    setExpandedPane("conversation");
     dismissSidebarPeek();
     setHomeOpen(false);
     setSettingsSection(null);
@@ -1231,6 +1244,7 @@ export function AppShell() {
     fileName: string,
     options?: { sourceSessionId?: string | null; modeHint?: "diff"; page?: number },
   ) => {
+    setExpandedPane("file");
     const sourceSessionId = options?.sourceSessionId;
     const modeHint = options?.modeHint;
     const page = options?.page;
@@ -1254,6 +1268,7 @@ export function AppShell() {
   }, [handleOpenFile, selectedSession?.id]);
 
   const handleOpenTerminal = useCallback((cwd: string) => {
+    setExpandedPane("file");
     const existing = terminalTabs.find((tab) => tab.cwd === cwd);
     const tab = existing ?? newTerminalTab(cwd);
     if (!existing) setTerminalTabs((tabs) => [...tabs, tab]);
@@ -1264,6 +1279,7 @@ export function AppShell() {
 
   // Subagent work opens in a right-panel tab instead of hijacking the main chat.
   const handleOpenSubagentTab = useCallback((sessionId: string, label: string) => {
+    setExpandedPane("file");
     setAgentTabs((prev) => prev.some((tab) => tab.sessionId === sessionId) ? prev : [...prev, { sessionId, label }]);
     setActiveFileTabId(`agent:${sessionId}`);
     setRightPanelOpen(true);
@@ -1271,7 +1287,7 @@ export function AppShell() {
   }, [isMobile]);
 
   // The agent switcher's side-panel button: opens a subagent's tab, or closes
-  // it when the open panel already has it (the panel closes with its last tab).
+  // it when the open panel already has it (desktop keeps the directory open).
   // The switcher stays open beside the panel, except on phones, where the
   // panel covers the chat.
   const openSubagentTabIds = useMemo(
@@ -1292,7 +1308,7 @@ export function AppShell() {
     const remaining = terminalTabs.filter((item) => item.id !== tab.id);
     setTerminalTabs((tabs) => tabs.flatMap((item) => item.id !== tab.id ? [item] : replacement ? [replacement] : []));
     setActiveFileTabId((current) => current !== tab.id ? current : replacement?.id ?? remaining.at(-1)?.id ?? fileTabs.at(-1)?.id ?? lastAgentTabId(agentTabs));
-    if (!replacement && !remaining.length && !fileTabs.length && !agentTabs.length) setRightPanelOpen(false);
+    if (!isWorkbenchDesktop && !replacement && !remaining.length && !fileTabs.length && !agentTabs.length) setRightPanelOpen(false);
   };
 
   const handleCloseFileTab = useCallback((tabId: string) => {
@@ -1307,12 +1323,12 @@ export function AppShell() {
         if (cur !== tabId) return cur;
         return fileTabs.at(-1)?.id ?? terminalTabs.at(-1)?.id ?? lastAgentTabId(remainingAgents);
       });
-      if (fileTabs.length === 0 && terminalTabs.length === 0 && remainingAgents.length === 0) setRightPanelOpen(false);
+      if (!isWorkbenchDesktop && fileTabs.length === 0 && terminalTabs.length === 0 && remainingAgents.length === 0) setRightPanelOpen(false);
       return;
     }
     setFileTabs((prev) => {
       const next = prev.filter((t) => t.id !== tabId);
-      if (next.length === 0 && terminalTabs.length === 0 && agentTabs.length === 0) setRightPanelOpen(false);
+      if (!isWorkbenchDesktop && next.length === 0 && terminalTabs.length === 0 && agentTabs.length === 0) setRightPanelOpen(false);
       return next;
     });
     setActiveFileTabId((cur) => {
@@ -1320,7 +1336,7 @@ export function AppShell() {
       const remaining = fileTabs.filter((t) => t.id !== tabId);
       return remaining.at(-1)?.id ?? terminalTabs.at(-1)?.id ?? lastAgentTabId(agentTabs);
     });
-  }, [fileTabs, terminalTabs, agentTabs]);
+  }, [fileTabs, terminalTabs, agentTabs, isWorkbenchDesktop]);
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
@@ -1479,6 +1495,7 @@ export function AppShell() {
 
   const currentView: WorkspaceView = settingsSection ? "settings" : activeTopPanel ?? (homeOpen ? "home" : "chat");
   const openArchiveWorkspace = useCallback((projectKey?: string) => {
+    setExpandedPane("conversation");
     dismissSidebarPeek();
     setSettingsSection(null);
     setActiveTopPanel("archive");
@@ -1487,6 +1504,7 @@ export function AppShell() {
     if (isMobile) setSidebarOpen(false);
   }, [dismissSidebarPeek, isMobile]);
   const navigateWorkspace = (view: WorkspaceView) => {
+    setExpandedPane("conversation");
     dismissSidebarPeek();
     if (view === "home") {
       invalidateWorkspaceRestore();
@@ -1533,7 +1551,7 @@ export function AppShell() {
 
   const settingsNavigation = <WorkspaceNavigation activeView={currentView}
     conversationAvailable={Boolean(selectedSession || effectiveNewSessionCwd)} inspectionAvailable={showChat} sessionAvailable={Boolean(selectedSession)} mobile={isMobile}
-    covered={rightPanelFullWidth} homeButtonRef={sidebarHomeRef} onHomeHover={sidebarPeek.show} onHomeLeave={sidebarPeek.scheduleHide} onNavigate={navigateWorkspace} />;
+    homeButtonRef={sidebarHomeRef} onHomeHover={sidebarPeek.show} onHomeLeave={sidebarPeek.scheduleHide} onNavigate={navigateWorkspace} />;
 
   const sidebarContent = (
     <>
@@ -2125,7 +2143,7 @@ export function AppShell() {
         }
       }
     `}</style>
-    <div className={`workspace-shell${isWorkbenchDesktop ? " is-files-docked" : ""}${treeOnly ? " is-preview-closed" : ""}`} style={{
+    <div className={`workspace-shell${isWorkbenchDesktop ? " is-files-docked" : ""}`} style={{
       display: "flex",
       width: "100%",
       height: "var(--app-viewport-height, 100dvh)",
@@ -2155,7 +2173,7 @@ export function AppShell() {
       <div
         ref={sidebarResizer.panelRef}
         id="session-sidebar"
-        inert={rightPanelFullWidth || (!isMobile && !sidebarOpen && !sidebarPeek.open)}
+        inert={!isMobile && !sidebarOpen && !sidebarPeek.open}
         data-sidebar-peek={sidebarPeek.open ? "" : undefined}
         onPointerEnter={sidebarPeek.cancel}
         onPointerLeave={sidebarPeek.scheduleHide}
@@ -2184,7 +2202,6 @@ export function AppShell() {
               event.preventDefault(); handleSidebarToggle();
             } else sidebarResizer.separatorProps.onKeyDown(event);
           }}
-          inert={rightPanelFullWidth}
           aria-controls="session-sidebar"
           className={`panel-resize-handle sidebar-resize-handle${sidebarResizer.isResizing ? " is-resizing" : ""}`}
           data-resize-handle="sidebar"
@@ -2192,12 +2209,16 @@ export function AppShell() {
         />
       )}
       {!isMobile && !sidebarOpen && <button ref={sidebarRestoreRef} type="button" className="sidebar-edge-restore"
-        data-sidebar-restore="" inert={rightPanelFullWidth} aria-label={translate("sidebar.show")}
+        data-sidebar-restore="" aria-label={translate("sidebar.show")}
         title={translate("sidebar.show")} aria-controls="session-sidebar" aria-expanded={false}
         onClick={handleSidebarToggle} />}
 
+      <div className={`workspace-main${isWorkbenchDesktop ? " has-unified-header" : ""}${fileWorkspaceOpen ? " is-files-open" : ""}${rightPanelReadingExpanded ? " is-focused-workspace" : ""}${expandedFileVisible ? " is-file-focused" : ""}${expandedConversationVisible ? " is-conversation-focused" : ""}${rightPanelResizer.isResizing ? " is-panel-resizing" : ""}`}
+        style={{ "--right-panel-width": `${rightPanelResizer.width}px` } as React.CSSProperties}>
+      {isWorkbenchDesktop && <div className="workspace-unified-bar" aria-hidden="true" />}
+
       {/* Center: chat */}
-      <div className="workspace-conversation" inert={rightPanelFullWidth} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+      <div className="workspace-conversation" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Conversation title and mobile drawer toggle */}
         <div ref={topBarRef} className="workspace-chat-header" style={{ flexShrink: 0, background: "var(--bg-panel)" }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative", borderBottom: "1px solid var(--border)", height: "calc(36px + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
@@ -2226,11 +2247,17 @@ export function AppShell() {
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             <SidebarToggleIcon size={18} open={sidebarOpen} />
-          </button> : <span className="workspace-title-folder" aria-hidden="true"><FolderIcon size={17} /></span>}
-          <div className="workspace-location" data-view={currentView}>
+          </button> : <span className="workspace-title-folder" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" /></svg></span>}
+          <button type="button" className="workspace-location workspace-context-tab" data-view={currentView}
+            disabled={!canFocusWorkspace}
+            aria-label={translate("files.showWorkspace", { view: translate(WORKSPACE_VIEW_LABELS[currentView]) })}
+            aria-controls="workspace-conversation-content"
+            aria-pressed={canFocusWorkspace ? expandedConversationVisible : undefined}
+            onClick={() => { setRightPanelExpanded(true); setExpandedPane("conversation"); }}>
             <span>{translate(WORKSPACE_VIEW_LABELS[currentView])}</span>
-            {selectedSession && <strong title={sessionDisplayTitle(selectedSession)}>{sessionDisplayTitle(selectedSession)}</strong>}
-          </div>
+            {selectedSession && currentView !== "home" && <strong title={sessionDisplayTitle(selectedSession)}>{sessionDisplayTitle(selectedSession)}</strong>}
+            {!selectedSession && currentView === "chat" && <strong>{translate("navigation.chat")}</strong>}
+          </button>
           {!isMobile && currentView === "chat" && selectedSession && <button type="button" className="workspace-title-action"
             onClick={() => void handleAutoName()} disabled={selectedSession.transient || autoNameStatus.kind === "naming" || !((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0)}
             title={autoNameStatus.kind === "error" ? autoNameStatus.message : translate("title.generateSession")}>
@@ -2323,7 +2350,7 @@ export function AppShell() {
         </div>
 
         {/* Embedded views share the conversation workspace. */}
-        <div className="workspace-content" style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+        <div id="workspace-conversation-content" className="workspace-content" inert={expandedFileVisible} aria-hidden={expandedFileVisible || undefined} style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {settingsSection && (
             <SettingsPanel embedded
               cwd={projectTrustCwd}
@@ -2697,10 +2724,9 @@ export function AppShell() {
         className={`right-panel-overlay-backdrop${fileWorkspaceOpen ? " is-open" : ""}`}
         onClick={handleRightPanelClose}
       />
-      {fileWorkspaceOpen && (
+      {fileWorkspaceOpen && !rightPanelReadingExpanded && (
         <div
-          {...(treeOnly ? fileTreeResizer.separatorProps : rightPanelResizer.separatorProps)}
-          inert={rightPanelFullWidth}
+          {...rightPanelResizer.separatorProps}
           aria-controls="file-panel"
           className={`panel-resize-handle right-panel-resize-handle${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " is-resizing" : ""}`}
           data-resize-handle="right-panel"
@@ -2712,9 +2738,8 @@ export function AppShell() {
       <div
         ref={attachFilePanel}
         id="file-panel"
-        className={`right-panel-container${fileWorkspaceOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelFullWidth ? " right-panel-full-width" : ""}${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " right-panel-resizing" : ""}`}
+        className={`right-panel-container${fileWorkspaceOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelReadingExpanded ? " right-panel-reading-expanded" : ""}${fileTreeHidden ? " is-tree-collapsed" : ""}${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " right-panel-resizing" : ""}`}
         style={{
-          "--right-panel-width": `${rightPanelResizer.width}px`,
           "--workbench-tree-width": `${fileTreeResizer.width}px`,
           display: "flex",
           flexDirection: "column",
@@ -2723,7 +2748,7 @@ export function AppShell() {
         } as React.CSSProperties}
       >
         {/* Right panel tab bar */}
-        <div style={{
+        <div className="file-panel-header" style={{
           display: "flex",
           alignItems: "center",
           flexShrink: 0,
@@ -2733,29 +2758,49 @@ export function AppShell() {
           borderBottom: "1px solid var(--border)",
         }}>
           <div style={{ flex: 1, overflow: "hidden" }}>
-            {isWorkbenchDesktop && panelTabs.length === 0 && <span className="workbench-empty-tab">{translate("sidebar.tabFiles")}</span>}
-            {(!isWorkbenchDesktop || panelTabs.length > 0) && <TabBar
-              tabs={panelTabs}
-              activeTabId={activeFileTabId ?? ""}
-              onSelectTab={setActiveFileTabId}
-              onCloseTab={handleCloseFileTab}
-            />}
+            <TabBar
+              tabs={isWorkbenchDesktop && panelTabs.length === 0
+                ? [{ id: "file-picker", label: translate("workbench.openFile"), filePath: "" }]
+                : panelTabs}
+              activeTabId={expandedConversationVisible ? "" : activeFileTabId ?? (isWorkbenchDesktop && panelTabs.length === 0 ? "file-picker" : "")}
+              onSelectTab={(tabId) => { setActiveFileTabId(tabId === "file-picker" ? null : tabId); setExpandedPane("file"); }}
+              onCloseTab={(tabId) => { if (tabId === "file-picker") handleRightPanelClose(); else handleCloseFileTab(tabId); }}
+              onOpenFiles={isWorkbenchDesktop ? () => {
+                setRightPanelExpanded(false);
+                setFileTreeCollapsed(false);
+              } : undefined}
+            />
           </div>
-          <button
+          {isWorkbenchDesktop && !filePickerActive && <button
+            ref={fileTreeToggleRef}
+            type="button"
+            className="file-tree-toggle"
+            onClick={toggleFileTree}
+            aria-controls="workbench-file-tree"
+            aria-expanded={!fileTreeHidden}
+            title={translate(fileTreeHidden ? "files.showDirectory" : "files.hideDirectory")}
+            aria-label={translate(fileTreeHidden ? "files.showDirectory" : "files.hideDirectory")}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3" />
+              <path d="M15 4v16" />
+              <path d={fileTreeHidden ? "m10 9-3 3 3 3" : "m8 9 3 3-3 3"} />
+            </svg>
+          </button>}
+          {isWorkbenchDesktop && <button
             type="button"
             className="file-panel-expand-button"
             onClick={handleRightPanelExpandToggle}
             aria-controls="file-panel"
-            aria-pressed={rightPanelFullWidth}
-            title={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
-            aria-label={translate(rightPanelFullWidth ? "files.restorePanelWidth" : "files.expandPanel")}
+            aria-pressed={rightPanelReadingExpanded}
+            title={translate(rightPanelReadingExpanded ? "files.restorePanelWidth" : "files.expandPanel")}
+            aria-label={translate(rightPanelReadingExpanded ? "files.restorePanelWidth" : "files.expandPanel")}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d={rightPanelFullWidth
-                ? "M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"
-                : "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3.5" />
+              <path d="M12 4v16" />
             </svg>
-          </button>
+          </button>}
           <button
             type="button"
             onClick={handleRightPanelClose}
@@ -2775,7 +2820,7 @@ export function AppShell() {
           </button>
         </div>
 
-        <div className="workbench-files-body">
+        <div className="workbench-files-body" inert={expandedConversationVisible} aria-hidden={expandedConversationVisible || undefined}>
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
         <div className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {activeFileTab?.filePath ? (
@@ -2814,7 +2859,7 @@ export function AppShell() {
             <div key={tab.id} hidden={tab.id !== activeFileTabId} style={{ width: "100%", height: "100%" }}>
               <TerminalPanel
                 tab={tab}
-                active={fileWorkspaceOpen && tab.id === activeFileTabId}
+                active={fileWorkspaceOpen && !expandedConversationVisible && tab.id === activeFileTabId}
                 onRestart={() => setTerminalTabs((tabs) => tabs.map((item) => item.id === tab.id ? { ...item, closing: "restart" } : item))}
                 onClosed={() => handleTerminalClosed(tab)}
                 onCloseError={() => setTerminalTabs((tabs) => tabs.map((item) => item.id === tab.id ? { ...item, closing: undefined } : item))}
@@ -2831,9 +2876,17 @@ export function AppShell() {
             />
           )}
         </div>
-        <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
-        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" />
+        <div className="workbench-tree-boundary" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined}>
+          <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
+          {!filePickerActive && <button type="button" className="workbench-tree-collapse" onClick={toggleFileTree}
+            aria-controls="workbench-file-tree" aria-expanded={!fileTreeHidden}
+            title={translate("files.hideDirectory")} aria-label={translate("files.hideDirectory")}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>}
         </div>
+        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined} />
+        </div>
+      </div>
       </div>
       </div>
     </div>
