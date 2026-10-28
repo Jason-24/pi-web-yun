@@ -14,7 +14,6 @@ import {
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
 import { useEnterSendMode, setEnterSendMode } from "@/hooks/useEnterSendMode";
-import { useFilesPlacement, setFilesPlacement } from "@/hooks/useFilesPlacement";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
 import {
@@ -80,7 +79,6 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const enterSendMode = useEnterSendMode();
-  const filesPlacement = useFilesPlacement();
   const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
@@ -382,45 +380,6 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         {cacheMissNoticesError && <p role="alert" className="settings-general-error">{cacheMissNoticesError}</p>}
       </section>
 
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.sidebar")}</h3>
-        <div className="settings-chat-options">
-          <div
-            className="settings-chat-option settings-chat-switch-option"
-            role="radiogroup"
-            aria-label={t("settings.filesPlacement")}
-            aria-describedby="settings-files-placement-description"
-          >
-            <span>{t("settings.filesPlacement")}</span>
-            <div className="settings-send-mode-options">
-              <label className="settings-send-mode-option">
-                <input
-                  type="radio"
-                  name="files-placement"
-                  value="below"
-                  checked={filesPlacement === "below"}
-                  onChange={() => setFilesPlacement("below")}
-                  className="sr-only"
-                />
-                <span className="settings-send-mode-label">{t("settings.filesPlacementBelow")}</span>
-              </label>
-              <label className="settings-send-mode-option">
-                <input
-                  type="radio"
-                  name="files-placement"
-                  value="tab"
-                  checked={filesPlacement === "tab"}
-                  onChange={() => setFilesPlacement("tab")}
-                  className="sr-only"
-                />
-                <span className="settings-send-mode-label">{t("settings.filesPlacementTab")}</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        <p id="settings-files-placement-description" className="settings-general-description">{t("settings.filesPlacementDescription")}</p>
-      </section>
-
       {shellSettings?.isWindows && (
         <section className="settings-general-section">
           <h3 className="settings-general-heading">{t("settings.shellTool")}</h3>
@@ -583,7 +542,7 @@ export function SettingsPanel({
     >
       <div className="settings-dialog-surface">
         <div className="settings-dialog-header">
-          <strong className="settings-dialog-title">{t("settings.title")}</strong>
+          {!embedded && <strong className="settings-dialog-title">{t("settings.title")}</strong>}
           <select
             aria-label={t("settings.title")}
             value={section}

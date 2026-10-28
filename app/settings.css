@@ -1553,6 +1553,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 .settings-section-host {
@@ -1563,38 +1564,42 @@
   min-height: 0;
 }
 
-/* The page scrolls across the dialog's full width, so its scrollbar sits at the
-   dialog's edge; only the content keeps a readable column. */
+/* Keep the scrollbar at the page edge and size the columns to the available
+   workspace, including when the session or file panels are open. */
 .settings-general {
+  display: grid;
+  grid-template-columns: minmax(0, 680px);
+  align-content: start;
+  justify-content: center;
+  gap: 32px;
   width: 100%;
   height: 100%;
   padding: 26px clamp(18px, 4vw, 40px) 40px;
   overflow-y: auto;
 }
 
-.settings-general > * {
-  max-width: 600px;
-}
-
 .settings-general-section {
-  margin-top: 30px;
+  min-width: 0;
 }
 
-.settings-general-section:first-of-type {
-  margin-top: 0;
+@container (min-width: 900px) {
+  .settings-general {
+    grid-template-columns: repeat(2, minmax(0, 480px));
+    column-gap: 48px;
+  }
 }
 
 .settings-general-heading {
-  margin: 0 0 5px;
+  margin: 0 0 12px;
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
 }
 
 .settings-general-description {
   margin: 0 0 12px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -1610,7 +1615,6 @@
   grid-template-columns: repeat(15, minmax(0, 1fr));
   grid-auto-rows: 40px;
   gap: 10px;
-  max-width: 428px;
   padding: 4px;
 }
 
@@ -1776,13 +1780,12 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: 420px;
 }
 
 .settings-chat-option {
   width: 100%;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .settings-chat-switch-option {
@@ -1873,7 +1876,6 @@
   flex-direction: column;
   gap: 3px;
   width: 100%;
-  max-width: 420px;
 }
 
 .settings-language-option {
@@ -1938,13 +1940,12 @@
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  max-width: 420px;
   min-height: 44px;
   padding: 0 10px;
   border-radius: 5px;
   background: var(--bg-panel);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .settings-general-error {

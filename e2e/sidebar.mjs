@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 /*
  * The sidebar's sessions and files in either layout: on a desktop the files
  * sit below the sessions by default (both in view; the files section may be
- * folded to its header row), phones and Settings › General › File browser
- * "Separate tab" show one tab at a time. Both panels keep their ids in both.
+ * folded to its header row), phones and the legacy saved "tab" preference
+ * show one tab at a time. Both panels keep their ids in both.
  */
 
 /** Shows the explorer: the Files tab, or the files section opened. */
@@ -30,8 +30,8 @@ export async function showSidebarSessions(page) {
 }
 
 /**
- * On a desktop both regions show by default; "Separate tab" brings the tabs
- * back and "Below sessions" returns, the file tree mounted throughout: its
+ * On an undocked desktop both regions show by default; the legacy preference
+ * can still bring the tabs back, with the file tree mounted throughout: its
  * own root stays on the page and its file search keeps its query, which a
  * remount would lose (open folders would come back from the per-folder
  * memory, so they prove nothing).
@@ -53,17 +53,18 @@ export async function checkFilesPlacement(page) {
   await fileQuery.fill("e2e-placement");
   // FileExplorer's root, not the scroll box the sidebar always renders around it.
   const tree = await page.locator("#session-sidebar-panel-files .sidebar-files-scroll > *").first().elementHandle();
-  const choose = async (label) => {
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await page.locator(".settings-section-tabs").getByRole("button", { name: "General", exact: true }).click();
-    const radio = page.getByRole("radio", { name: label, exact: true });
-    await radio.locator("..").click();
-    assert.equal(await radio.isChecked(), true);
-    await page.keyboard.press("Escape");
-    await page.getByRole("dialog", { name: "Settings", exact: true }).waitFor({ state: "hidden" });
+  // The setting was retired from General. Exercise the compatibility store as
+  // another browser tab would, without depending on the removed controls.
+  const choose = async (placement) => {
+    await page.evaluate((value) => {
+      const key = "pi-web:sidebar-files-placement";
+      const oldValue = localStorage.getItem(key);
+      localStorage.setItem(key, value);
+      window.dispatchEvent(new StorageEvent("storage", { key, oldValue, newValue: value, storageArea: localStorage }));
+    }, placement);
   };
 
-  await choose("Separate tab");
+  await choose("tab");
   await tablist.waitFor();
   assert.equal(await tablist.getByRole("tab").count(), 2);
   assert.equal(await tablist.getByRole("tab", { name: "Files", exact: true }).count(), 1);
@@ -72,7 +73,7 @@ export async function checkFilesPlacement(page) {
   await showSidebarFiles(page);
   await page.getByRole("tabpanel", { name: "Files", exact: true }).waitFor();
 
-  await choose("Below sessions");
+  await choose("below");
   await sessions.waitFor();
   await files.waitFor();
   assert.equal(await tablist.count(), 0);

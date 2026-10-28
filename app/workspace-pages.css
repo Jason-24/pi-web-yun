@@ -40,9 +40,9 @@
 /* The settings categories use the same host, without modal geometry or a backdrop. */
 .settings-dialog-backdrop.is-embedded { position: static; display: flex; align-items: stretch; justify-content: stretch; width: 100%; height: 100%; padding: 0; background: var(--bg); z-index: auto; }
 .settings-dialog-backdrop.is-embedded > .settings-dialog-surface { width: 100%; max-width: none; height: 100%; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
-.settings-dialog-backdrop.is-embedded .settings-dialog-header { flex-wrap: wrap; height: auto; min-height: 64px; padding: 16px 56px 16px 20px; }
-.settings-dialog-backdrop.is-embedded .settings-dialog-title { font-size: 20px; }
-.settings-dialog-backdrop.is-embedded .settings-section-tabs { margin-left: auto; }
+.settings-dialog-backdrop.is-embedded .settings-dialog-header { padding: 0 52px 0 clamp(18px, 4vw, 40px); }
+.settings-dialog-backdrop.is-embedded .settings-section-tabs { margin: 0 0 0 -14px; }
+.settings-dialog-backdrop.is-embedded .settings-section-tab { flex: 0 0 auto; width: auto; padding: 0 14px; }
 
 .sidebar-archive-entry { display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-height: 38px; margin: 4px 8px 8px; padding: 8px 10px; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
 .sidebar-archive-entry:hover, .sidebar-archive-entry[aria-current="page"] { color: var(--text); background: var(--bg-selected); }
@@ -84,8 +84,7 @@
 .archive-workspace-empty { padding: 48px 20px; color: var(--text-muted); font-size: 13px; line-height: 1.8; text-align: center; border: 1px dashed var(--border); border-radius: 12px; }
 .archive-workspace-error { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 12px; }
 @media (max-width: 1000px) {
-  .settings-dialog-backdrop.is-embedded .settings-dialog-header { gap: 10px; }
-  .settings-dialog-backdrop.is-embedded .settings-section-tabs { margin-left: 0; flex-wrap: wrap; }
+  .settings-dialog-backdrop.is-embedded .settings-mobile-section-picker { margin: 10px 0; }
   .workspace-page-header { padding: 16px 20px; }
 }
 @media (max-width: 640px) {
