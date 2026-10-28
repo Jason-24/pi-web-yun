@@ -89,6 +89,28 @@ try {
   assert.equal(await opener.getAttribute("aria-selected"), "true");
   assert.equal(await panel.locator(".workbench-file-empty").isVisible(), true, "the empty picker keeps a visible preview placeholder");
   await page.waitForFunction(() => Math.abs(document.querySelector(".file-panel-header").getBoundingClientRect().left - document.querySelector("#file-panel").getBoundingClientRect().left) < 1);
+  // The empty picker supports dragging its directory boundary closed too.
+  const dragTreeClosed = async (cancel = false) => {
+    const handle = panel.locator(".workbench-tree-resizer");
+    const box = await handle.boundingBox();
+    const width = (await tree.boundingBox()).width;
+    await page.mouse.move(box.x + box.width / 2, box.y + 160);
+    await page.mouse.down();
+    await page.mouse.move(box.x + width - 60, box.y + 160, { steps: 10 });
+    if (cancel) await handle.dispatchEvent("pointercancel", { pointerId: 1 });
+    await page.mouse.up();
+  };
+  const pickerTreeWidth = Math.round((await tree.boundingBox()).width);
+  await dragTreeClosed();
+  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  assert.equal(await tree.getAttribute("inert"), "");
+  assert.equal(await page.evaluate(() => localStorage.getItem("pi-workbench-file-tree-width")), String(pickerTreeWidth));
+  await panel.locator(".workbench-tree-restore").click();
+  await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, pickerTreeWidth);
+  await dragTreeClosed(true);
+  assert.equal(await panel.locator(".workbench-tree-restore").count(), 0, "Cancelling a drag never collapses the directory");
+  await panel.locator(".workbench-tree-resizer").press("Enter");
+  await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, pickerTreeWidth);
   const fileFilter = tree.getByRole("textbox", { name: "搜索文件", exact: true });
   await fileFilter.waitFor();
   assert.equal(await fileFilter.evaluate(el => el === document.activeElement), false, "a passive dock filter never steals focus");
@@ -132,8 +154,7 @@ try {
   await content.evaluate(el => { el.dataset.instance = "same"; el.scrollTop = 200; });
   const originalWidth = (await panel.locator(".workbench-file-preview").boundingBox()).width;
   const treeWidth = (await tree.boundingBox()).width;
-  await panel.locator(".workbench-tree-collapse").focus();
-  await panel.locator(".workbench-tree-collapse").press("Enter");
+  await dragTreeClosed();
   await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
   assert.ok((await panel.locator(".workbench-file-preview").boundingBox()).width > originalWidth + 150);
   assert.equal(await tree.evaluate(el => el.inert), true);

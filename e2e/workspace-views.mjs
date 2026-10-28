@@ -15,7 +15,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
   const other = { ...session, id: "workspace-other", name: "另一项项目任务" };
   const messages = [
     { role: "user", content: "检查工作区的导航与视图切换", timestamp: 1792972800000 },
-    { role: "assistant", content: [{ type: "text", text: "会话已经加载。\n\n" + "保持当前对话与草稿，切换视图时继续接收会话事件。\n\n".repeat(40) }], timestamp: 1792972801000, stopReason: "stop" },
+    { role: "assistant", content: [{ type: "text", text: "会话已经加载。\n\n" + "保持当前对话与草稿，切换视图时继续接收会话事件。\n\n".repeat(40) }], timestamp: 1792972801000, stopReason: "stop", usage: { input: 25000, output: 19000, cacheRead: 0, cacheWrite: 0, totalTokens: 44000, cost: { input: 0.075, output: 0.285, cacheRead: 0, cacheWrite: 0, total: 0.36 } } },
   ];
   const contextPage = { messages, entryIds: ["user", "answer"], oldestEntryId: "user", hasMore: true, turnsBefore: 0, thinkingLevel: "off", model: null };
   const tree = [1, 2].map(index => ({ entry: { type: "message", id: `branch-${index}`, parentId: null,
@@ -70,6 +70,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
       return reply({ sessionId: isOther ? other.id : session.id, info: isOther ? other : session, context: contextPage, filePath: "", tree: isOther ? tree.slice(0, 1) : tree, leafId: "branch-1", totalActiveMs: 0 });
     }
     if (path.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: 'data: {"type":"connected","isStreaming":false}\n\n' });
+    if (path.startsWith("/api/agent/") && request.method() === "GET") return reply({ state: { isStreaming: false, contextUsage: { percent: 16.4, tokens: 78000, contextWindow: 475000 } } });
     if (path.startsWith("/api/agent/") && request.method() === "POST") {
       const command = request.postDataJSON() ?? {};
       commands.push(command.type);
@@ -92,6 +93,27 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     const view = id => nav.locator(`[data-workspace-view="${id}"]`);
     const input = page.locator(".workspace-chat-view textarea").first();
     await input.waitFor({ timeout: 90000 });
+    const costBadge = page.locator(".composer-session-stat-cost");
+    await costBadge.waitFor();
+    assert.equal(await costBadge.innerText(), "$0.36", "Desktop composer exposes the billed session amount");
+    const contextRing = page.locator("[data-context-usage]");
+    await contextRing.waitFor();
+    assert.equal(await contextRing.innerText(), "", "Context details stay hidden at rest");
+    assert.equal(await page.getByRole("tooltip").count(), 0);
+    await contextRing.hover();
+    const contextTooltip = page.getByRole("tooltip");
+    await contextTooltip.waitFor();
+    assert.match(await contextTooltip.innerText(), /16% 已用（剩余 84%）/);
+    assert.match(await contextTooltip.innerText(), /已用 78k 标记，共 475k/);
+    assert.equal(await page.locator("#workspace-usage-page").count(), 0, "Hover never opens the usage page");
+    await page.screenshot({ path: resolve(artifacts, "context-usage-hover.png") });
+    await page.mouse.move(20, 20);
+    await contextTooltip.waitFor({ state: "hidden" });
+    await contextRing.focus();
+    await contextTooltip.waitFor();
+    await page.keyboard.press("Escape");
+    await contextTooltip.waitFor({ state: "hidden" });
+    await input.focus();
     const conversationHeader = page.locator(".workspace-chat-header");
     assert.equal(await conversationHeader.locator(".workspace-sidebar-toggle").count(), 0, "desktop sidebar control lives outside the reading header");
     assert.equal(await conversationHeader.locator(":scope > div").first().evaluate(el => getComputedStyle(el).borderBottomWidth), "0px", "no divider cuts across the transcript");

@@ -4,9 +4,10 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { CloseIcon, ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarPeek } from "@/hooks/useSidebarPeek";
 import { ChatWindow } from "./ChatWindow";
+import { ContextUsageIndicator } from "./ContextUsageIndicator";
 import { HomeView } from "./HomeView";
 import { ArchiveView } from "./ArchiveView";
 import type { ArchiveSnapshot } from "@/lib/session-archive";
@@ -262,8 +263,12 @@ export function AppShell() {
   const expandedConversationVisible = rightPanelReadingExpanded && expandedPane === "conversation";
   const canFocusWorkspace = isWorkbenchDesktop && fileWorkspaceOpen;
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false);
-  const fileTreeHidden = isWorkbenchDesktop && !filePickerActive && (fileTreeCollapsed || rightPanelReadingExpanded);
+  const fileTreeHidden = isWorkbenchDesktop && (fileTreeCollapsed || (!filePickerActive && rightPanelReadingExpanded));
   const fileTreeToggleRef = useRef<HTMLButtonElement>(null);
+  const fileTreeRestoreRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (filePickerActive) setFileTreeCollapsed(false);
+  }, [filePickerActive]);
   const toggleFileTree = useCallback(() => {
     if (rightPanelReadingExpanded) setRightPanelExpanded(false);
     setFileTreeCollapsed(fileTreeHidden ? false : true);
@@ -340,6 +345,11 @@ export function AppShell() {
     getMaxWidth: useCallback(() => Math.max(200, Math.min(640, rightPanelWidthRef.current - 280)), []),
     growthDirection: "left",
     persistClamp: false,
+    collapseAt: 120,
+    onCollapse: useCallback(() => {
+      setFileTreeCollapsed(true);
+      requestAnimationFrame(() => fileTreeRestoreRef.current?.focus({ preventScroll: true }));
+    }, []),
     storageKey: "pi-workbench-file-tree-width",
     widthRef: fileTreeWidthRef,
   });
@@ -1935,19 +1945,14 @@ export function AppShell() {
 
     const tokens = sessionStats?.tokens;
     const cost = sessionStats?.cost ?? 0;
-    const formatCompact = formatCompactCount;
     const costText = formatCostShort(cost);
 
     let contextColor = "var(--text-muted)";
-    let desktopContextText: string | null = null;
     let mobileContextText: string | null = null;
     if (contextUsage?.contextWindow) {
       const percent = contextUsage.percent;
       if (percent !== null && percent > 90) contextColor = "#ef4444";
       else if (percent !== null && percent > 70) contextColor = "rgba(234,179,8,0.95)";
-      desktopContextText = percent !== null
-        ? `${percent.toFixed(0)}% / ${formatCompact(contextUsage.contextWindow)}`
-        : `? / ${formatCompact(contextUsage.contextWindow)}`;
       mobileContextText = percent !== null ? `${percent.toFixed(0)}%` : null;
     }
 
@@ -1965,13 +1970,10 @@ export function AppShell() {
     }
     const tooltip = tooltipParts.join("  |  ");
     const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
-    const hasMobileValues = Boolean(
-      (tokens && (tokens.input > 0 || tokens.output > 0))
-      || costText
-      || mobileContextText,
-    );
+    const hasMobileValues = Boolean(costText || mobileContextText);
 
     return (
+      <div style={{ display: mobile ? "contents" : "flex", alignItems: "center", minWidth: 0 }}>
       <button
         type="button"
         onClick={() => toggleTopPanel("session")}
@@ -2016,22 +2018,6 @@ export function AppShell() {
       >
         {mobile ? (
           <>
-            {tokens && tokens.input > 0 && (
-              <span className="mobile-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
-                </svg>
-                {formatCompact(tokens.input)}
-              </span>
-            )}
-            {tokens && tokens.output > 0 && (
-              <span className="mobile-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-                </svg>
-                {formatCompact(tokens.output)}
-              </span>
-            )}
             {costText && (
               <span className="mobile-session-stat-cost" style={{ color: "var(--text)", fontWeight: 500, flexShrink: 0 }}>
                 {costText}
@@ -2050,33 +2036,18 @@ export function AppShell() {
           </>
         ) : (
           <>
-            {tokens && tokens.input > 0 && (
-              <span className="composer-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
-                </svg>
-                {formatCompact(tokens.input)}
+            {costText && (
+              <span className="composer-session-stat-cost" style={{ color: "var(--text)", fontWeight: 500, flexShrink: 0 }}>
+                {costText}
               </span>
             )}
-            {tokens && tokens.output > 0 && (
-              <span className="composer-session-stat-io" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-                </svg>
-                {formatCompact(tokens.output)}
-              </span>
-            )}
-            {desktopContextText && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4, color: contextColor }}>
-                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9" /><line x1="1" y1="9" x2="9" y2="9" />
-                </svg>
-                {desktopContextText}
-              </span>
-            )}
+
           </>
         )}
       </button>
+      {!mobile && contextUsage && contextUsage.contextWindow > 0 && <ContextUsageIndicator usage={contextUsage}
+        onClick={() => toggleTopPanel("session")} expanded={activeTopPanel === "session"} />}
+      </div>
     );
   };
 
@@ -2771,7 +2742,7 @@ export function AppShell() {
               } : undefined}
             />
           </div>
-          {isWorkbenchDesktop && !filePickerActive && <button
+          {isWorkbenchDesktop && (!filePickerActive || fileTreeHidden) && <button
             ref={fileTreeToggleRef}
             type="button"
             className="file-tree-toggle"
@@ -2797,8 +2768,7 @@ export function AppShell() {
             aria-label={translate(rightPanelReadingExpanded ? "files.restorePanelWidth" : "files.expandPanel")}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="3.5" />
-              <path d="M12 4v16" />
+              <path d="M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6" />
             </svg>
           </button>}
           <button
@@ -2816,7 +2786,10 @@ export function AppShell() {
               color: "var(--text-muted)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
             }}
           >
-            <CloseIcon size={16} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3.5" />
+              <path d="M12 4v16" />
+            </svg>
           </button>
         </div>
 
@@ -2885,6 +2858,10 @@ export function AppShell() {
           </button>}
         </div>
         <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined} />
+        {isWorkbenchDesktop && fileTreeHidden && !rightPanelReadingExpanded && <button ref={fileTreeRestoreRef}
+          type="button" className="workbench-tree-restore" onClick={toggleFileTree}
+          aria-label={translate("files.showDirectory")} title={translate("files.showDirectory")}
+          aria-controls="workbench-file-tree" aria-expanded={false} />}
         </div>
       </div>
       </div>

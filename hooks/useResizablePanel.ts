@@ -149,7 +149,7 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     // Kept apart from the size shown, the user's size changes only when the
     // drag moved: a plain click would save what a short window clamped it to.
     if (!cancelled && onCollapse && collapseAt !== undefined && drag.requestedWidth < collapseAt) {
-      commitWidth(drag.startWidth, { forcePersist: true });
+      commitWidth(persistClamp ? drag.startWidth : preferredRef.current, { forcePersist: true });
       onCollapse();
     } else {
       commitWidth(widthRef.current, { forcePersist: persistClamp || widthRef.current !== drag.startWidth });

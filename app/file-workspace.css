@@ -1,5 +1,5 @@
 /* The file workspace shows content on the left and its directory on the right. */
-.workbench-files-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.workbench-files-body { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .workbench-file-preview { position: relative; }
 .workbench-file-tree, .workbench-tree-boundary { display: none; }
 .workbench-file-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px; text-align: center; color: var(--text-dim); }
@@ -22,6 +22,8 @@
 .file-tree-toggle:focus-visible, .workbench-tree-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .is-files-docked .is-tree-collapsed .workbench-file-tree { width: 0; border-left-width: 0; opacity: 0; pointer-events: none; }
 .is-files-docked .is-tree-collapsed .workbench-tree-boundary { visibility: hidden; }
+.workbench-tree-restore { position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; width: 8px; padding: 0; border: 0; border-left: 1px solid var(--border); background: transparent; cursor: pointer; }
+.workbench-tree-restore:hover, .workbench-tree-restore:focus-visible { background: var(--bg-hover); outline: none; border-left: 2px solid var(--accent); }
 .right-panel-resizing .workbench-file-tree { transition: none; }
 .workbench-file-tree .sidebar-files-head { padding: 12px 12px 0; border-bottom: 0; }
 .workbench-file-tree .sidebar-files-actions { padding: 8px 0 4px; gap: 2px; }

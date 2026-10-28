@@ -53,6 +53,8 @@ try {
   await character().click();
   await waitFor("data-pose", "happy");
   await canvasPose("happy");
+  const heart = pet.locator('span[aria-hidden="true"] svg path').first();
+  assert.equal(await heart.evaluate(el => getComputedStyle(el).fill), "rgb(240, 98, 146)", "Pat hearts stay pink independently of theme accent");
   assert.ok(await pet.locator('[data-living]').evaluate((el) => el.getAnimations().length > 0), "Patting restores a small hop without scaling the face");
   assert.match(await pet.innerText(), /治愈|温柔/);
   await more().click();
@@ -166,6 +168,10 @@ try {
   await touch.detach();
   await page.clock.install();
   await page.clock.fastForward(95000);
+  assert.equal(await pet.getAttribute("data-status"), "idle", "Idle time must never put the companion to sleep");
+  assert.equal(await pet.getAttribute("data-pose"), "idle");
+  await more().click();
+  await page.getByRole("button", { name: "休息一下", exact: true }).click();
   await waitFor("data-status", "sleeping");
   const wakeBox = await character().boundingBox();
   await page.touchscreen.tap(wakeBox.x + wakeBox.width / 2, wakeBox.y + 40);

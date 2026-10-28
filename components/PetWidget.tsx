@@ -51,7 +51,6 @@ export function PetWidget() {
   const backgroundMood: Mood = background.waiting.some((id) => id !== activity.sessionId) ? "waiting"
     : background.running.some((id) => id !== activity.sessionId) ? "busy" : "idle";
   const mood: Mood = activity.phase === "waiting" ? "waiting" : activity.phase !== "idle" ? "busy" : backgroundMood;
-  const [sleepy, setSleepy] = useState(false);
   const [resting, setResting] = useState(false);
   const [action, setAction] = useState<Pose | null>(null);
   const [greeting, setGreeting] = useState("");
@@ -65,7 +64,6 @@ export function PetWidget() {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; origin: Position; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
-  const lastActivityRef = useRef(0);
   const previousMoodRef = useRef<Mood>("idle");
   const previousPhaseRef = useRef(activity.phase);
   const previousResultRef = useRef<number | undefined>(undefined);
@@ -85,7 +83,6 @@ export function PetWidget() {
   }, [t]);
 
   useEffect(() => {
-    lastActivityRef.current = Date.now();
     try {
       setVisible(localStorage.getItem(VISIBLE_KEY) === "1");
       setSmall(localStorage.getItem(SMALL_KEY) === "1");
@@ -135,7 +132,6 @@ export function PetWidget() {
             });
           }
         } catch { /* Preserve the last known state on a network failure. */ }
-        if (!cancelled) setSleepy(Date.now() - lastActivityRef.current > 90000);
       }
       if (!cancelled) timer = setTimeout(tick, 2500);
     };
@@ -148,7 +144,6 @@ export function PetWidget() {
     if (!visible) { previousResultRef.current = activity.result?.sequence; return; }
     const changed = mood !== previousMoodRef.current || activity.phase !== previousPhaseRef.current;
     if (changed) {
-      lastActivityRef.current = Date.now(); setSleepy(false);
       if (mood !== "idle") {
         setResting(false); clearTimeout(actionTimerRef.current); setAction(null);
         const key = mood === "waiting" ? "pet.attention" : activity.phase === "replying" ? "pet.replying"
@@ -161,7 +156,7 @@ export function PetWidget() {
     previousMoodRef.current = mood; previousPhaseRef.current = activity.phase;
     if (activity.phase === "idle" && activity.result && activity.result.sequence !== previousResultRef.current) {
       previousResultRef.current = activity.result.sequence;
-      lastActivityRef.current = Date.now(); setSleepy(false); setResting(false);
+      setResting(false);
       const kind = activity.result.kind;
       speak(kind === "complete" ? "pet.greetDone" : kind === "stopped" ? "pet.stopped" : "pet.failed", kind === "complete" ? "cheer" : "wave");
       if (kind === "complete") setHop((value) => value + 1);
@@ -204,7 +199,7 @@ export function PetWidget() {
   }, [visible, menuOpen, position, small]);
 
   const wake = () => {
-    lastActivityRef.current = Date.now(); setSleepy(false); setResting(false);
+    setResting(false);
   };
   const hide = () => {
     setVisible(false); storePreference(VISIBLE_KEY, "0"); toggleRef.current?.focus();
@@ -248,7 +243,7 @@ export function PetWidget() {
     if (drag.moved && position) storePreference(POSITION_KEY, JSON.stringify(position));
   };
 
-  const asleep = mood === "idle" && (resting || sleepy);
+  const asleep = mood === "idle" && resting;
   const pose: Pose = asleep ? "sleep" : action ?? (mood === "busy" ? "thinking" : mood === "waiting" ? "wave" : "idle");
   const status = asleep ? "sleeping" : mood;
 
@@ -276,7 +271,7 @@ export function PetWidget() {
           <span className={styles.ground} aria-hidden="true" />
           <PetLivingPortrait pose={pose} dragging={dragging} hop={hop} />
           {asleep && <span className={styles.zzz} aria-hidden="true">z <span>z</span> Z</span>}
-          {reaction > 0 && <span key={reaction} className={styles.hearts} aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} style={{ "--i": item } as CSSProperties}>♡</span>)}</span>}
+          {reaction > 0 && <span key={reaction} className={styles.hearts} aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} style={{ "--i": item } as CSSProperties}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 3.5 12.7C-2 7.3 5.8-.5 11.2 4.9l.8.8.8-.8C18.2-.5 26 7.3 20.5 12.7Z" /></svg></span>)}</span>}
         </button>
         <div className={styles.nameplate}>
           <button className={styles.identity} type="button" aria-label={t("pet.move")} title={t("pet.moveHint")}
@@ -296,7 +291,6 @@ export function PetWidget() {
           </button>
           <button ref={menuButtonRef} type="button" className={styles.more} aria-label={t("pet.actions")} title={t("pet.actions")}
             aria-expanded={menuOpen} aria-controls="pet-actions" onClick={() => {
-              lastActivityRef.current = Date.now();
               const rect = petRef.current?.getBoundingClientRect();
               setMenuSide(rect && rect.left >= 240 ? "left" : rect && window.innerWidth - rect.right >= 240 ? "right" : "inside");
               setMenuOpen((value) => !value);
@@ -308,10 +302,10 @@ export function PetWidget() {
           </div>
           <div className={styles.actionGrid}>
             <button type="button" onClick={() => interact("wave")}><Icon name="wave" />{t("pet.hello")}</button>
-            <button type="button" onClick={() => interact("happy")}><Icon name="heart" />{t("pet.pat")}</button>
+            <button type="button" onClick={() => interact("happy")}><span className={styles.patIcon}><Icon name="heart" /></span>{t("pet.pat")}</button>
             <button type="button" onClick={() => interact("cheer")}><Icon name="cheer" />{t("pet.encourage")}</button>
             <button type="button" onClick={() => {
-              lastActivityRef.current = Date.now(); setSleepy(false); setResting(!asleep); setMenuOpen(false);
+              setResting(!asleep); setMenuOpen(false);
               menuButtonRef.current?.focus();
               speak(asleep ? "pet.wakeReply" : "pet.sleepReply", asleep ? "wave" : "sleep");
             }}><Icon name="moon" />{t(asleep ? "pet.wake" : "pet.rest")}</button>
