@@ -56,7 +56,16 @@ try {
   const heart = pet.locator('span[aria-hidden="true"] svg path').first();
   assert.equal(await heart.evaluate(el => getComputedStyle(el).fill), "rgb(240, 98, 146)", "Pat hearts stay pink independently of theme accent");
   assert.ok(await pet.locator('[data-living]').evaluate((el) => el.getAnimations().length > 0), "Patting restores a small hop without scaling the face");
-  assert.match(await pet.innerText(), /治愈|温柔/);
+  const patLines = [];
+  for (let i = 0; i < 5; i++) {
+    // Leave the character's separate double-click greeting gesture untriggered.
+    if (i > 0) { await page.waitForTimeout(550); await character().click(); }
+    const line = await pet.getByRole("status").innerText();
+    assert.ok(line.trim(), "Each pat has a spoken reaction");
+    if (i > 0) assert.notEqual(line, patLines[i - 1], "Consecutive pats never repeat the same reply");
+    patLines.push(line);
+  }
+  assert.equal(new Set(patLines.slice(0, 4)).size, 4, "All four pat replies appear before reuse");
   await more().click();
   await page.getByRole("button", { name: "打招呼", exact: true }).click();
   await waitFor("data-pose", "wave");
@@ -85,6 +94,10 @@ try {
   assert.equal(await more().getAttribute("aria-expanded"), "false");
   assert.equal(await more().evaluate((element) => element === document.activeElement), true);
   await character().focus();
+  const keyboardBefore = await pet.boundingBox();
+  await page.keyboard.press("ArrowLeft");
+  assert.ok(Math.abs((await pet.boundingBox()).x - keyboardBefore.x + 16) < 2, "Arrow-key movement is available on the figure");
+  await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
   await waitFor("data-pose", "happy");
   await waitFor("data-pose", "idle");
@@ -144,6 +157,8 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(200);
   await inViewport();
+  assert.equal(await more().evaluate(el => getComputedStyle(el).opacity), "1", "Touch screens always expose the compact actions button");
+  assert.ok((await more().boundingBox()).width >= 40, "Touch actions keep a usable hit target");
   // Crossing the mobile layout boundary remounts the rail and its companion.
   if (await page.locator("#pet-actions").count() === 0) await more().click();
   await menuFits();

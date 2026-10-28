@@ -27,14 +27,10 @@
 .portrait canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; opacity: 0; }
 .portrait[data-living="true"] canvas { opacity: 1; }
 .portrait[data-living="true"] img { opacity: 0; }
-.nameplate { display: flex; align-items: center; gap: 5px; padding: 5px 6px; min-height: 36px; max-width: 100%; margin-top: 4px; border: 1px solid var(--border); border-radius: 30px; background: var(--bg-panel); box-shadow: 0 3px 16px color-mix(in srgb, var(--text) 6%, transparent); pointer-events: auto; }
-.identity { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 3px 4px 3px 6px; border: 0; background: transparent; color: inherit; font-family: inherit; cursor: move; touch-action: none; }
-.name { font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-.status { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.statusDot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-.statusDot[data-status="busy"], .statusDot[data-status="waiting"] { animation: pulse 1.6s ease-in-out infinite; }
-.statusDot[data-status="sleeping"] { background: var(--text-dim); }
-.more { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+.more { position: absolute; right: 4px; bottom: 12px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; pointer-events: auto; opacity: 0; transform: translateY(3px); transition: opacity 160ms 180ms, transform 160ms 180ms, background 140ms; }
+/* Bridge the small gap from the figure so the hover control stays reachable. */
+.more::before { content: ""; position: absolute; inset: -6px -4px -6px -16px; }
+.pet:hover .more, .pet:focus-within .more, .more[aria-expanded="true"] { opacity: 1; transform: translateY(0); transition-delay: 0s; }
 .more:hover, .more[aria-expanded="true"] { background: var(--bg-hover); color: var(--text); }
 .actions { position: absolute; bottom: 50px; left: 0; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg-panel); box-shadow: 0 12px 40px color-mix(in srgb, var(--text) 13%, transparent); pointer-events: auto; animation: appear 160ms ease-out; }
 .pet[data-menu-side="left"] .actions { left: auto; right: calc(100% + 8px); width: 224px; }
@@ -60,11 +56,14 @@
 @keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes heart-rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.4) rotate(-15deg); } 20% { opacity: 1; transform: translate(0, -12px) scale(1.15) rotate(8deg); } 45% { opacity: 1; transform: translate(calc((var(--i) - 1) * 8px), -28px) scale(1) rotate(-6deg); } 100% { opacity: 0; transform: translate(calc((var(--i) - 1) * 22px), -72px) scale(0.7) rotate(15deg); } }
 @keyframes doze { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 0.8; transform: translateY(-8px); } }
-@keyframes pulse { 50% { opacity: 0.35; } }
+@media (hover: none), (pointer: coarse) {
+  .more { width: 40px; height: 40px; right: 0; bottom: 8px; opacity: 1; transform: none; }
+  .more::before { inset: -2px; }
+}
 @media (max-width: 640px) {
   .pet { --figure-height: 224px; width: 208px; right: 12px; bottom: max(88px, env(safe-area-inset-bottom)); }
   .small { --figure-height: 168px; width: 200px; }
-  .more { width: 34px; height: 34px; }
+  .more { width: 40px; height: 40px; right: 0; bottom: 8px; opacity: 1; transform: none; }
 }
 @media (max-height: 480px) {
   .pet { --figure-height: 150px; bottom: 12px; }

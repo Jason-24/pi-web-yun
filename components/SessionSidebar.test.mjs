@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
+
+// The project dialog uses a CSS module; Node renders markup without a bundler.
+registerHooks({
+  load(url, context, nextLoad) {
+    if (!url.endsWith(".module.css")) return nextLoad(url, context);
+    return { format: "module", shortCircuit: true,
+      source: "export default new Proxy({}, { get: (_, key) => String(key) });" };
+  },
+});
 
 const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconfigPaths: true });
 const React = await jiti.import("react");

@@ -37,6 +37,7 @@ import {
   loadGroupExpansion,
   loadNonGitCwds,
   loadPinnedCollapsed,
+  loadRecentsCollapsed,
   loadShowIgnoredFiles,
   loadSidebarTab,
   rememberCwdGitStatus,
@@ -44,6 +45,7 @@ import {
   saveFilesCollapsed,
   saveGroupExpansion,
   savePinnedCollapsed,
+  saveRecentsCollapsed,
   saveShowIgnoredFiles,
   saveSidebarTab,
   type SidebarTab,
@@ -61,6 +63,7 @@ import {
   mergeProjectChoices,
   newSessionContextKey,
   newSessionTargetForProject,
+  projectChoices,
   withProjectAlias,
   type NewSessionContext,
   type NewSessionOptions,
@@ -70,6 +73,7 @@ import {
 } from "@/lib/new-session-context";
 import {
   chunkForSessionUiRequests,
+  isProjectRemoved,
   MAX_PROJECT_ORDER_KEYS,
   MAX_SESSION_UI_IDS_PER_REQUEST,
   type ProjectMovePosition,
@@ -84,6 +88,7 @@ import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { useSessionUiState } from "@/hooks/useSessionUiState";
 import { archiveViewState, filesFoldState, useSidebarMotion } from "@/hooks/useSidebarMotion";
 import { DirectoryPicker } from "./DirectoryPicker";
+import { CreateProjectDialog } from "./CreateProjectDialog";
 import { DismissButton } from "./DismissButton";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
 import { PiWebTitle } from "./PiWebTitle";
@@ -247,6 +252,7 @@ interface Props {
 export interface SessionSidebarControl {
   restoreArchivedSession(sessionId: string): Promise<boolean>;
   deleteArchivedSession(sessionId: string): Promise<boolean>;
+  deleteArchivedSessions(sessionIds: readonly string[]): Promise<boolean>;
   refreshArchive(): Promise<void>;
   /** Identity, then the sidebar's cwd, then `onNewSession`, as any new session. */
   startNewSessionIn(target: NewSessionTarget): void;
@@ -522,6 +528,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   const [customPathValue, setCustomPathValue] = useState(loadLastCustomCwd);
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [validatedProject, setValidatedProject] = useState<ValidatedProject | null>(null);
   // The files tab's project and worktree picker.
   const filesPickerRef = useRef<ProjectWorktreePickerHandle>(null);
@@ -586,6 +593,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   const [keptOpenGroups, setKeptOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
   const [moreShown, setMoreShown] = useState<Readonly<Record<string, number>>>({});
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
+  const [recentsCollapsed, setRecentsCollapsed] = useState(false);
   // The archive view's folded projects, per browser (lib/sidebar-prefs.ts).
   const [archiveCollapsed, setArchiveCollapsed] = useState<readonly string[]>([]);
   const [archiveView, setArchiveViewState] = useState(false);
@@ -672,6 +680,16 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     refresh: refreshUiState,
   } = useSessionUiState();
 
+  // All project writes share ordered optimistic updates and failure feedback.
+  const applyUiState = useCallback(async (request: SessionUiStateRequest) => {
+    const ok = await applyUiStateRequest(request);
+    if (!ok) setUiWriteFailures((count) => count + 1);
+    return ok;
+  }, [applyUiStateRequest]);
+  const rememberOpenedProject = useCallback((projectKey: string, root: string) => {
+    void applyUiState({ action: "pin-project", projectKey, root, pinned: true });
+  }, [applyUiState]);
+
   // The explorer's scroll container is always mounted (empty without a cwd),
   // so the scrollbar hook stays bound to the element that is on the page.
   const headerRef = useRef<HTMLDivElement>(null);
@@ -741,6 +759,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     const groups = loadGroupExpansion();
     if (Object.keys(groups).length > 0) setGroupExpansion(groups);
     if (loadPinnedCollapsed()) setPinnedCollapsed(true);
+    if (loadRecentsCollapsed()) setRecentsCollapsed(true);
     const archiveFolds = loadArchiveCollapsed();
     if (archiveFolds.length > 0) setArchiveCollapsed(archiveFolds);
     if (loadFilesCollapsed()) setFilesCollapsed(true);
@@ -1219,6 +1238,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
         return;
       }
       folderReturnFocusRef.current = null;
+      rememberOpenedProject(data.projectKey, data.projectRoot);
       setValidatedProject({
         cwd: data.cwd,
         root: data.projectRoot,
@@ -1230,7 +1250,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     } finally {
       setCustomPathValidating(false);
     }
-  }, [customPathOpen, customPathValue, customPathValidating, focusAfterCommit]);
+  }, [customPathOpen, customPathValue, customPathValidating, focusAfterCommit, rememberOpenedProject]);
 
   const handleCustomPathClick = useCallback((opener: HTMLElement | null) => {
     folderReturnFocusRef.current = opener;
@@ -1304,9 +1324,10 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   // picker read from the project list or the worktree listing: a pinned
   // project without sessions keeps its server key, as in startNewSessionIn.
   const handleFilesPick = useCallback(({ cwd, projectKey, projectRoot }: NewSessionTarget) => {
+    if (projectKey && projectRoot) rememberOpenedProject(projectKey, projectRoot);
     if (projectKey && projectRoot) setValidatedProject({ cwd, root: projectRoot, key: projectKey });
     setSelectedCwd(cwd);
-  }, []);
+  }, [rememberOpenedProject]);
 
   // Clicking a session moves the effective cwd to that session's worktree.
   // Done on the click path (not via the selectedCwd prop sync) so it also
@@ -1323,20 +1344,23 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   // adopts it up front: a session in another project closes the previous
   // project's file tabs instead of being mistaken for identity hydration.
   const startNewSessionIn = useCallback(({ cwd, projectKey, projectRoot, carryComposer }: NewSessionTarget) => {
+    if (projectKey && projectRoot) rememberOpenedProject(projectKey, projectRoot);
     // A worktree without sessions has no other source of identity yet.
     if (projectKey && projectRoot) setValidatedProject({ cwd, root: projectRoot, key: projectKey });
     setSelectedCwd(cwd);
     onNewSession?.(createTempSessionId(), cwd, projectKey, carryComposer ? { carryComposer: true } : undefined);
-  }, [onNewSession]);
+  }, [onNewSession, rememberOpenedProject]);
   // The handle below is made once: it calls the newest closure.
   const startNewSessionInRef = useRef(startNewSessionIn);
   startNewSessionInRef.current = startNewSessionIn;
   const restoreArchivedSessionRef = useRef<(sessionId: string) => Promise<boolean>>(async () => false);
   const deleteArchivedSessionRef = useRef<(sessionId: string) => Promise<boolean>>(async () => false);
+  const deleteArchivedSessionsRef = useRef<(sessionIds: readonly string[]) => Promise<boolean>>(async () => false);
 
   useImperativeHandle(controlRef, () => ({
     restoreArchivedSession: (sessionId) => restoreArchivedSessionRef.current(sessionId),
     deleteArchivedSession: (sessionId) => deleteArchivedSessionRef.current(sessionId),
+    deleteArchivedSessions: (sessionIds) => deleteArchivedSessionsRef.current(sessionIds),
     refreshArchive: refreshUiState,
     startNewSessionIn: (target) => startNewSessionInRef.current(target),
     openFolderForNewSession: (onPicked, returnFocusTo) => {
@@ -1434,6 +1458,21 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     () => (currentProjectKey && currentProjectRoot ? { key: currentProjectKey, root: currentProjectRoot } : null),
     [currentProjectKey, currentProjectRoot],
   );
+  // Retain a selected project even before its first conversation is saved.
+  // Removal wins over automatic retention, including when it is still active
+  // or selected in another window. Explicit folder picks above can reopen it.
+  const rememberedProjectsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (loading || !uiStateSynced || !sessionDetailsLoaded || !currentProject) return;
+    const { key, root } = currentProject;
+    if (isProjectRemoved(uiState, key) || Object.hasOwn(uiState.projects, key)) return;
+    const resolved = validatedProject?.cwd === selectedCwd
+      || worktreeState?.forCwd === selectedCwd
+      || allSessions.some((session) => session.cwd === selectedCwd);
+    if (!resolved || rememberedProjectsRef.current.has(key)) return;
+    rememberedProjectsRef.current.add(key);
+    rememberOpenedProject(key, root);
+  }, [loading, uiStateSynced, sessionDetailsLoaded, currentProject, uiState, validatedProject, selectedCwd, worktreeState, allSessions, rememberOpenedProject]);
   // What the tree shows and every toggle reads: the saved choices over the
   // groups kept open for the page. Writes go to the saved choices alone
   // (saveGroupChoices).
@@ -1443,6 +1482,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   );
   const model = useMemo(() => buildSessionTree({
     sections: true,
+    recentsCollapsed,
     sessions: allSessions,
     uiState,
     runningIds: runningSessionIds,
@@ -1453,7 +1493,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     groupExpansion: shownGroupExpansion,
     moreShown,
     pinnedCollapsed,
-  }), [allSessions, uiState, runningSessionIds, awaitingInputSessionIds, unreadSessionIds, selectedSessionId, currentProject, shownGroupExpansion, moreShown, pinnedCollapsed]);
+  }), [allSessions, uiState, runningSessionIds, awaitingInputSessionIds, unreadSessionIds, selectedSessionId, currentProject, shownGroupExpansion, moreShown, pinnedCollapsed, recentsCollapsed]);
   const mainRows = useMemo(() => onOpenArchive ? model.rows.filter((row) => row.kind !== "footer-archived") : model.rows, [model.rows, onOpenArchive]);
   // Built while the archive view is rendered, its way out included: it
   // leaves as it was, not empty.
@@ -1589,13 +1629,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     return button && button.getClientRects().length > 0 ? button : selectedTabButton();
   }, [selectedTabButton]);
 
-  // Pin and archive changes apply at once and are saved in the background; a
-  // refused save rolls back (useSessionUiState) and says why in a toast.
-  const applyUiState = useCallback(async (request: SessionUiStateRequest) => {
-    const ok = await applyUiStateRequest(request);
-    if (!ok) setUiWriteFailures((count) => count + 1);
-    return ok;
-  }, [applyUiStateRequest]);
   useEffect(() => {
     if (uiWriteFailures === shownUiWriteFailuresRef.current) return;
     shownUiWriteFailuresRef.current = uiWriteFailures;
@@ -2137,14 +2170,16 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     }
   }, [focusAfterCommit, loadSessions, onSessionDeleted, showToast, t]);
 
-  deleteArchivedSessionRef.current = async (sessionId) => {
-    const family = familyByRootId.get(sessionId);
-    if (!family) return true;
-    if (!isFamilyArchived(family, uiState, runningSessionIds)) return false;
-    const ok = await deleteFamilyIds(`archive-session:${sessionId}`, [family.root.id], () => null);
-    if (ok) await refreshUiState();
-    return ok;
+  deleteArchivedSessionsRef.current = async (sessionIds) => {
+    const ids = [...new Set(sessionIds)];
+    const families = ids.flatMap((id) => { const family = familyByRootId.get(id); return family ? [family] : []; });
+    const archived = families.filter((family) => isFamilyArchived(family, uiState, runningSessionIds));
+    const eligibleIds = archived.map((family) => family.root.id);
+    const ok = await deleteFamilyIds(ids.length === 1 ? `archive-session:${ids[0]}` : "archive-clear", eligibleIds, () => null);
+    await refreshUiState();
+    return ok && archived.length === families.length;
   };
+  deleteArchivedSessionRef.current = (sessionId) => deleteArchivedSessionsRef.current([sessionId]);
 
   const deleteAllProjectSessions = useCallback((project: SidebarProject) => {
     const { ids } = familiesToDelete(treeSelectionInput, project.key);
@@ -2307,6 +2342,12 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     if (next) setMoreShown((shown) => showLessFamilies(shown, PINNED_MORE_KEY));
   };
 
+  const handleToggleRecents = () => {
+    const next = !recentsCollapsed;
+    setRecentsCollapsed(next);
+    saveRecentsCollapsed(next);
+  };
+
   // Everything that goes to the files goes through here: the files tab, or
   // the files section below the sessions, opened (and saved so) if folded.
   // The focus follows once they show.
@@ -2330,10 +2371,8 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     window.open(newSessionDeepLink(cwd), "_blank", "noopener,noreferrer");
   };
 
-  const handleOpenOtherProject = (opener: HTMLElement) => {
-    // The picker can live in a hidden right-hand dock. Anchor to the actual
-    // trigger without revealing the file workspace or changing sidebar tabs.
-    filesPickerRef.current?.openMenu("project", opener);
+  const handleOpenOtherProject = () => {
+    setCreateProjectOpen(true);
   };
   // Once the files show, their project button or search field takes focus.
   // Below the sessions they may show already:
@@ -2389,10 +2428,11 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     return [
       {
         type: "item",
-        id: "pin-project",
-        label: t(project.pinned ? "sidebar.unpinProject" : "sidebar.pinProject"),
-        icon: project.pinned ? <PinOffIcon /> : <PinIcon />,
-        onSelect: () => { void applyUiState({ action: "pin-project", projectKey: project.key, root: project.root, pinned: !project.pinned }); },
+        id: "remove-project",
+        label: t("sidebar.removeProject"),
+        title: t("sidebar.removeProjectHint"),
+        icon: <PinOffIcon />,
+        onSelect: () => { void applyUiState({ action: "remove-project", projectKey: project.key }); },
       },
       ...nameItems,
       {
@@ -2667,6 +2707,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     onShowMore: handleShowMore,
     onShowLess: handleShowLess,
     onTogglePinned: handleTogglePinned,
+    onToggleRecents: handleToggleRecents,
     onArchiveFamily: archiveFamily,
     onRestoreFamily: restoreFamily,
     onOpenRowMenu: openRowMenu,
@@ -2824,11 +2865,31 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   return (
     <div
       ref={setSidebarRoot}
-      className={`session-sidebar${stacked ? " is-files-below" : ""}${stacked && filesCollapsed ? " is-files-collapsed" : ""}${stacked && filesFold.moving ? " is-files-folding" : ""}${toast ? " has-toast" : ""}`}
+      className={`session-sidebar${stacked ? " is-files-below" : ""}${stacked && filesCollapsed ? " is-files-collapsed" : ""}${stacked && filesFold.moving ? " is-files-folding" : ""}${onOpenArchive && sessionsShown ? " has-archive-footer" : ""}${toast ? " has-toast" : ""}`}
       style={{ "--sidebar-files-height": `${filesSizer.width}px` } as CSSProperties}
       onFocus={(event) => { sidebarFocusRef.current = event.target; }}
       onBlur={(event) => { if (event.relatedTarget === null && !document.hasFocus()) return; if (!event.currentTarget.contains(event.relatedTarget)) sidebarFocusRef.current = null; }}
     >
+      {createProjectOpen && (
+        <CreateProjectDialog
+          projects={projectChoices(newSessionContext ?? { project: null, projects: projectChoiceList, worktrees: null, currentWorktreePath: null })}
+          initialPath={customPathValue || selectedCwd || undefined}
+          onCancel={() => setCreateProjectOpen(false)}
+          onCreate={async (target, name) => {
+            if (!target.projectKey || !target.projectRoot) return false;
+            const saved = await applyUiState({
+              action: "create-project", projectKey: target.projectKey, root: target.projectRoot, name,
+            });
+            if (!saved) return false;
+            saveLastCustomCwd(target.cwd);
+            setCustomPathValue(target.cwd);
+            setValidatedProject({ cwd: target.cwd, root: target.projectRoot, key: target.projectKey });
+            setSelectedCwd(target.cwd);
+            setCreateProjectOpen(false);
+            return true;
+          }}
+        />
+      )}
       {customPathOpen && (
         <DirectoryPicker
           initialPath={customPathValue}

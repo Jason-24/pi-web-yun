@@ -9,7 +9,8 @@ export function mountPortraitMotion(canvas: HTMLCanvasElement, ready: () => void
   const images = new Map<PortraitPose, HTMLImageElement>();
   let disposed = false, frame = 0, previous = 0, elapsed = 0, announced = false;
   let current: PortraitPose = "idle", from: PortraitPose = "idle", target: PortraitPose = "idle", transition = 1;
-  let targetX = 0, lookX = 0;
+  let targetX = 0, lookX = 0, lastLook = -10, poseAge = 0;
+  let glance = 0, nextGlance = 5 + Math.random() * 4;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
   const resize = () => {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -23,19 +24,34 @@ export function mountPortraitMotion(canvas: HTMLCanvasElement, ready: () => void
     if (now - previous < 1000 / 30) return;
     const dt = Math.min((now - previous) / 1000, 0.05); previous = now; elapsed += dt;
     if (target !== current && images.get(target)?.naturalWidth && transition >= 1) {
-      from = current; current = target; transition = reduced.matches ? 1 : 0;
+      from = current; current = target; transition = reduced.matches ? 1 : 0; poseAge = 0;
     }
-    transition = Math.min(1, transition + dt / 0.16);
+    poseAge += dt;
+    transition = Math.min(1, transition + dt / 0.3);
     const amount = transition * transition * (3 - 2 * transition);
     const image = images.get(current);
     if (!image?.naturalWidth) return;
-    lookX += ((reduced.matches || current === "sleep" ? 0 : targetX) - lookX) * -Math.expm1(-4 * dt);
+    // Brief, irregular glances settle back to centre when the pointer rests.
+    if (elapsed >= nextGlance) {
+      glance = (Math.random() - 0.5) * 0.9;
+      nextGlance = elapsed + 6 + Math.random() * 6;
+    }
+    const gaze = elapsed - lastLook < 2.5 ? targetX : glance;
+    lookX += ((reduced.matches || current === "sleep" ? 0 : gaze) - lookX) * -Math.expm1(-2.8 * dt);
+    glance *= Math.exp(-dt * 0.45);
     const breath = reduced.matches ? 0 : Math.sin(elapsed * (current === "sleep" ? 1.1 : 1.5));
+    const awake = !reduced.matches && current !== "sleep";
+    // Slow weight shifts and a single greeting/nod use rigid movement: no facial warping.
+    const sway = awake ? Math.sin(elapsed * 0.72) * 0.004 + Math.sin(elapsed * 1.13 + 1) * 0.002 : 0;
+    const envelope = awake && poseAge < 2.2 ? Math.sin(Math.PI * poseAge / 2.2) ** 2 : 0;
+    const gesture = current === "wave" ? Math.sin(poseAge * 5.5) * 0.015 * envelope
+      : current === "happy" ? Math.sin(poseAge * 3) * 0.009 * envelope
+      : current === "thinking" ? -0.008 * envelope : 0;
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.save();
     // Less than one source pixel of breathing, pivoted at the feet; the face stays intact.
     context.translate(canvas.width * 0.5, canvas.height * 0.965);
-    context.rotate(lookX * 0.005);
+    context.rotate(lookX * 0.012 + sway + gesture);
     context.scale(1, 1 + breath * 0.0013);
     context.translate(-canvas.width * 0.5, -canvas.height * 0.965);
     if (amount < 1) {
@@ -63,7 +79,7 @@ export function mountPortraitMotion(canvas: HTMLCanvasElement, ready: () => void
   });
   return {
     setPose(pose) { target = pose; },
-    setLook(x) { targetX = Math.max(-1, Math.min(1, x)); },
+    setLook(x) { targetX = Math.max(-1, Math.min(1, x)); lastLook = elapsed; },
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       images.forEach((image) => { image.onload = null; image.onerror = null; });

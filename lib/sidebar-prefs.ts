@@ -19,6 +19,7 @@ const GROUP_EXPANSION_STORAGE_KEY = "pi-web:sidebar-groups-v2";
 const LEGACY_GROUP_EXPANSION_STORAGE_KEY = "pi-web:sidebar-groups";
 const ARCHIVE_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-archive-collapsed";
 const PINNED_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-pins-collapsed";
+const RECENTS_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-recents-collapsed";
 const SHOW_IGNORED_FILES_STORAGE_KEY = "pi-web:sidebar-files-show-ignored";
 const FILES_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-files-collapsed";
 const NON_GIT_CWDS_STORAGE_KEY = "pi-web:sidebar-non-git-cwds";
@@ -176,6 +177,28 @@ export function savePinnedCollapsed(
   if (!storage) return;
   try {
     storage.setItem(PINNED_COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    // Persistence is best-effort.
+  }
+}
+
+/** Recent shortcuts stay open unless this browser explicitly collapsed them. */
+export function loadRecentsCollapsed(storage: StorageLike | null = getBrowserStorage()): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(RECENTS_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveRecentsCollapsed(
+  collapsed: boolean,
+  storage: StorageLike | null = getBrowserStorage(),
+): void {
+  if (!storage) return;
+  try {
+    storage.setItem(RECENTS_COLLAPSED_STORAGE_KEY, String(collapsed));
   } catch {
     // Persistence is best-effort.
   }

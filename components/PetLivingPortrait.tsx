@@ -10,6 +10,7 @@ export function PetLivingPortrait({ pose, dragging, hop }: { pose: PortraitPose;
   const hopRef = useRef<Animation | null>(null);
   const motionRef = useRef<PortraitMotion | null>(null);
   const poseRef = useRef(pose);
+  const draggingRef = useRef(dragging);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let disposed = false;
@@ -19,7 +20,7 @@ export function PetLivingPortrait({ pose, dragging, hop }: { pose: PortraitPose;
       motionRef.current.setPose(poseRef.current);
     }).catch(() => { /* The original portrait remains usable if acceleration is unavailable. */ });
     const look = (event: PointerEvent) => {
-      if (event.pointerType === "touch" || event.buttons) return;
+      if (event.pointerType === "touch" || event.buttons || draggingRef.current) return;
       const rect = canvasRef.current?.getBoundingClientRect();
       if (rect) motionRef.current?.setLook((event.clientX-rect.left-rect.width/2)/320);
     };
@@ -34,16 +35,26 @@ export function PetLivingPortrait({ pose, dragging, hop }: { pose: PortraitPose;
   useEffect(() => { poseRef.current = pose; motionRef.current?.setPose(pose); }, [pose]);
   useEffect(() => {
     if (!hop || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // A pat gets a soft little bounce; cheering gets a more buoyant hop.
+    const height = poseRef.current === "happy" ? 5 : 12;
+    hopRef.current?.cancel();
     hopRef.current = portraitRef.current?.animate([
-      { transform: "translateY(0)", offset: 0 },
-      { transform: "translateY(2px)", offset: 0.15 },
-      { transform: "translateY(-15px)", offset: 0.45 },
-      { transform: "translateY(1px)", offset: 0.8 },
+      { transform: "translateY(0)", offset: 0, easing: "ease-in" },
+      { transform: "translateY(1.5px)", offset: 0.16, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" },
+      { transform: `translateY(-${height}px)`, offset: 0.43, easing: "cubic-bezier(0.55, 0, 0.85, 0.4)" },
+      { transform: "translateY(1px)", offset: 0.72, easing: "ease-out" },
+      { transform: "translateY(-1px)", offset: 0.86, easing: "ease-in-out" },
       { transform: "translateY(0)", offset: 1 },
-    ], { duration: 760, easing: "ease-in-out" }) ?? null;
+    ], { duration: poseRef.current === "happy" ? 680 : 820 }) ?? null;
     return () => { hopRef.current?.cancel(); };
   }, [hop]);
-  useEffect(() => { if (dragging) hopRef.current?.cancel(); }, [dragging]);
+  useEffect(() => { draggingRef.current = dragging; if (dragging) hopRef.current?.cancel(); }, [dragging]);
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const stop = () => { if (reduced.matches) hopRef.current?.cancel(); };
+    reduced.addEventListener("change", stop);
+    return () => reduced.removeEventListener("change", stop);
+  }, []);
   return <span ref={portraitRef} className={styles.portrait} data-dragging={dragging} data-living={ready}>
     {/* The selected authored pose remains usable without canvas acceleration. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -39,6 +39,8 @@ export interface SessionUiState {
   revision: number;
   sessions: Record<string, SessionUiFamilyState>;
   projects: Record<string, SessionUiProjectState>;
+  /** Projects explicitly removed from the list; sessions and files remain intact. */
+  removedProjects?: Record<string, number>;
   /**
    * projectKeys of the sidebar's groups, top first, pinned and other projects
    * in one list (each band keeps the relative order of its own keys). Keys of
@@ -64,6 +66,9 @@ export type SessionUiStateRequest =
   /** Undo: writes back exact prior values (null = absent). */
   | { action: "restore"; entries: SessionUiFlagsSnapshot[] }
   | { action: "pin-project"; projectKey: string; root: string; pinned: boolean }
+  /** Save the project and its display name together; no session or directory is created. */
+  | { action: "create-project"; projectKey: string; root: string; name: string }
+  | { action: "remove-project"; projectKey: string }
   /** New projects, top first: the ones `projectOrder` lacks go in front of it. Never pushes a key out. */
   | { action: "add-projects"; keys: string[] }
   /**
@@ -127,6 +132,10 @@ export function projectDisplayName(value: unknown): string | null | undefined {
 export function storedProjectName(state: SessionUiState, projectKey: string): string | undefined {
   const names = state.projectNames;
   return names && hasOwn(names, projectKey) ? names[projectKey] : undefined;
+}
+
+export function isProjectRemoved(state: SessionUiState, projectKey: string): boolean {
+  return !!state.removedProjects && hasOwn(state.removedProjects, projectKey);
 }
 
 const utf8 = new TextEncoder();
@@ -213,6 +222,13 @@ export function normalizeSessionUiState(value: unknown): SessionUiState | null {
     if (!isProjectString(key)) continue;
     const project = normalizeProject(entry);
     if (project) state.projects[key] = project;
+  }
+  if (isPlainObject(value.removedProjects)) {
+    const removed: Record<string, number> = {};
+    for (const [key, time] of Object.entries(value.removedProjects)) {
+      if (isProjectString(key) && isTimestamp(time)) removed[key] = time;
+    }
+    if (Object.keys(removed).length) state.removedProjects = removed;
   }
   // Anything but an array reads as no order: it is cheap to rebuild, and no
   // reason to set pins and archive aside with a file taken for corrupt.
@@ -330,6 +346,18 @@ export function parseSessionUiStateRequest(body: unknown): ParseResult {
       }
       return { ok: true, request: { action: "restore", entries } };
     }
+    case "remove-project": {
+      if (!isProjectString(body.projectKey)) return { ok: false, error: `projectKey must be a non-empty string of at most ${MAX_PROJECT_STRING_LENGTH} characters` };
+      return { ok: true, request: { action: "remove-project", projectKey: body.projectKey } };
+    }
+    case "create-project": {
+      if (!isProjectString(body.projectKey) || !isProjectString(body.root)) {
+        return { ok: false, error: "projectKey and root must be valid project paths" };
+      }
+      const name = projectDisplayName(body.name);
+      if (!name) return { ok: false, error: `name must be one line of at most ${MAX_PROJECT_NAME_LENGTH} characters` };
+      return { ok: true, request: { action: "create-project", projectKey: body.projectKey, root: body.root, name } };
+    }
     case "pin-project": {
       if (!isProjectString(body.projectKey)) {
         return { ok: false, error: `projectKey must be a non-empty string of at most ${MAX_PROJECT_STRING_LENGTH} characters` };
@@ -367,7 +395,7 @@ export function parseSessionUiStateRequest(body: unknown): ParseResult {
       return { ok: true, request: { action: "rename-project", projectKey: body.projectKey, name } };
     }
     default:
-      return { ok: false, error: "action must be \"set\", \"restore\", \"pin-project\", \"add-projects\", \"move-project\" or \"rename-project\"" };
+      return { ok: false, error: "action must be \"set\", \"restore\", \"pin-project\", \"create-project\", \"remove-project\", \"add-projects\", \"move-project\" or \"rename-project\"" };
   }
 }
 
@@ -424,6 +452,7 @@ function copyState(state: SessionUiState): SessionUiState {
   // Only when present: an explicit undefined would not equal an absent field.
   if (state.projectOrder) copy.projectOrder = [...state.projectOrder];
   if (state.projectNames) copy.projectNames = { ...state.projectNames };
+  if (state.removedProjects) copy.removedProjects = { ...state.removedProjects };
   return copy;
 }
 
@@ -560,6 +589,18 @@ export function applySessionUiStateRequest(
   const next = copyState(state);
   let changed = false;
   switch (request.action) {
+    case "create-project": {
+      const name = projectDisplayName(request.name);
+      if (!name) return { state: next, changed: false };
+      const renamed = writeProjectName(next, request.projectKey, name);
+      // Refuse the whole change when the name list is full, including reopening
+      // a removed project. The disk writer commits this result under one lock.
+      if (storedProjectName(next, request.projectKey) !== name) return { state, changed: false };
+      const pinned = applySessionUiStateRequest(next, {
+        action: "pin-project", projectKey: request.projectKey, root: request.root, pinned: true,
+      }, now);
+      return { state: pinned.state, changed: renamed || pinned.changed };
+    }
     case "set":
       for (const id of request.ids) {
         const previous = hasOwn(next.sessions, id) ? next.sessions[id] : undefined;
@@ -574,10 +615,27 @@ export function applySessionUiStateRequest(
         if (writeFamily(next.sessions, entry.id, family)) changed = true;
       }
       break;
+    case "remove-project": {
+      const { projectKey } = request;
+      if (!isProjectRemoved(next, projectKey)) {
+        next.removedProjects = { ...next.removedProjects, [projectKey]: now };
+        changed = true;
+      }
+      if (hasOwn(next.projects, projectKey)) {
+        delete next.projects[projectKey];
+        changed = true;
+      }
+      break;
+    }
     case "pin-project": {
       const { projectKey, root } = request;
       const previous = hasOwn(next.projects, projectKey) ? next.projects[projectKey] : undefined;
       if (request.pinned) {
+        if (isProjectRemoved(next, projectKey)) {
+          delete next.removedProjects![projectKey];
+          if (Object.keys(next.removedProjects!).length === 0) delete next.removedProjects;
+          changed = true;
+        }
         if (previous?.root !== root) {
           next.projects[projectKey] = { pinnedAt: now, root };
           changed = true;

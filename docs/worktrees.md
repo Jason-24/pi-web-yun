@@ -2,6 +2,16 @@
 
 Pi Web can show all Git worktrees for one project in the sidebar. Use this when you want to keep separate checkouts for different branches, while keeping the project's sessions grouped together.
 
+## Adding a Project
+
+Click **+** beside the **Projects** heading to open **Create project**. Enter a project name and choose one source folder with **Add**. You can browse folders, enter a path in the folder browser, choose a known project folder, or use **Use default directory**. The folder browser also lets you create a child folder.
+
+Click **Create project** to validate the directory, save the project and its display name, and select it. The project stays in the sidebar even before it has a conversation. If validation or saving fails, the dialog keeps your entries for retry. Selecting an existing project folder uses its existing project identity.
+
+Each project uses one working directory at a time. Its display name does not rename the folder, and adding it does not create or send a conversation. **Use default directory** creates the dated default folder when selected; a child folder created in the browser also remains if you later cancel the project dialog.
+
+The **+** beside an individual project's name still starts a new chat in that project. The file browser and empty composer's project/worktree menus keep their existing directory and checkout selection actions.
+
 ## When the Worktree Control Appears
 
 The worktree switcher appears below the project picker when the selected directory is a Git repository root.

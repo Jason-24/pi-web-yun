@@ -64,7 +64,7 @@ export async function checkChatMinimap({ browser, base, artifacts }) {
     assert.ok(lastBox.y - firstBox.y <= 112, "the ticks form a compact group");
     const markerWidths = () => nodes.evaluateAll(elements => elements.map(el => el.querySelector("span").getBoundingClientRect().width));
     assert.ok((await markerWidths()).every(width => width === 6), "all ticks stay short before hovering, including the current turn");
-    assert.equal(await page.locator("[data-minimap-lock]").evaluate(el => getComputedStyle(el).opacity), "0", "the lock stays hidden while idle");
+    assert.equal(await page.locator("[data-minimap-lock]").count(), 0, "the retired lock control is absent");
     await page.screenshot({ path: resolve(artifacts, "chat-minimap-idle.png") });
     const hover = async index => {
       await nodes.nth(index).hover();
@@ -108,14 +108,16 @@ export async function checkChatMinimap({ browser, base, artifacts }) {
     assert.equal(await scroll.evaluate(el => el.scrollTop), before, "empty gutter space does not navigate");
     assert.equal(await preview.count(), 0, "empty gutter space does not open a preview");
     await hover(3);
-    const lock = page.locator("[data-minimap-lock]");
-    await lock.click();
-    await preview.waitFor({ state: "detached" });
-    await nodes.first().hover();
-    assert.equal(await preview.count(), 0, "the saved lock suppresses hover previews");
+    await page.evaluate(() => localStorage.setItem("pi-web:minimap-preview-locked", "true"));
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.locator('[data-minimap-lock="on"]').waitFor();
-    await lock.click();
+    await nodes.first().waitFor();
+    await nodes.last().hover();
+    await preview.waitFor();
+    assert.equal(await page.locator("[data-minimap-lock]").count(), 0, "old preferences cannot bring the control back or suppress previews");
+    assert.equal(await page.evaluate(() => localStorage.getItem("pi-web:minimap-preview-locked")), null, "the old saved lock is cleared on mount");
+    await page.mouse.move(0, 0);
+    await page.locator(".workspace-chat-view textarea").focus();
+    await preview.waitFor({ state: "detached" });
     await nodes.last().hover();
     await preview.waitFor();
     await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
@@ -134,7 +136,7 @@ export async function checkChatMinimap({ browser, base, artifacts }) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.equal(commands.some(type => type === "prompt" || type === "abort"), false);
     assert.deepEqual(errors, []);
-    console.log("PASS: left conversation ticks, compact per-turn previews, lists, heading jumps, keyboard selection, blank gutter, persisted lock, history numbering, sidebar collapse, dark and responsive layouts.");
+    console.log("PASS: left conversation ticks, compact per-turn previews, lists, heading jumps, keyboard selection, blank gutter, retired lock preference ignored, history numbering, sidebar collapse, dark and responsive layouts.");
   } catch (error) {
     await page.screenshot({ path: resolve(artifacts, "chat-minimap-failure.png") });
     throw error;

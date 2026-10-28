@@ -279,15 +279,21 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await page.keyboard.press("Escape");
     assert.equal(await view("chat").getAttribute("aria-current"), "page");
     assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    const settingsScrollPosition = await scroller.evaluate(element => element.scrollTop);
     await view("settings").click();
     const settings = page.locator(".settings-dialog-backdrop.is-embedded");
     await settings.waitFor();
     assert.equal(await settings.getAttribute("role"), "region");
     assert.equal(await settings.getAttribute("aria-modal"), null);
     assert.equal(await settings.evaluate(el => getComputedStyle(el).position), "static");
+    const returnSession = page.getByRole("button", { name: "返回会话", exact: true });
+    assert.equal(await returnSession.getAttribute("title"), session.name);
     await page.screenshot({ path: resolve(artifacts, "workspace-settings.png") });
-    await view("chat").click();
+    await returnSession.click();
+    await settings.waitFor({ state: "detached" });
     assert.equal(await input.getAttribute("data-instance"), "original");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    assert.ok(Math.abs(await scroller.evaluate(element => element.scrollTop) - settingsScrollPosition) < 2, "returning from Settings preserves the reading position");
     // Content stays to the left of the directory; both separators grow leftward.
     await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
     const filePanel = page.locator("#file-panel");

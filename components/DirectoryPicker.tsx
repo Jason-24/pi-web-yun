@@ -203,7 +203,12 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
         if (event.target === event.currentTarget && !busy) onCancel();
       }}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) onCancel();
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+          event.preventDefault();
+          if (!busy) onCancel();
+        }
       }}
       style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}
     >

@@ -369,9 +369,11 @@ export function ProjectWorktreePicker({
         title: choice.root,
         checked: choice.key === project?.key,
         badge: activity ? <ActivitySummary running={activity.running} unread={activity.unread} t={t} /> : undefined,
-        // The owners ignore a pick of the folder already in use.
+        // Report explicit picks even for the active project, so an owner can
+        // restore a removed project entry without changing its current worktree.
         onSelect: () => {
-          if (choice.key !== project?.key || !worktrees) onPick({ cwd: choice.root, projectKey: choice.key, projectRoot: choice.root }, "project");
+          const cwd = choice.key === project?.key && worktrees ? current?.path ?? choice.root : choice.root;
+          onPick({ cwd, projectKey: choice.key, projectRoot: choice.root }, "project");
         },
       };
     });

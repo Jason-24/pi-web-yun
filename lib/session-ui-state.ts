@@ -23,7 +23,7 @@ import {
 
 const MAX_BYTES = 4 * 1024 * 1024;
 // `__proto__` is never copied: assigning it would set the object's prototype instead.
-const KNOWN_KEYS = new Set(["version", "revision", "sessions", "projects", "projectOrder", "projectNames", "__proto__"]);
+const KNOWN_KEYS = new Set(["version", "revision", "sessions", "projects", "removedProjects", "projectOrder", "projectNames", "__proto__"]);
 
 // Route handlers are bundled separately and hot reload re-evaluates modules; globalThis keeps one queue per process.
 const QUEUE_KEY: symbol = Symbol.for("pi-web:session-ui-state-write-queue");
@@ -224,6 +224,7 @@ function editState(
         revision: next.revision,
         sessions: next.sessions,
         projects: next.projects,
+        ...(next.removedProjects && Object.keys(next.removedProjects).length > 0 ? { removedProjects: next.removedProjects } : {}),
         ...(next.projectOrder?.length ? { projectOrder: next.projectOrder } : {}),
         ...(next.projectNames && Object.keys(next.projectNames).length > 0 ? { projectNames: next.projectNames } : {}),
         ...extras,

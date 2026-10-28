@@ -18,7 +18,7 @@
  */
 
 import { listSessionFamilies, type SessionFamily } from "./session-family";
-import { storedProjectName, type ProjectMovePosition, type SessionUiFamilyState, type SessionUiState } from "./session-ui-state-shared";
+import { isProjectRemoved, storedProjectName, type ProjectMovePosition, type SessionUiFamilyState, type SessionUiState } from "./session-ui-state-shared";
 import type { SessionInfo } from "./types";
 import { workspaceKeyOf } from "./workspace-memory";
 
@@ -54,7 +54,7 @@ export interface SidebarProject { key: string; root: string; name: string; custo
 export interface SidebarFamilyStatus { running: boolean; awaiting: boolean; unread: boolean; selected: boolean; transient: boolean }
 
 export type SidebarRow =
-  | { kind: "section"; key: "section-projects" | "section-recents"; label: "projects" | "recents" }
+  | { kind: "section"; key: "section-projects" | "section-recents"; label: "projects" | "recents"; collapsed?: boolean }
   | { kind: "recent"; key: string; family: SessionFamily; project: SidebarProject; status: SidebarFamilyStatus }
   | { kind: "pinned-header"; key: "pinned-header"; count: number; collapsed: boolean; running: number; unread: number }
   | { kind: "session"; key: string; family: SessionFamily; context: "pinned" | "group" | "archive"; project: SidebarProject; status: SidebarFamilyStatus; archivedAt: number | null }
@@ -70,6 +70,8 @@ export type SidebarRow =
 export interface SessionTreeInput {
   /** Show labelled project groups and a separate recent-conversation list. */
   sections?: boolean;
+  /** Hide recent shortcuts while keeping their section's disclosure visible. */
+  recentsCollapsed?: boolean;
   /** The full catalog (allSessions), subagents included. */
   sessions: readonly SessionInfo[];
   uiState: SessionUiState;
@@ -475,7 +477,7 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
   if (currentProject) addKey(currentProject.key);
   for (const key of Object.keys(uiState.projects)) addKey(key);
 
-  const projects = projectKeys.map((key) => resolver.get(key));
+  const projects = projectKeys.filter((key) => !isProjectRemoved(uiState, key)).map((key) => resolver.get(key));
   // A Map: a stored key such as "constructor" must not find a prototype member.
   const rank = new Map<string, number>();
   (uiState.projectOrder ?? []).forEach((key, index) => {
@@ -541,12 +543,13 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
   // them would only push the next header away. One spacer parts them from
   // the footer, as one parts the pinned section from them.
   if (orderedProjects.length > 0) rows.push({ kind: "spacer", key: "footer-spacer" });
-  rows.push({ kind: "footer-open", key: "footer-open" });
+  // Sectioned navigation opens projects from its header's plus button.
+  if (!input.sections) rows.push({ kind: "footer-open", key: "footer-open" });
   if (input.sections) {
     const recent = families.filter((family) => !family.root.transient && !isFamilyArchived(family, uiState, runningIds)).slice(0, 10);
     if (recent.length > 0) {
-      rows.push({ kind: "section", key: "section-recents", label: "recents" });
-      for (const family of recent) rows.push({ kind: "recent", key: `recent:${family.root.id}`, family,
+      rows.push({ kind: "section", key: "section-recents", label: "recents", collapsed: !!input.recentsCollapsed });
+      if (!input.recentsCollapsed) for (const family of recent) rows.push({ kind: "recent", key: `recent:${family.root.id}`, family,
         project: resolver.get(familyProjectKey(family)), status: familyStatus(family, input) });
     }
   }

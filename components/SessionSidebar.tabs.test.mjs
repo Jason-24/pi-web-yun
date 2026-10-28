@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
+
+// The project dialog uses a CSS module; Node renders markup without a bundler.
+registerHooks({
+  load(url, context, nextLoad) {
+    if (!url.endsWith(".module.css")) return nextLoad(url, context);
+    return { format: "module", shortCircuit: true,
+      source: "export default new Proxy({}, { get: (_, key) => String(key) });" };
+  },
+});
 
 // The tabs layout's markup (the desktop setting's other choice; phones),
 // rendered. useFilesPlacement's server snapshot is always "below", so the

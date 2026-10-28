@@ -2218,8 +2218,24 @@ export function AppShell() {
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             <SidebarToggleIcon size={18} open={sidebarOpen} />
-          </button> : <span className="workspace-title-folder" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" /></svg></span>}
-          <button type="button" className="workspace-location workspace-context-tab" data-view={currentView}
+          </button> : <span className="workspace-title-folder" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" /><path d="M3 10h18" /></svg></span>}
+          {currentView === "settings" ? <div className="workspace-location workspace-settings-location" data-view="settings">
+            <button type="button" className="workspace-context-tab workspace-settings-heading"
+              disabled={!canFocusWorkspace}
+              aria-label={translate("files.showWorkspace", { view: translate("common.settings") })}
+              aria-controls="workspace-conversation-content"
+              aria-pressed={canFocusWorkspace ? expandedConversationVisible : undefined}
+              onClick={() => { setRightPanelExpanded(true); setExpandedPane("conversation"); }}>
+              {translate("common.settings")}
+            </button>
+            {(selectedSession || effectiveNewSessionCwd) && <button type="button" className="workspace-return-session"
+              title={selectedSession ? sessionDisplayTitle(selectedSession) : translate("navigation.chat")}
+              aria-controls="workspace-conversation-content"
+              onClick={() => navigateWorkspace("chat")}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m10 6-6 6 6 6M4 12h16" /></svg>
+              <span>{translate("settings.backToConversation")}</span>
+            </button>}
+          </div> : <button type="button" className="workspace-location workspace-context-tab" data-view={currentView}
             disabled={!canFocusWorkspace}
             aria-label={translate("files.showWorkspace", { view: translate(WORKSPACE_VIEW_LABELS[currentView]) })}
             aria-controls="workspace-conversation-content"
@@ -2228,7 +2244,7 @@ export function AppShell() {
             <span>{translate(WORKSPACE_VIEW_LABELS[currentView])}</span>
             {selectedSession && currentView !== "home" && <strong title={sessionDisplayTitle(selectedSession)}>{sessionDisplayTitle(selectedSession)}</strong>}
             {!selectedSession && currentView === "chat" && <strong>{translate("navigation.chat")}</strong>}
-          </button>
+          </button>}
           {!isMobile && currentView === "chat" && selectedSession && <button type="button" className="workspace-title-action"
             onClick={() => void handleAutoName()} disabled={selectedSession.transient || autoNameStatus.kind === "naming" || !((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0)}
             title={autoNameStatus.kind === "error" ? autoNameStatus.message : translate("title.generateSession")}>
@@ -2358,6 +2374,7 @@ export function AppShell() {
                 onProjectChange={setArchiveProjectKey} onSelectSession={handleSelectSession}
                 onRestore={(sessionId) => sidebarControlRef.current?.restoreArchivedSession(sessionId) ?? Promise.resolve(false)}
                 onDelete={(sessionId) => sidebarControlRef.current?.deleteArchivedSession(sessionId) ?? Promise.resolve(false)}
+                onDeleteMany={(sessionIds) => sidebarControlRef.current?.deleteArchivedSessions(sessionIds) ?? Promise.resolve(false)}
                 onRefresh={() => { void sidebarControlRef.current?.refreshArchive(); }} />}
               {activeTopPanel === "history" && selectedSession && <SubagentViewer key={`${selectedSession.id}:${historyRefreshKey}`} variant="history"
                 sessionId={selectedSession.id} fallbackLabel={sessionDisplayTitle(selectedSession)}

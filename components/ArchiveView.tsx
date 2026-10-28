@@ -16,14 +16,20 @@ interface Props {
   onSelectSession(session: SessionInfo): void;
   onRestore(sessionId: string): Promise<boolean>;
   onDelete(sessionId: string): Promise<boolean>;
+  onDeleteMany(sessionIds: readonly string[]): Promise<boolean>;
   onRefresh(): void;
 }
 
-export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSession, onRestore, onDelete, onRefresh }: Props) {
+export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSession, onRestore, onDelete, onDeleteMany, onRefresh }: Props) {
   const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<ReadonlyMap<string, "restore" | "delete">>(() => new Map());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmClearIds, setConfirmClearIds] = useState<readonly string[] | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const clearInFlightRef = useRef(false);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
   const [errors, setErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   const searchRef = useRef<HTMLInputElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
@@ -46,14 +52,14 @@ export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSes
   useLayoutEffect(() => {
     if (pending.size || actionFinishedRef.current) focusIfLost(document, window.matchMedia?.("(pointer: coarse)").matches ? regionRef.current : searchRef.current);
     actionFinishedRef.current = false;
-  }, [pending, snapshot.entries]);
+  }, [pending, snapshot.entries, clearing]);
   useEffect(() => { setConfirmDeleteId(null); }, [query, projectKey]);
   useEffect(() => {
     if (confirmDeleteId && !snapshot.entries.some((entry) => entry.session.id === confirmDeleteId)) setConfirmDeleteId(null);
   }, [snapshot.entries, confirmDeleteId]);
 
   const restore = async (sessionId: string) => {
-    if (pending.has(sessionId)) return;
+    if (pending.has(sessionId) || confirmClearIds || clearInFlightRef.current) return;
     setPending((current) => new Map(current).set(sessionId, "restore"));
     setErrors((current) => { const next = new Map(current); next.delete(sessionId); return next; });
     try {
@@ -71,7 +77,7 @@ export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSes
     regionRef.current?.querySelector<HTMLButtonElement>(`[data-archived-session="${CSS.escape(sessionId)}"] .archive-workspace-delete`)?.focus();
   };
   const remove = async (sessionId: string) => {
-    if (pending.has(sessionId)) return;
+    if (pending.has(sessionId) || confirmClearIds || clearInFlightRef.current) return;
     setPending((current) => new Map(current).set(sessionId, "delete"));
     setErrors((current) => { const next = new Map(current); next.delete(sessionId); return next; });
     try {
@@ -82,6 +88,28 @@ export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSes
     } finally {
       actionFinishedRef.current = true;
       setPending((current) => { const next = new Map(current); next.delete(sessionId); return next; });
+    }
+  };
+
+  const cancelClear = () => {
+    if (clearInFlightRef.current) return;
+    setConfirmClearIds(null);
+    clearButtonRef.current?.focus();
+  };
+  const clearArchive = async () => {
+    if (!confirmClearIds?.length || clearInFlightRef.current || pending.size) return;
+    clearInFlightRef.current = true;
+    setClearing(true);
+    setClearError(null);
+    try {
+      if (!await onDeleteMany(confirmClearIds)) throw new Error("archive clear incomplete");
+    } catch {
+      setClearError(t("archive.clearFailed"));
+    } finally {
+      clearInFlightRef.current = false;
+      actionFinishedRef.current = true;
+      setClearing(false);
+      setConfirmClearIds(null);
     }
   };
 
@@ -101,7 +129,27 @@ export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSes
         {projects.map((project) => <option key={project.key} value={project.key}>{project.name}</option>)}
       </select>
       <span className="archive-workspace-count" role="status">{t("archive.count", { count: visible.length })}</span>
+      <button ref={clearButtonRef} type="button" className="archive-workspace-delete archive-workspace-clear"
+        disabled={!snapshot.loaded || !!snapshot.error || !snapshot.entries.length || pending.size > 0 || clearing}
+        aria-expanded={confirmClearIds !== null} onClick={() => {
+          setConfirmDeleteId(null);
+          setClearError(null);
+          setConfirmClearIds(snapshot.entries.map((entry) => entry.session.id));
+        }}><TrashIcon size={15} />{t(clearing ? "archive.deleting" : "archive.clearAll")}</button>
     </div>
+    {confirmClearIds && <div className="archive-delete-confirmation archive-clear-confirmation" role="group" aria-label={t("archive.clearAll")}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+          event.preventDefault(); event.stopPropagation(); cancelClear();
+        }
+      }}>
+      <div><strong>{t("archive.clearTitle", { count: confirmClearIds.length })}</strong><p>{t("archive.clearWarning")}</p></div>
+      <button type="button" autoFocus disabled={clearing} onClick={cancelClear}>{t("sidebar.cancel")}</button>
+      <button type="button" className="is-danger" disabled={clearing} onClick={() => void clearArchive()}>
+        {t(clearing ? "archive.deleting" : "archive.clearAll")}
+      </button>
+    </div>}
+    {clearError && <div className="archive-workspace-error" role="alert"><span>{clearError}</span><button type="button" onClick={onRefresh}>{t("i18n.refresh")}</button></div>}
     <p className="archive-workspace-description">{t("archive.description")}</p>
     {snapshot.error && <div className="archive-workspace-error" role="alert">{t("archive.loadFailed")}
       <button type="button" onClick={onRefresh}>{t("i18n.refresh")}</button>
@@ -118,11 +166,11 @@ export function ArchiveView({ snapshot, projectKey, onProjectChange, onSelectSes
             }}><ArchiveIcon size={16} /><span className="archive-workspace-title">{title}</span>
               <time dateTime={new Date(archivedAt).toISOString()} title={t("archive.archivedOn")}>{dateFormat.format(archivedAt)}</time>
             </a>
-            <button type="button" className="archive-workspace-restore" onClick={() => void restore(session.id)} disabled={pending.has(session.id)}
+            <button type="button" className="archive-workspace-restore" onClick={() => void restore(session.id)} disabled={pending.has(session.id) || confirmClearIds !== null || clearing}
               aria-label={t("archive.restoreSession", { title })}>
               <RestoreIcon size={15} />{t(pending.get(session.id) === "restore" ? "archive.restoring" : "sidebar.restore")}
             </button>
-            <button type="button" className="archive-workspace-delete" disabled={pending.has(session.id)}
+            <button type="button" className="archive-workspace-delete" disabled={pending.has(session.id) || confirmClearIds !== null || clearing}
               aria-label={t("archive.deleteSession", { title })} aria-expanded={confirmDeleteId === session.id}
               onClick={() => {
                 setErrors((current) => { const next = new Map(current); next.delete(session.id); return next; });

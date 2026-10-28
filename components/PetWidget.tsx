@@ -8,6 +8,7 @@ import styles from "./PetWidget.module.css";
 import { PetLivingPortrait } from "./PetLivingPortrait";
 import type { PortraitPose as Pose } from "./PetPortraitMotion";
 import { petChatActivity } from "@/lib/pet-chat-activity";
+import { createPetReplyPicker } from "@/lib/pet-replies";
 
 const VISIBLE_KEY = "pi-yun-pet-visible";
 const POSITION_KEY = "pi-yun-pet-pos";
@@ -69,12 +70,15 @@ export function PetWidget() {
   const previousResultRef = useRef<number | undefined>(undefined);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const interactionRef = useRef(0);
+  const replyPickerRef = useRef<ReturnType<typeof createPetReplyPicker> | null>(null);
 
   const speak = useCallback((key: string, pose?: Pose) => {
     clearTimeout(bubbleTimerRef.current);
-    setGreeting(t(key));
-    bubbleTimerRef.current = setTimeout(() => setGreeting(""), 4500);
+    replyPickerRef.current ??= createPetReplyPicker();
+    const line = t(replyPickerRef.current(key));
+    setGreeting(line);
+    // Longer lines get enough reading time in Chinese as well as English.
+    bubbleTimerRef.current = setTimeout(() => setGreeting(""), Math.min(8000, Math.max(4500, Array.from(line).length * 130)));
     if (pose) {
       clearTimeout(actionTimerRef.current);
       setAction(pose);
@@ -205,12 +209,12 @@ export function PetWidget() {
     setVisible(false); storePreference(VISIBLE_KEY, "0"); toggleRef.current?.focus();
   };
   const interact = (pose: Pose) => {
-    wake(); setMenuOpen(false); interactionRef.current++;
+    wake(); setMenuOpen(false);
     if (pose === "cheer" || pose === "happy") setHop((value) => value + 1);
     if (menuOpen) menuButtonRef.current?.focus();
     if (pose === "happy") {
       setReaction((value) => value + 1);
-      speak(interactionRef.current % 2 ? "pet.patReply1" : "pet.patReply2", "happy");
+      speak("pet.patReply1", "happy");
     } else speak(pose === "wave" ? "pet.helloReply" : "pet.cheerReply", pose);
   };
 
@@ -267,35 +271,26 @@ export function PetWidget() {
           onClick={(event) => {
             if (suppressClickRef.current && event.detail !== 0) { suppressClickRef.current = false; return; }
             interact("happy");
-          }} onDoubleClick={() => interact("wave")}>
+          }} onDoubleClick={() => interact("wave")}
+          onKeyDown={(event) => {
+            const offset: Record<string, [number, number]> = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] };
+            if (!offset[event.key] || !petRef.current) return;
+            event.preventDefault();
+            const rect = petRef.current.getBoundingClientRect(), [dx, dy] = offset[event.key];
+            const next = { x: Math.max(8, Math.min(rect.left + dx, window.innerWidth - rect.width - 8)), y: Math.max(8, Math.min(rect.top + dy, window.innerHeight - rect.height - 8)) };
+            setPosition(next); storePreference(POSITION_KEY, JSON.stringify(next));
+          }}>
           <span className={styles.ground} aria-hidden="true" />
           <PetLivingPortrait pose={pose} dragging={dragging} hop={hop} />
           {asleep && <span className={styles.zzz} aria-hidden="true">z <span>z</span> Z</span>}
           {reaction > 0 && <span key={reaction} className={styles.hearts} aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} style={{ "--i": item } as CSSProperties}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 3.5 12.7C-2 7.3 5.8-.5 11.2 4.9l.8.8.8-.8C18.2-.5 26 7.3 20.5 12.7Z" /></svg></span>)}</span>}
         </button>
-        <div className={styles.nameplate}>
-          <button className={styles.identity} type="button" aria-label={t("pet.move")} title={t("pet.moveHint")}
-            onPointerDown={onDragStart} onPointerMove={onDragMove}
-            onPointerUp={(event) => finishDrag(event)} onPointerCancel={(event) => finishDrag(event, true)}
-            onLostPointerCapture={() => { dragRef.current = null; setDragging(false); }}
-            onKeyDown={(event) => {
-              const offset: Record<string, [number, number]> = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] };
-              if (!offset[event.key] || !petRef.current) return;
-              event.preventDefault();
-              const rect = petRef.current.getBoundingClientRect(), [dx, dy] = offset[event.key];
-              const next = { x: Math.max(8, Math.min(rect.left + dx, window.innerWidth - rect.width - 8)), y: Math.max(8, Math.min(rect.top + dy, window.innerHeight - rect.height - 8)) };
-              setPosition(next); storePreference(POSITION_KEY, JSON.stringify(next));
-            }}>
-            <span className={styles.statusDot} data-status={status} aria-hidden="true" />
-            <span className={styles.name}>{t("pet.name")}</span><span className={styles.status}>{t(`pet.status.${status}`)}</span>
-          </button>
-          <button ref={menuButtonRef} type="button" className={styles.more} aria-label={t("pet.actions")} title={t("pet.actions")}
+        <button ref={menuButtonRef} type="button" className={styles.more} aria-label={t("pet.actions")} title={t("pet.actions")}
             aria-expanded={menuOpen} aria-controls="pet-actions" onClick={() => {
               const rect = petRef.current?.getBoundingClientRect();
               setMenuSide(rect && rect.left >= 240 ? "left" : rect && window.innerWidth - rect.right >= 240 ? "right" : "inside");
               setMenuOpen((value) => !value);
             }}><Icon name="more" /></button>
-        </div>
         {menuOpen && <div id="pet-actions" className={styles.actions} role="group" aria-label={t("pet.actions")}>
           <div className={styles.actionHeading}><div>{t("pet.menuTitle")}<span>{t("pet.menuHint")}</span></div>
             <button type="button" aria-label={t("pet.closeActions")} onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}><Icon name="close" /></button>

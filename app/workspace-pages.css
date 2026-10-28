@@ -5,6 +5,11 @@
 .workspace-location { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0 8px; font-size: 12px; color: var(--text-muted); }
 .workspace-location > span { flex-shrink: 0; }
 .workspace-location > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--text); border-left: 1px solid var(--border); padding-left: 12px; }
+.workspace-settings-location { gap: 8px; }
+.workspace-settings-location > .workspace-settings-heading { flex-shrink: 0; font-size: 14px; color: var(--text); }
+.workspace-return-session { display: inline-flex; align-items: center; flex-shrink: 0; gap: 6px; height: 30px; margin-left: 4px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.workspace-return-session:hover { color: var(--text); }
+.workspace-return-session:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workspace-mobile-location { display: flex; align-items: center; flex: 1; min-width: 0; padding: 0 10px; color: var(--text-muted); font-size: 12px; }
 .workspace-title-action { padding: 0 10px; color: var(--text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
 .workspace-title-action:disabled { opacity: .4; cursor: default; }
@@ -44,7 +49,9 @@
 .settings-dialog-backdrop.is-embedded .settings-section-tabs { margin: 0 0 0 -14px; }
 .settings-dialog-backdrop.is-embedded .settings-section-tab { flex: 0 0 auto; width: auto; padding: 0 14px; }
 
-.sidebar-archive-entry { display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-height: 38px; margin: 4px 8px 8px; padding: 8px 10px; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+.session-sidebar { --sidebar-archive-entry-height: 38px; }
+.session-sidebar.has-archive-footer { --sidebar-toast-footer-space: calc(var(--sidebar-archive-entry-height) + 12px); }
+.sidebar-archive-entry { display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-height: var(--sidebar-archive-entry-height); margin: 4px 8px 8px; padding: 8px 10px; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
 .sidebar-archive-entry:hover, .sidebar-archive-entry[aria-current="page"] { color: var(--text); background: var(--bg-selected); }
 .sidebar-archive-entry-count { margin-left: auto; color: var(--text-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
 .sidebar-archive-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -73,6 +80,7 @@
 .archive-workspace-delete { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; min-height: 34px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .archive-workspace-delete:hover, .archive-workspace-delete[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
 .archive-workspace-delete:disabled { opacity: .5; cursor: default; }
+.archive-clear-confirmation { margin: 16px 0; }
 .archive-delete-confirmation { display: flex; align-items: center; gap: 10px; flex-basis: 100%; padding: 14px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; }
 .archive-delete-confirmation > div { flex: 1; min-width: 0; }
 .archive-delete-confirmation strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
@@ -97,7 +105,7 @@
   .workspace-page-header h1 { font-size: 18px; }
   .workspace-page-back, .workspace-page-export { padding: 7px 9px; font-size: 11px; }
   .workspace-page-content .system-prompt-scroll, .workspace-branch-list { padding: 18px 16px; }
-  .sidebar-archive-entry { min-height: 44px; }
+  .session-sidebar { --sidebar-archive-entry-height: 44px; }
   .archive-workspace { padding: 20px 16px; }
   .archive-workspace-toolbar { flex-wrap: wrap; gap: 10px; }
   .archive-workspace-search { flex-basis: 100%; }

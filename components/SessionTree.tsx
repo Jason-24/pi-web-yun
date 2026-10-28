@@ -43,7 +43,6 @@ import {
   FolderIcon,
   FolderPlusIcon,
   MoreIcon,
-  PinIcon,
   PlusIcon,
   RestoreIcon,
   SpinnerIcon,
@@ -113,6 +112,7 @@ export interface SessionTreeProps {
   /** Back to the base limit; key is a projectKey or PINNED_MORE_KEY. */
   onShowLess(key: string): void;
   onTogglePinned(): void;
+  onToggleRecents?(): void;
   onArchiveFamily(family: SessionFamily): void;
   onRestoreFamily(family: SessionFamily): void;
   onOpenRowMenu(row: SessionRow, anchor: SidebarMenuAnchor, opener: HTMLElement | null): void;
@@ -929,7 +929,6 @@ const GroupRowView = memo(function GroupRowView({
             below align with the project name. Icons are decorative. */}
         <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
-        {project.pinned && <PinIcon size={10} className="session-tree-group-pin" label={t("sidebar.pinnedProject")} />}
         {!expanded && <ActivitySummary running={row.running} unread={row.unread} t={t} />}
       </button>
       <span className="session-tree-group-actions">
@@ -983,8 +982,20 @@ const PlainRowView = memo(function PlainRowView({
 
   switch (row.kind) {
     case "section":
-      return <div className="session-tree-row session-tree-section" style={style} data-row-key={row.key} role="heading" aria-level={2}>
-        {t(row.label === "projects" ? "sidebar.projects" : "sidebar.recents")}
+      return <div className={`session-tree-row session-tree-section${row.label === "projects" ? " is-projects" : ""}`} style={style} data-row-key={row.key}
+        role={row.label === "recents" ? "heading" : undefined} aria-level={row.label === "recents" ? 2 : undefined}>
+        {row.label === "recents" ? <button type="button" className="session-tree-recents-toggle"
+          aria-expanded={!row.collapsed} onClick={() => handlers.current.onToggleRecents?.()}>
+          <span>{t("sidebar.recents")}</span>
+          <ChevronIcon size={12} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
+        </button> : <>
+          <span role="heading" aria-level={2}>{t("sidebar.projects")}</span>
+          <button type="button" className="session-tree-section-action" aria-label={t("projectCreate.title")}
+            title={t("projectCreate.title")} aria-haspopup="dialog"
+            onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}>
+            <PlusIcon size={16} />
+          </button>
+        </>}
       </div>;
     case "recent": {
       const title = sessionRowTitle(row.family.root);
@@ -1071,11 +1082,11 @@ const PlainRowView = memo(function PlainRowView({
           <button
             type="button"
             className="session-tree-footer-button"
-            aria-haspopup="menu"
+            aria-haspopup="dialog"
             onClick={(event) => handlers.current.onOpenOtherProject(event.currentTarget)}
           >
             <FolderPlusIcon size={12} />
-            <span className="session-tree-footer-label">{t("sidebar.openOtherProject")}</span>
+            <span className="session-tree-footer-label">{t("projectCreate.title")}</span>
           </button>
         </div>
       );

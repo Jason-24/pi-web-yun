@@ -570,7 +570,7 @@ html[data-keyboard-open] .sidebar-sheet {
 .sidebar-toast-region {
   position: absolute;
   right: 8px;
-  bottom: 8px;
+  bottom: calc(8px + var(--sidebar-toast-footer-space, 0px));
   left: 8px;
   z-index: 30;
   pointer-events: none;

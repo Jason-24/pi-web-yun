@@ -129,6 +129,16 @@ test("rename-project names a project, GET reads it back, and null clears it", as
   assert.equal(cleared.revision, 2);
 });
 
+test("create-project saves the alias and project together without creating a session", async () => {
+  await reset();
+  const created = await okState(await post({ action: "create-project", projectKey: "/repo", root: "/repo", name: "  My workspace  " }));
+  assert.equal(created.revision, 1);
+  assert.equal(created.projectNames["/repo"], "My workspace");
+  assert.equal(created.projects["/repo"].root, "/repo");
+  assert.deepEqual(created.sessions, {});
+  assert.deepEqual(await okState(await GET()), created);
+});
+
 test("a name with no room left is refused, and nothing is written", async () => {
   await reset();
   await mkdir(agentDir, { recursive: true });
@@ -141,6 +151,10 @@ test("a name with no room left is refused, and nothing is written", async () => 
   assert.equal(body.reason, "full");
   assert.equal(typeof body.error, "string");
   assert.equal(await readFile(statePath, "utf8"), before);
+  const creation = await post({ action: "create-project", projectKey: "/new", root: "/new", name: "New" });
+  assert.equal(creation.status, 409);
+  assert.equal((await creation.json()).reason, "full");
+  assert.equal(await readFile(statePath, "utf8"), before, "a refused name cannot leave a partial project");
   // A project that has a name can still change it.
   const renamed = await okState(await post({ action: "rename-project", projectKey: "/p1", name: "One" }));
   assert.equal(renamed.projectNames["/p1"], "One");

@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     const state = await updateSessionUiState(request);
     // A name with no room left was not stored (nothing was written): say so,
     // rather than answer with a state that quietly lacks it.
-    if (request.action === "rename-project" && request.name !== null && storedProjectName(state, request.projectKey) !== request.name) {
+    if ((request.action === "rename-project" || request.action === "create-project") && request.name !== null && storedProjectName(state, request.projectKey) !== request.name) {
       return refusal(409, "full", `No room for another project name (at most ${MAX_PROJECT_NAMES}, ${PROJECT_NAMES_MAX_BYTES / 1024} KiB in all)`);
     }
     return NextResponse.json({ state } satisfies SessionUiStateResponse, { headers: NO_STORE });

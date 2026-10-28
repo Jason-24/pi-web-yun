@@ -917,11 +917,11 @@ a.session-tree-main {
    on a coarse pointer, below), so it never covers the file tree. Still the
    one live region, at the root. */
 .session-sidebar.is-files-below .sidebar-toast-region {
-  bottom: calc(var(--sidebar-files-height, 320px) + 8px);
+  bottom: calc(var(--sidebar-files-height, 320px) + 8px + var(--sidebar-toast-footer-space, 0px));
 }
 
 .session-sidebar.is-files-below.is-files-collapsed .sidebar-toast-region {
-  bottom: 37px;
+  bottom: calc(37px + var(--sidebar-toast-footer-space, 0px));
 }
 
 /* One toolbar row in the cells of the chat's top bar beside it (AppShell):
@@ -1603,7 +1603,7 @@ a.session-tree-main {
   }
 
   .session-sidebar.is-files-below.is-files-collapsed .sidebar-toast-region {
-    bottom: 45px;
+    bottom: calc(45px + var(--sidebar-toast-footer-space, 0px));
   }
 }
 

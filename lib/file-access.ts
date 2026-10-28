@@ -1,6 +1,8 @@
 import { getAdditionalAllowedRoots, normalizeSlashes } from "./allowed-roots";
 import { isExistingPathWithinRoots, isPathWithinRoots } from "./path-security";
 import { listAllSessions } from "./session-reader";
+import { readSessionUiState } from "./session-ui-state";
+import { isProjectRemoved } from "./session-ui-state-shared";
 export { allowFileRoot, normalizeSlashes } from "./allowed-roots";
 export { isWindowsAbsolutePath } from "./paths";
 
@@ -29,6 +31,13 @@ export async function getAllowedFileRoots(): Promise<Set<string>> {
   }
 
   for (const root of getAdditionalAllowedRoots()) roots.add(root);
+
+  // Explicitly opened projects remain browsable after a server restart even
+  // when they have never saved a conversation (and no in-memory grant remains).
+  const state = readSessionUiState();
+  for (const [key, project] of Object.entries(state.projects)) {
+    if (!isProjectRemoved(state, key)) roots.add(normalizeSlashes(project.root));
+  }
 
   globalThis.__piAllowedRootsCache = { roots, expiresAt: now + ALLOWED_ROOTS_TTL_MS };
   return roots;

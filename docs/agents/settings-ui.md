@@ -25,6 +25,7 @@
 
 
 ## Workbench settings entry points
+- The desktop Settings header replaces the passive session name with a quiet Back to conversation button when a session or composer exists. Its tooltip names the session, and it uses `navigateWorkspace("chat")`, preserving the mounted transcript, scroll and draft. Keep the Settings label as a separate context button so focused file tabs can still switch back to Settings; never nest the return button in that button. Mobile retains its existing Settings close/navigation controls.
 - AppShell has its primary Settings entry in the 52px rail at the far left on desktop (`app/navigation-rail.css`), available even when the session sidebar is collapsed. Models, Skills and the other categories remain in SettingsPanel's navigation; do not duplicate them as rail shortcuts. The entry opens the last available settings section, keeps its tooltip and accessible name, and stays active for any open settings section. Project requirements are checked inside SettingsPanel.
 - Phones render the same navigation once as a labelled row at the bottom of the session drawer; do not add a second set of interactive buttons. Desktop panel width limits reserve the rail's 52px.
 - Desktop rail entries are fixed workspace destinations, plus a separate companion visibility toggle that never navigates away from the current view. Generate title stays beside the conversation title. Mobile session actions remain in the chat header/overflow and enter the same embedded views.

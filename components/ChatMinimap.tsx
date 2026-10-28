@@ -8,7 +8,6 @@ import {
   normalizeDisplayMath,
 } from "@/lib/markdown";
 import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
-import { loadMinimapPreviewLocked, saveMinimapPreviewLocked } from "@/lib/minimap-preview-lock";
 import type { AgentMessage, AssistantMessage, CustomMessage, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
 import styles from "./ChatMinimap.module.css";
@@ -26,8 +25,6 @@ interface Props {
 
 const MAX_NODE_GAP = 10;
 const MINIMAP_PADDING = 28;
-// Reserve space below the centered tick group for its preview-lock control.
-const MINIMAP_BOTTOM_PADDING = 36 + MINIMAP_PADDING;
 const PREVIEW_HIDE_DELAY = 250;
 const NAVIGATION_ACTIVE_LOCK_MS = 1600;
 
@@ -222,10 +219,10 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
   }
 
   const height = Math.max(1, minimapHeight);
-  const usableHeight = Math.min(180, Math.max(0, height - MINIMAP_PADDING - MINIMAP_BOTTOM_PADDING));
+  const usableHeight = Math.min(180, Math.max(0, height - 2 * MINIMAP_PADDING));
   if (allNodes.length === 1) {
     return {
-      nodes: [{ ...allNodes[0], topRatio: Math.max(MINIMAP_PADDING, (height - 36) / 2) / height }],
+      nodes: [{ ...allNodes[0], topRatio: Math.max(MINIMAP_PADDING, height / 2) / height }],
       gap: MAX_NODE_GAP,
       fillsHeight: false,
     };
@@ -233,7 +230,7 @@ function layoutNodes(allNodes: NodeInfo[], minimapHeight: number): NodeLayout {
 
   const naturalGap = usableHeight / (allNodes.length - 1);
   const gap = Math.min(MAX_NODE_GAP, naturalGap);
-  const start = Math.max(MINIMAP_PADDING, (height - 36 - gap * (allNodes.length - 1)) / 2);
+  const start = Math.max(MINIMAP_PADDING, (height - gap * (allNodes.length - 1)) / 2);
   return {
     nodes: allNodes.map((node, index) => ({
       ...node,
@@ -258,7 +255,6 @@ export const ChatMinimap = memo(function ChatMinimap({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [minimapHeight, setMinimapHeight] = useState(600);
   const [minimapHovered, setMinimapHovered] = useState(false);
-  const [locked, setLocked] = useState(loadMinimapPreviewLocked);
   const [mouseYRatio, setMouseYRatio] = useState<number | null>(null);
   const [previewHeight, setPreviewHeight] = useState(180);
   const draggingRef = useRef(false);
@@ -555,21 +551,17 @@ export const ChatMinimap = memo(function ChatMinimap({
   }, []);
 
   const showPreview = useCallback(() => {
-    if (locked) return;
     cancelPreviewHide();
     setMinimapHovered(true);
-  }, [cancelPreviewHide, locked]);
+  }, [cancelPreviewHide]);
 
-  const toggleLock = useCallback(() => {
-    const next = !locked;
-    setLocked(next);
-    saveMinimapPreviewLocked(next);
-    if (next) {
-      cancelPreviewHide();
-      setMinimapHovered(false);
-      setMouseYRatio(null);
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem("pi-web:minimap-preview-locked");
+    } catch {
+      // Old lock preferences are irrelevant even when storage is unavailable.
     }
-  }, [cancelPreviewHide, locked]);
+  }, []);
 
   const schedulePreviewHide = useCallback(() => {
     cancelPreviewHide();
@@ -697,40 +689,6 @@ export const ChatMinimap = memo(function ChatMinimap({
           </button>
         );
       })}
-
-      <button
-        type="button"
-        className={styles.lock}
-        style={{ top: Math.min(minimapHeight - 32, (positionedNodes.at(-1)?.topRatio ?? .5) * minimapHeight + 16) }}
-        data-minimap-lock={locked ? "on" : "off"}
-        aria-pressed={locked}
-        title={t(locked ? "chatMinimap.unlockPreview" : "chatMinimap.lockPreview")}
-        aria-label={t(locked ? "chatMinimap.unlockPreview" : "chatMinimap.lockPreview")}
-        onMouseDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          toggleLock();
-        }}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="4" y="11" width="16" height="10" rx="2" />
-          {locked ? (
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          ) : (
-            <path d="M8 11V7a4 4 0 0 1 7.9-.9" />
-          )}
-        </svg>
-      </button>
 
       {minimapHovered && previewNode && (
         <div

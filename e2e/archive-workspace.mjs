@@ -27,6 +27,8 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
   const deletes = [];
   let refuseDelete = true;
   let keepRunningOnce = true;
+  let holdDelete = false;
+  let releaseDelete = null;
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/api/**", async route => {
     const request = route.request();
@@ -36,6 +38,7 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
     if (path === "/api/sessions/delete" && request.method() === "POST") {
       const { ids } = request.postDataJSON();
       deletes.push(ids);
+      if (holdDelete) await new Promise(resolve => { releaseDelete = resolve; });
       if (refuseDelete) { refuseDelete = false; return route.fulfill({ status: 503, json: { error: "Fixture delete failure" } }); }
       if (keepRunningOnce) { keepRunningOnce = false; return reply({ deleted: [], running: ids, missing: [] }); }
       const deleted = sessions.filter(session => ids.includes(session.id) || ids.includes(session.relation?.parentSessionId)).map(session => session.id);
@@ -73,7 +76,7 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
         entryIds: ["u1", "a1"], oldestEntryId: "u1", hasMore: false, turnsBefore: 0, thinkingLevel: "off", model: null } });
     if (path.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: 'data: {"type":"connected","isStreaming":false}\n\n' });
     if (path.startsWith("/api/agent/") && request.method() === "POST") {
-      commands.push(request.postDataJSON().type);
+      commands.push(request.postDataJSON()?.type);
       return reply({ success: true, data: {} });
     }
     return reply({});
@@ -83,6 +86,18 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
   const pane = page.locator("[data-workspace-page=archive]");
   const row = id => pane.locator(`[data-archived-session="${id}"]`);
   const sidebarRow = name => page.locator("#session-sidebar-panel-sessions .session-tree-session").filter({ hasText: name });
+  const checkToastAboveArchive = async () => {
+    const toast = page.locator(".sidebar-toast");
+    await toast.waitFor();
+    await toast.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {}))));
+    const toastBox = await toast.boundingBox();
+    const archiveBox = await footer.boundingBox();
+    assert.ok(toastBox.y + toastBox.height <= archiveBox.y - 8, "operation toasts leave the fixed archive entry unobstructed");
+    assert.equal(await footer.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    }), true, "the archive entry remains clickable through every toast");
+  };
   try {
     await page.goto(`${base}/?session=${live.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
     await footer.getByText("2", { exact: true }).waitFor({ timeout: 90000 });
@@ -118,6 +133,7 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
     await footer.click();
     await row(a.id).locator(".archive-workspace-restore").click();
     await row(a.id).getByText("恢复失败，请重试。", { exact: true }).waitFor();
+    await checkToastAboveArchive();
     await footer.getByText("2", { exact: true }).waitFor();
     await row(a.id).locator(".archive-workspace-restore").click();
     await row(a.id).waitFor({ state: "detached" });
@@ -175,6 +191,8 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
     await row(a.id).waitFor({ state: "detached" });
     await footer.getByText("2", { exact: true }).waitFor();
     assert.equal(sessions.some(session => session.id === child.id), false, "successful deletion removes the archived family");
+    await checkToastAboveArchive();
+    await page.screenshot({ path: resolve(artifacts, "archive-toast-above-entry.png") });
     assert.ok(sessions.some(session => session.id === live.id), "other conversations are untouched");
     await row(b.id).getByRole("link").click();
     await page.waitForURL(`**/?session=${b.id}`);
@@ -187,14 +205,102 @@ export async function checkArchiveWorkspace({ browser, base, artifacts }) {
     assert.deepEqual(deletes, [[a.id], [a.id], [a.id], [b.id]]);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().right <= 1);
+    await page.locator(".workspace-sidebar-toggle").click();
+    await footer.waitFor();
+    await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().left >= 0);
+    await checkToastAboveArchive();
+    await page.screenshot({ path: resolve(artifacts, "archive-toast-mobile.png") });
+    await footer.click();
+    await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().right <= 1);
     await row(live.id).locator(".archive-workspace-delete").click();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.screenshot({ path: resolve(artifacts, "archive-mobile-delete-confirm.png") });
     await row(live.id).locator(".archive-delete-confirmation").getByRole("button", { name: "取消", exact: true }).click();
     assert.equal(deletes.length, 4);
+    // The bulk action confirms all archived projects, even while filters hide rows.
+    const bulkA = info("archive-bulk-a", "批量归档支付任务", payment);
+    const bulkB = info("archive-bulk-b", "批量归档工具任务", tools);
+    const bulkChild = { ...child, id: "archive-bulk-child", relation: { ...child.relation, parentSessionId: bulkA.id } };
+    const newlyArchived = info("archive-later", "确认后才归档的任务", tools);
+    sessions.push(bulkA, bulkB, bulkChild, newlyArchived);
+    delete state.sessions[live.id].archivedAt;
+    state.sessions[bulkA.id] = { archivedAt };
+    state.sessions[bulkB.id] = { archivedAt };
+    state.revision++;
+    refuseDelete = true;
+    keepRunningOnce = true;
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(`${base}/?session=${live.id}`, { waitUntil: "domcontentloaded" });
+    await footer.getByText("2", { exact: true }).waitFor();
+    await footer.click();
+    await row(bulkA.id).waitFor();
+    const clearButton = pane.locator(".archive-workspace-clear");
+    const clearConfirmation = pane.locator(".archive-clear-confirmation");
+    await search.fill("批量归档支付");
+    await pane.getByRole("combobox", { name: "按项目筛选" }).selectOption(payment);
+    assert.equal(await pane.locator("[data-archived-session]").count(), 1);
+    await clearButton.click();
+    await clearConfirmation.getByText("永久删除全部 2 个归档会话？", { exact: true }).waitFor();
+    assert.equal(await clearConfirmation.getByRole("button", { name: "取消", exact: true }).evaluate(el => el === document.activeElement), true);
+    await page.keyboard.press("Escape");
+    await clearConfirmation.waitFor({ state: "detached" });
+    assert.ok(await pane.isVisible());
+    assert.equal(deletes.length, 4, "opening and cancelling sends no deletion request");
+    await clearButton.click();
+    await clearConfirmation.getByRole("button", { name: "取消", exact: true }).click();
+    assert.equal(deletes.length, 4);
+    await clearButton.click();
+    await page.screenshot({ path: resolve(artifacts, "archive-clear-confirmation.png") });
+    await clearConfirmation.getByRole("button", { name: "清空归档", exact: true }).click();
+    const clearError = pane.getByText("部分归档未能删除，可能已恢复或开始运行，请刷新后重试。", { exact: true });
+    await clearError.waitFor();
+    assert.deepEqual([...deletes.at(-1)].sort(), [bulkA.id, bulkB.id].sort());
+    assert.ok(sessions.some(session => session.id === bulkA.id));
+    // A server-side running-family refusal leaves the remaining archive retryable.
+    await clearButton.click();
+    await clearConfirmation.getByRole("button", { name: "清空归档", exact: true }).click();
+    await clearError.waitFor();
+    assert.ok(sessions.some(session => session.id === bulkB.id));
+    await clearButton.click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().right <= 1);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: resolve(artifacts, "archive-clear-mobile.png") });
+    holdDelete = true;
+    await Promise.all([
+      page.waitForRequest(request => request.url().includes("/api/sessions/delete")),
+      clearConfirmation.getByRole("button", { name: "清空归档", exact: true }).click(),
+    ]);
+    assert.equal(await clearButton.isDisabled(), true);
+    assert.equal(await clearConfirmation.getByRole("button", { name: "取消", exact: true }).isDisabled(), true);
+    assert.equal(await row(bulkA.id).locator(".archive-workspace-restore").isDisabled(), true);
+    assert.equal(await row(bulkA.id).locator(".archive-workspace-delete").isDisabled(), true);
+    await clearConfirmation.locator(".is-danger").evaluate(el => { el.click(); el.click(); });
+    assert.equal(deletes.length, 7, "duplicate clicks cannot send overlapping batches");
+    state.sessions[newlyArchived.id] = { archivedAt };
+    state.revision++;
+    holdDelete = false;
+    releaseDelete();
+    await clearConfirmation.waitFor({ state: "detached" });
+    await footer.getByText("1", { exact: true }).waitFor();
+    assert.equal(sessions.some(session => [bulkA.id, bulkB.id, bulkChild.id].includes(session.id)), false);
+    assert.ok(sessions.some(session => session.id === live.id), "unarchived conversations remain untouched");
+    assert.ok(sessions.some(session => session.id === newlyArchived.id), "a new archive is outside the confirmed snapshot");
+    await search.fill("");
+    await pane.getByRole("combobox", { name: "按项目筛选" }).selectOption("");
+    await clearButton.click();
+    await clearConfirmation.getByText("永久删除全部 1 个归档会话？", { exact: true }).waitFor();
+    await clearConfirmation.getByRole("button", { name: "清空归档", exact: true }).click();
+    await footer.getByText("0", { exact: true }).waitFor();
+    await pane.getByText("没有已归档的会话", { exact: true }).waitFor();
+    assert.equal(await clearButton.isDisabled(), true);
     assert.equal(commands.some(type => type === "prompt" || type === "abort"), false);
     assert.deepEqual(errors, []);
-    console.log("PASS: archive navigation/search/restore, confirmed deletion with Cancel/Escape, failure/retry and running-family refusal, family cleanup, selected-session deletion keeps the archive open, mobile/dark layout; no prompt/abort or browser errors.");
+    console.log("PASS: archive navigation/search/restore, single and batch deletion, Cancel/Escape, failure/retry, running-family refusal, confirmed-id snapshot, family cleanup, unarchived protection, duplicate-submit guard, selected-session preservation, mobile/dark; no prompt/abort or browser errors.");
+  } catch (error) {
+    await page.screenshot({ path: resolve(artifacts, "archive-failure.png") }).catch(() => {});
+    console.error({ deletes, errors, archiveErrors: await pane.getByRole("alert").allTextContents().catch(() => []) });
+    throw error;
   } finally { await context.close(); }
 }
 

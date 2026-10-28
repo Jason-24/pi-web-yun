@@ -61,3 +61,17 @@ Model prompts, live model streaming, and agent execution are outside this suite.
 Failures save a screenshot, Playwright trace, and server log under
 `test-results/e2e/`; CI uploads that directory. Open a trace with
 `npx playwright show-trace test-results/e2e/trace.zip`.
+
+## Project dialog and retention checks against a running server
+
+Reuse the existing development server for these standalone checks. They do not start another server or run a build:
+
+```sh
+node e2e/project-create.mjs
+node e2e/project-retention.mjs
+```
+
+Both default to `http://127.0.0.1:30141`; set `E2E_BASE_URL` for another existing instance. They use headless Edge on Windows and Playwright Chromium elsewhere; `E2E_BROWSER_CHANNEL` overrides the browser channel. All API responses and project writes are isolated in browser fixtures, so the checks do not modify real projects or sessions or send prompts.
+
+- `project-create.mjs`: desktop light/dark and mobile layouts, folder browsing, nested Escape and focus restoration, long paths, validation failures, save rollback/retry, aliases after reload, and default folders. Screenshots go to `test-results/project-create/`.
+- `project-retention.mjs`: projects without sessions survive reload, failed removal rolls back, removed projects stay hidden even while current, and explicitly adding a known folder through Create project restores its project entry. Screenshots go to `test-results/project-retention/`.

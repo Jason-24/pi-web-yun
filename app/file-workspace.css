@@ -2,6 +2,14 @@
 .workbench-files-body { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .workbench-file-preview { position: relative; }
 .workbench-file-tree, .workbench-tree-boundary { display: none; }
+/* The viewport is known to CSS before React restores its media-query snapshot
+   and attaches the file-tree portal. Do not paint the inline fallback in the
+   session sidebar on wide screens, even during that first render. */
+@media (min-width: 1200px) {
+  .workspace-shell .session-sidebar > .sidebar-files-panel,
+  .workspace-shell .session-sidebar > .sidebar-files-resize-handle { display: none; }
+  .workspace-shell .session-sidebar.is-files-below .sidebar-toast-region { bottom: calc(8px + var(--sidebar-toast-footer-space, 0px)); }
+}
 .workbench-file-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px; text-align: center; color: var(--text-dim); }
 .workbench-file-empty > svg { width: 48px; height: 48px; margin-bottom: 8px; opacity: .75; }
 .workbench-file-empty strong { color: var(--text); font-size: 18px; font-weight: 550; }
@@ -116,8 +124,8 @@
 }
 @media (min-width: 641px) {
   .workspace-chat-header > div:first-child { height: calc(64px + env(safe-area-inset-top)) !important; padding-inline: 16px; }
-  .workspace-location[data-view="chat"] > strong { color: var(--text-muted); font-size: 15px; font-weight: 500; }
-  .workspace-title-folder { color: var(--text-dim); }
+  .workspace-location[data-view="chat"] > strong { color: var(--text); font-size: 16px; font-weight: 600; }
+  .workspace-title-folder { color: var(--text); }
 }
 @media (max-width: 640px) {
   .workspace-shell #file-panel > .file-panel-header { min-height: 52px; height: calc(52px + env(safe-area-inset-top)) !important; padding-right: 6px; }
@@ -145,6 +153,7 @@
   background: var(--bg); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   pointer-events: none;
 }
+.has-unified-header:not(.is-files-open) > .workspace-unified-bar { border-bottom: 0; }
 .has-unified-header .workspace-chat-header {
   position: absolute; top: 0; left: 0; right: 0; height: var(--workspace-header-height);
   z-index: 5; background: transparent !important;
