@@ -367,8 +367,8 @@ test("renders the read-only tool preset as the active selection", () => {
     ),
   );
 
-  assert.match(html, /title="Change tool preset: read-only"/);
-  assert.match(html, />read-only<\/span>/);
+  assert.match(html, /title="Change tool preset: Read-only"/);
+  assert.match(html, />Read-only<\/span>/);
 });
 
 test("renders the empty tool preset as Chat only", () => {

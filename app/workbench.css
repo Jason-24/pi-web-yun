@@ -115,13 +115,65 @@
 .workspace-shell .chat-input-controls {
   flex: 1 1 280px; min-width: 0; flex-wrap: wrap;
   container-type: inline-size;
-  margin-top: 0 !important; gap: 2px !important;
+  margin-top: 0 !important; gap: 8px !important;
 }
-.workspace-shell .chat-composer-model { flex: 1 1 120px !important; }
+.workspace-shell .chat-composer-model { flex: 0 1 auto !important; max-width: 40%; gap: 6px !important; }
 .workspace-shell .chat-composer-model > button { width: 30px !important; height: 32px !important; }
-.workspace-shell .chat-composer-model .model-selector { max-width: calc(100% - 32px); }
-.workspace-shell .chat-composer-model .model-selector > button { max-width: 100% !important; font-size: 12px !important; padding: 0 8px !important; }
-.workspace-shell .chat-composer-options { max-width: 100%; }
+.workspace-shell .chat-composer-model .model-selector { max-width: calc(100% - 36px); }
+.workspace-shell .chat-composer-model .model-selector > button { max-width: 100% !important; font-size: 12px !important; font-weight: 550; padding: 0 10px !important; }
+.workspace-shell .chat-composer-options { flex: 1 1 260px !important; min-width: 0; max-width: 100%; margin-left: 0 !important; }
+.workspace-shell .chat-composer-options-list { flex: 1; min-width: 0; gap: 6px !important; }
+.workspace-shell .chat-composer-usage { display: flex; flex: 1; min-width: 0; justify-content: flex-end; align-items: center; margin-left: auto; }
+.workspace-shell .chat-composer-attach > svg { width: 16px; height: 16px; }
+.workspace-shell .chat-composer-control > svg,
+.workspace-shell .chat-composer-utility > svg,
+.workspace-shell .chat-composer-model .model-selector > button > svg { flex-shrink: 0; width: 14px; height: 14px; }
+.chat-composer-caret { display: block; flex: none; width: 5px; height: 5px; margin: -3px 1px 0 3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); opacity: .55; }
+.workspace-shell .chat-composer-control > span:first-of-type { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.chat-reasoning-menu {
+  position: absolute; bottom: calc(100% + 10px); z-index: 100;
+  width: 232px; max-width: calc(100vw - 32px); max-height: min(420px, calc(var(--app-viewport-height, 100vh) - 120px));
+  padding: 6px; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 12%, transparent), 0 2px 6px color-mix(in srgb, var(--text) 4%, transparent);
+}
+.reasoning-menu-heading { padding: 8px 12px 7px; color: var(--text-dim); font-size: 11px; font-weight: 500; }
+.reasoning-menu-row { margin-block: 2px; border-radius: 7px; }
+.reasoning-menu-row > button[role="option"] {
+  min-height: 38px; padding-block: 9px !important; gap: 10px !important;
+  border-radius: inherit; font-size: 13px !important; line-height: 20px; font-weight: 400 !important;
+}
+.reasoning-menu-row > button[role="option"][aria-selected="true"] { font-weight: 550 !important; }
+.reasoning-menu-row > button[role="option"] > svg,
+.reasoning-menu-row > button[role="option"] > span:first-child:not(.reasoning-option-copy) { width: 14px !important; flex-shrink: 0; }
+.reasoning-menu-row > button[role="option"] > svg { height: 14px; stroke: var(--text); }
+.reasoning-menu-row.is-auto { margin-bottom: 11px; }
+.reasoning-menu-row.is-auto::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -6px; height: 1px; background: var(--border); }
+.reasoning-option-copy { flex: 1; min-width: 0; }
+.reasoning-option-label { display: block; color: var(--text); white-space: normal; overflow-wrap: anywhere; }
+.reasoning-option-hint { display: block; margin-top: 1px; color: var(--text-dim); font-size: 11px; font-weight: 400; line-height: 18px; }
+.reasoning-option-original { margin-left: 6px; color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; font-weight: 400; }
+.reasoning-menu-row > span[role="img"] > svg { width: 12px; height: 12px; }
+.reasoning-menu-row > button[role="option"]:focus-visible { outline-offset: -2px; }
+@media (min-width: 641px) {
+  .workspace-shell .chat-composer-control,
+  .workspace-shell .chat-composer-model .model-selector > button {
+    height: 30px !important; border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important;
+    border-radius: 8px !important; background: var(--bg-panel) !important; color: var(--text-muted);
+  }
+  .workspace-shell .chat-composer-control:hover,
+  .workspace-shell .chat-composer-control[aria-expanded="true"],
+  .workspace-shell .chat-composer-model .model-selector > button:hover,
+  .workspace-shell .chat-composer-model .model-selector > button[aria-expanded="true"] { background: var(--bg-hover) !important; border-color: var(--border) !important; color: var(--text) !important; }
+  .workspace-shell .chat-composer-model .model-selector > button::after { content: ""; flex: none; width: 5px; height: 5px; margin: -3px 1px 0 3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); opacity: .55; }
+  .workspace-shell .chat-composer-utility { min-width: 30px; padding-inline: 7px !important; }
+  .workspace-shell .chat-composer-sound { width: 30px !important; }
+  @container (max-width: 480px) {
+    .workspace-shell .chat-composer-options { flex-basis: auto !important; }
+    .workspace-shell .chat-composer-options-list { gap: 2px !important; }
+    .workspace-shell .chat-composer-control > span { display: none; }
+  }
+}
 .composer-session-stats { flex-shrink: 0; max-width: 100%; font-family: var(--font-ui); }
 .composer-session-stats:hover { background: var(--bg-hover) !important; }
 .composer-session-popover {
@@ -137,7 +189,7 @@
   .composer-session-stat-io { display: none !important; }
 }
 .workspace-shell .chat-composer-options > div { flex-wrap: wrap; }
-.workspace-shell .chat-composer-options > div > div > button { padding-left: 8px !important; padding-right: 8px !important; }
+.workspace-shell .chat-composer-control { padding-left: 9px !important; padding-right: 9px !important; }
 .workspace-shell .chat-composer-submit { flex: 0 0 auto; margin-left: auto; }
 .workspace-shell .chat-composer-send {
   width: 34px !important; height: 34px !important; padding: 0 !important;
@@ -189,7 +241,10 @@
   .workspace-shell .chat-composer-entry { padding: 12px 12px 2px !important; }
   .workspace-shell .chat-composer-footer { padding: 4px 7px 7px; gap: 4px; }
   .workspace-shell .chat-input-controls { flex-basis: 0; }
-  .workspace-shell .chat-composer-model { flex-basis: 0 !important; }
+  .workspace-shell .chat-composer-model { flex: 1 1 0 !important; max-width: none; }
+  .workspace-shell .chat-composer-options { flex: 0 0 auto !important; }
+  .workspace-shell .chat-composer-options-list { gap: 1px !important; }
+  .workspace-shell .chat-composer-caret { display: none; }
   .workspace-shell .chat-composer-options > div { flex-wrap: nowrap; }
 }
 @media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {

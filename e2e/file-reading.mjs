@@ -190,7 +190,8 @@ try {
   const savedPanelWidth = await page.evaluate(() => localStorage.getItem("pi-right-panel-width"));
   await panel.locator(".file-panel-expand-button").click();
   assert.equal(await panel.getAttribute("class").then(value => value.includes("right-panel-reading-expanded")), true);
-  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, treeWidth);
+  assert.equal(await tree.evaluate(el => el.inert), false, "expanded reading preserves the open directory");
   await page.waitForFunction(() => Math.abs(document.querySelector("#file-panel").getBoundingClientRect().width - document.querySelector(".workspace-main").getBoundingClientRect().width) < 1);
   const mainBox = await page.locator(".workspace-main").boundingBox();
   const expandedFile = await panel.boundingBox();
@@ -202,6 +203,27 @@ try {
   assert.equal(await page.evaluate(() => localStorage.getItem("pi-right-panel-width")), savedPanelWidth);
   assert.equal(await content.getAttribute("data-instance"), "same");
   await page.screenshot({ path: resolve(artifacts, "reading-focused.png") });
+  const assertFileFocused = async () => {
+    assert.equal(await panel.locator(".file-panel-expand-button").getAttribute("aria-pressed"), "true");
+    assert.equal(await chatInput.isVisible(), false, "directory actions never reveal the conversation column");
+    assert.equal(await content.getAttribute("data-instance"), "same");
+  };
+  await dragTreeClosed();
+  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  await assertFileFocused();
+  await panel.locator(".workbench-tree-restore").click();
+  await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
+  await assertFileFocused();
+  await panel.locator(".file-tree-toggle").click();
+  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  await panel.locator(".file-tree-toggle").click();
+  await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
+  await assertFileFocused();
+  await panel.locator(".file-tree-toggle").click();
+  await panel.getByRole("button", { name: "选择文件", exact: true }).click();
+  await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
+  await assertFileFocused();
+  assert.equal(await content.evaluate(el => el.scrollTop), beforeRestore, "directory controls preserve the reading position");
   const contextTab = page.locator(".workspace-context-tab");
   const readingTab = panel.getByRole("tab", { name: "reading.txt", exact: true });
   const focusedScrollTop = await content.evaluate(el => el.scrollTop);
@@ -339,7 +361,7 @@ try {
     if (name !== "FileViewer.tsx") await panel.getByRole("tab", { name, exact: true }).getByRole("button").click();
   }
   await panel.locator(".file-panel-expand-button").click();
-  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).waitFor();
   await page.waitForFunction(() => {
     const panel = document.querySelector("#file-panel");
     return Math.abs(panel.getBoundingClientRect().width - document.querySelector(".workspace-main").getBoundingClientRect().width) < 1;
@@ -360,6 +382,13 @@ try {
   await panel.locator(".file-panel-expand-button").click();
   assert.equal(await contextTab.getAttribute("aria-label"), "显示主页");
   assert.equal(await homeView.isVisible(), false);
+  await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).waitFor();
+  await panel.locator(".file-tree-toggle").click();
+  await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
+  await panel.locator(".file-tree-toggle").click();
+  await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).waitFor();
+  assert.equal(await homeView.isVisible(), false, "restoring the directory keeps Home hidden");
+  assert.equal(await panel.locator(".file-panel-expand-button").getAttribute("aria-pressed"), "true");
   await contextTab.press("Enter");
   assert.equal(await homeView.isVisible(), true);
   assert.equal(await homeView.getAttribute("data-instance"), "same-home");

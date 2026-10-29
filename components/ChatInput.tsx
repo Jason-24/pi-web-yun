@@ -125,6 +125,10 @@ const TOOL_PRESET_MAP: Record<ToolPresetLabel, ToolPreset> = {
   default: "default",
   full: "full",
 };
+const TOOL_PRESET_LABEL_KEYS: Record<ToolPresetLabel, string> = {
+  configured: "chat.toolsConfigured", "chat-only": "chat.chatOnly", "read-only": "chat.toolsReadOnly",
+  default: "chat.toolsStandard", full: "chat.toolsFull",
+};
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
 const TEXT_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const ANCHORED_MENU_GAP = 8;
@@ -264,9 +268,9 @@ function subscribeUpwardMenuMaxHeight(
 }
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
-const THINKING_LEVEL_DESC_KEYS: Record<typeof THINKING_LEVELS[number], string> = {
-  auto: "chat.thinkingUseDefault", off: "chat.thinkingOff", minimal: "chat.thinkingMinimal", low: "chat.thinkingLow",
-  medium: "chat.thinkingMedium", high: "chat.thinkingHigh", xhigh: "chat.thinkingXhigh", max: "chat.thinkingMax",
+const THINKING_LEVEL_LABEL_KEYS: Record<typeof THINKING_LEVELS[number], string> = {
+  auto: "chat.reasoningAuto", off: "chat.reasoningOff", minimal: "chat.reasoningMinimal", low: "chat.reasoningLow",
+  medium: "chat.reasoningMedium", high: "chat.reasoningHigh", xhigh: "chat.reasoningXhigh", max: "chat.reasoningMax",
 };
 
 function formatTokenCount(tokens: number): string {
@@ -1663,11 +1667,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const resolvedThinkingLevel = thinkingLevel && thinkingLevel !== "auto" ? thinkingLevel : null;
   const thinkingDisplayLabel = (() => {
     const lvl = resolvedThinkingLevel ?? "auto";
-    if (lvl === "auto" || !thinkingLevelMap) return lvl;
-    return thinkingLevelMap[lvl] ?? lvl;
+    const mapped = lvl !== "auto" ? thinkingLevelMap?.[lvl] : null;
+    return mapped != null && mapped !== lvl ? mapped : t(THINKING_LEVEL_LABEL_KEYS[lvl]);
   })();
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
-  const toolPresetLabel = rawToolPresetLabel === "chat-only" ? t("chat.chatOnly") : rawToolPresetLabel;
+  const toolPresetLabel = t(TOOL_PRESET_LABEL_KEYS[rawToolPresetLabel as ToolPresetLabel]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -2424,6 +2428,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           {/* LEFT: attach + model selector (idle) or steer/followup toggle (streaming) */}
           <div className="chat-composer-model" style={{ flex: isMobile ? "1 1 auto" : "0 0 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 2 }}>
             <button
+              className="chat-composer-attach"
               onClick={() => fileInputRef.current?.click()}
              title={t("chat.attachFiles")}
               style={{
@@ -2465,9 +2470,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               />
             )}
           </div>
-
-          {/* spacer */}
-          {!isMobile && <div className="chat-composer-usage" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>{sessionStatsControl}</div>}
 
           {/* RIGHT: thinking + tools preset + compact + sound (idle) | Stop + sound (streaming) */}
           <div ref={controlsMenuRef} className="chat-composer-options" style={{
@@ -2521,7 +2523,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {t("chat.moreControls")}
               </button>
             )}
-            <div style={{
+            <div className="chat-composer-options-list" style={{
               display: isMobile ? (controlsMenuOpen ? "flex" : "none") : "flex",
               alignItems: "center",
               gap: isMobile ? 1 : 2,
@@ -2543,13 +2545,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               } : null),
             }}>
             {onThinkingLevelChange && (
-              <div ref={thinkingDropdownRef} style={{ position: "relative" }}>
+              <div ref={thinkingDropdownRef} style={{ position: "relative" }} onKeyDown={(event) => {
+                if (event.key !== "Escape" || !thinkingDropdownOpen) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setThinkingDropdownOpen(false);
+                event.currentTarget.querySelector<HTMLButtonElement>(".chat-composer-control")?.focus({ preventScroll: true });
+              }}>
                 <button
+                  className="chat-composer-control"
                   onClick={() => setThinkingDropdownOpen((v) => !v)}
                   title={isStreaming
                     ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
                     : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
                   aria-label={t("chat.changeReasoningLabel")}
+                  aria-haspopup="listbox"
+                  aria-expanded={thinkingDropdownOpen}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                     padding: isMobile ? "0 6px" : "8px 12px",
@@ -2578,15 +2589,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <line x1="8" y1="21" x2="11" y2="21" />
                   </svg>
                   {(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{thinkingDisplayLabel}</span>}
+                  <span className="chat-composer-caret" aria-hidden="true" />
                 </button>
                 {thinkingDropdownOpen && (
-                  <div style={{
-                    position: "absolute", bottom: "calc(100% + 6px)",
-                    ...(isMobile ? { left: 0 } : { right: 0 }),
-                    zIndex: 100, background: "var(--bg)", border: "1px solid var(--border)",
-                    borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
-                    overflow: "hidden", minWidth: 180,
-                  }}>
+                  <div className="chat-reasoning-menu" role="listbox" aria-label={t("chat.reasoningMenuTitle")}
+                    style={isMobile ? { left: 0 } : { right: 0 }}>
+                    <div className="reasoning-menu-heading" aria-hidden="true">{t("chat.reasoningMenuTitle")}</div>
                     {THINKING_LEVELS.filter((lvl) => {
                       if (!availableThinkingLevels) return true;
                       if (lvl === "auto") return true;
@@ -2595,13 +2603,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       const isActive = lvl === "auto"
                         ? isAutoThinkingSelection
                         : !isAutoThinkingSelection && resolvedThinkingLevel === lvl;
-                      const desc = t(THINKING_LEVEL_DESC_KEYS[lvl]);
                       const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                      const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl;
+                      const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : t(THINKING_LEVEL_LABEL_KEYS[lvl]);
                       const showOriginal = mappedVal != null && mappedVal !== lvl;
                       return (
                         <SelectorRow
                           key={lvl}
+                          className={`reasoning-menu-row${lvl === "auto" ? " is-auto" : ""}`}
                           active={isActive}
                           onSelect={() => {
                             setThinkingDropdownOpen(false);
@@ -2624,11 +2632,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                               }
                             : undefined}
                         >
-                          <span style={{ flex: 1 }}>
-                            {displayLabel}
-                            {showOriginal && <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", marginLeft: 5 }}>({lvl})</span>}
+                          <span className="reasoning-option-copy">
+                            <span className="reasoning-option-label">{displayLabel}
+                              {showOriginal && <span className="reasoning-option-original">({lvl})</span>}
+                            </span>
+                            {lvl === "auto" && <span className="reasoning-option-hint">{t("chat.reasoningAutoDescription")}</span>}
                           </span>
-                          <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>{desc}</span>
                         </SelectorRow>
                       );
                     })}
@@ -2639,10 +2648,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {!isStreaming && onToolPresetChange && (
               <div ref={toolDropdownRef} style={{ position: "relative" }}>
                 <button
+                  className="chat-composer-control"
                   onClick={(e) => { if (!isStreaming && !isStrayClick(e)) setToolDropdownOpen((v) => !v); }}
                   disabled={isStreaming}
                   title={t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
                   aria-label={t("chat.changeToolPreset")}
+                  aria-expanded={toolDropdownOpen}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                     padding: isMobile ? "0 6px" : "8px 12px",
@@ -2671,6 +2682,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                   </svg>
                   {(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{toolPresetLabel}</span>}
+                  <span className="chat-composer-caret" aria-hidden="true" />
                 </button>
                 {toolDropdownOpen && (
                   <div style={{
@@ -2711,7 +2723,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           {isActive
                             ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>
                             : <span style={{ width: 10, flexShrink: 0 }} />}
-                          <span style={{ flex: 1 }}>{lvl}</span>
+                          <span style={{ flex: 1 }}>{t(TOOL_PRESET_LABEL_KEYS[lvl])}</span>
                           <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>{desc}</span>
                         </button>
                       );
@@ -2721,9 +2733,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             )}
 
+            {!isMobile && <div className="chat-composer-usage">{sessionStatsControl}</div>}
+
             {(!isStreaming || isCompacting) && onCompact && (
-              <div>
+              <div className="chat-composer-compact">
                 <button
+                  className="chat-composer-utility"
                   onClick={isCompacting ? onAbortCompaction : (e) => { if (!isStrayClick(e)) onCompact(); }}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
@@ -2755,7 +2770,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
                       <line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-                    </svg>{(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
+                    </svg>{isMobile && controlsMenuOpen && <span style={{ whiteSpace: "nowrap" }}>{t("chat.compact")}</span>}</>
                   )}
                 </button>
               </div>
@@ -2790,6 +2805,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
             {onSoundToggle !== undefined && (
               <button
+                className="chat-composer-utility chat-composer-sound"
                 onClick={onSoundToggle}
                  title={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}
                  aria-label={soundEnabled ? t("chat.disableSound") : t("chat.enableSound")}

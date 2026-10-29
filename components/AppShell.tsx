@@ -263,17 +263,17 @@ export function AppShell() {
   const expandedConversationVisible = rightPanelReadingExpanded && expandedPane === "conversation";
   const canFocusWorkspace = isWorkbenchDesktop && fileWorkspaceOpen;
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false);
-  const fileTreeHidden = isWorkbenchDesktop && (fileTreeCollapsed || (!filePickerActive && rightPanelReadingExpanded));
+  const fileTreeHidden = isWorkbenchDesktop && fileTreeCollapsed;
   const fileTreeToggleRef = useRef<HTMLButtonElement>(null);
   const fileTreeRestoreRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (filePickerActive) setFileTreeCollapsed(false);
   }, [filePickerActive]);
   const toggleFileTree = useCallback(() => {
-    if (rightPanelReadingExpanded) setRightPanelExpanded(false);
+    setExpandedPane("file");
     setFileTreeCollapsed(fileTreeHidden ? false : true);
     fileTreeToggleRef.current?.focus({ preventScroll: true });
-  }, [fileTreeHidden, rightPanelReadingExpanded]);
+  }, [fileTreeHidden]);
   useEffect(() => {
     if (!fileWorkspaceOpen || !isWorkbenchDesktop) setRightPanelExpanded(false);
   }, [fileWorkspaceOpen, isWorkbenchDesktop]);
@@ -2754,7 +2754,7 @@ export function AppShell() {
               onSelectTab={(tabId) => { setActiveFileTabId(tabId === "file-picker" ? null : tabId); setExpandedPane("file"); }}
               onCloseTab={(tabId) => { if (tabId === "file-picker") handleRightPanelClose(); else handleCloseFileTab(tabId); }}
               onOpenFiles={isWorkbenchDesktop ? () => {
-                setRightPanelExpanded(false);
+                setExpandedPane("file");
                 setFileTreeCollapsed(false);
               } : undefined}
             />
@@ -2875,7 +2875,7 @@ export function AppShell() {
           </button>}
         </div>
         <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined} />
-        {isWorkbenchDesktop && fileTreeHidden && !rightPanelReadingExpanded && <button ref={fileTreeRestoreRef}
+        {isWorkbenchDesktop && fileTreeHidden && <button ref={fileTreeRestoreRef}
           type="button" className="workbench-tree-restore" onClick={toggleFileTree}
           aria-label={translate("files.showDirectory")} title={translate("files.showDirectory")}
           aria-controls="workbench-file-tree" aria-expanded={false} />}

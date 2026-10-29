@@ -33,6 +33,7 @@ export function SelectorRow({
   onSelect,
   star,
   gutter = Boolean(star),
+  className,
   children,
 }: {
   active: boolean;
@@ -40,6 +41,7 @@ export function SelectorRow({
   star?: SelectorRowStar;
   /** Keep room for the star so it never covers the row's text; pass it to every row of a menu that has stars so they line up. */
   gutter?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -50,6 +52,7 @@ export function SelectorRow({
 
   return (
     <div
+      className={className}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setFocused(true)}

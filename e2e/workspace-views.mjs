@@ -334,8 +334,8 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await page.screenshot({ path: resolve(artifacts, "workspace-file-layout.png") });
     await filePanel.getByRole("button", { name: "放大文件阅读", exact: true }).click();
     await page.waitForFunction(() => Math.abs(document.querySelector("#file-panel").getBoundingClientRect().width - document.querySelector(".workspace-main").getBoundingClientRect().width) < 1);
-    await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
-    assert.equal(await directory.evaluate(el => el.inert), true, "expanded reading temporarily hides the directory");
+    await assertFileOrder();
+    assert.equal(await directory.evaluate(el => el.inert), false, "expanded reading keeps the directory available beside the file");
     assert.equal(await input.isVisible(), false, "expanded reading fills the content area");
     await page.locator(".workspace-context-tab").click();
     assert.equal(await input.isVisible(), true, "the top context entry restores the conversation");
