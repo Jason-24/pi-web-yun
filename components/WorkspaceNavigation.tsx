@@ -2,7 +2,7 @@
 
 import type { Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { HomeIcon, MessageIcon, RestoreIcon } from "./SidebarIcons";
+import { AgentsIcon, HomeIcon, MessageIcon, RestoreIcon } from "./SidebarIcons";
 import { SettingsSectionIcon } from "./SettingsPanel";
 import { PetWidget } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
@@ -20,12 +20,13 @@ function ViewIcon({ view }: { view: WorkspaceView }) {
   if (view === "home") return <HomeIcon size={18} />;
   if (view === "chat") return <MessageIcon size={18} />;
   if (view === "history") return <RestoreIcon size={18} />;
+  if (view === "agents") return <AgentsIcon size={20} />;
   if (view === "branches") return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M15 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2v3l3-3" />
     <path d="M11 9h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2v3l-3-3h-5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z" />
     <path d="M12 13h6" />
   </svg>;
-  if (view === "settings" || view === "agents") return <SettingsSectionIcon section={view === "agents" ? "agents" : "general"} size={19} />;
+  if (view === "settings") return <SettingsSectionIcon section="general" size={19} />;
   return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {view === "system" ? <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></>
       : view === "tools" ? <path d="M14.7 6.3a5 5 0 0 0-6.1 6.1L3 18a2.1 2.1 0 0 0 3 3l5.6-5.6a5 5 0 0 0 6.1-6.1L14 13l-3-3Z" />

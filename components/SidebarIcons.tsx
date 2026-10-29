@@ -15,6 +15,14 @@ export interface SidebarIconProps {
   label?: string;
 }
 
+/** A small collaborating group, shared by the workspace rail and Agents settings. */
+export function AgentsIcon({ strokeWidth = 1.7, ...props }: SidebarIconProps & { strokeWidth?: number }) {
+  return <SidebarIcon {...props} strokeWidth={strokeWidth}>
+    <circle cx="9" cy="8" r="3" />
+    <path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 20v-2a5 5 0 0 0-4-4.9" />
+  </SidebarIcon>;
+}
+
 function SidebarIcon({ size = 13, className, label, strokeWidth = 2, children }: SidebarIconProps & { strokeWidth?: number; children: ReactNode }) {
   return (
     <svg

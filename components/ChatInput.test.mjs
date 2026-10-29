@@ -536,7 +536,7 @@ test("the live model selector can reapply its current model without changing dra
     choose(option);
     assert.deepEqual(calls, [["open", false], ["filter", ""], ...(expected ? [[expected, option.provider, option.modelId]] : [])]);
   }
-  assert.match(readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"), /onReselect=\{onModelChange\}/);
+  assert.match(readFileSync(new URL("./ComposerModelControl.tsx", import.meta.url), "utf8"), /onReselect=\{\(provider, modelId\) => \{ onModelChange\(provider, modelId\);/);
 });
 
 test("filters model options by name, id, provider and provider/id", () => {

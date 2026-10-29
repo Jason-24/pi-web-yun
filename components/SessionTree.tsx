@@ -997,8 +997,8 @@ const PlainRowView = memo(function PlainRowView({
         role={row.label === "recents" ? "heading" : undefined} aria-level={row.label === "recents" ? 2 : undefined}>
         {row.label === "recents" ? <button type="button" className="session-tree-recents-toggle"
           aria-expanded={!row.collapsed} onClick={() => handlers.current.onToggleRecents?.()}>
-          <span>{t("sidebar.recents")}</span>
           <ChevronIcon size={12} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
+          <span>{t("sidebar.recents")}</span>
         </button> : <>
           <span role="heading" aria-level={2}>{t("sidebar.projects")}</span>
           <button type="button" className="session-tree-section-action" aria-label={t("projectCreate.title")}

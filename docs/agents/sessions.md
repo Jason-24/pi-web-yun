@@ -338,3 +338,12 @@ Files: `lib/markdown.ts` (`markdownClobberPrefix`, `rehypeMatchClobberedIds`, `j
 ## Upstream v0.13 compatibility
 - The read-only Debug view uses the fork's embedded workspace panels and follows session switches. Usage remains in the composer, while Debug opens from the conversation header. Keep the archive view open when its selected session is deleted.
 - Completion retains both `failed` and `subagentsActive`: failed or aborted runs never celebrate, and a parent waiting for subagent reports never announces task completion. The visible companion's background poll includes `subagentsActiveSessionIds`.
+
+## Recent conversation disclosures
+- The sidebar's Recent conversations header puts its chevron before the label. The whole inset row is a hover/focus target and keeps the existing native-button keyboard behavior and browser-persisted collapse state (`sidebar-prefs.ts`); it does not resize the project section.
+- Home initially shows eight recent root sessions. Show more reveals eight more from the already-loaded catalog, preserving order and existing links. After the last batch, the same button becomes Show less to return to eight while retaining keyboard focus. Lists of eight or fewer and the empty state have no disclosure control. Archived sessions stay filtered by AppShell; subagents stay excluded in HomeView.
+- `e2e/home-recents.mjs` checks the full-row disclosure, saved collapse state, keyboard interaction, batched Home list, stable focus, links, short/empty lists and mobile/dark layout against isolated API fixtures on the existing dev server.
+
+## Navigation brand typography
+- PI-YUN uses Segoe UI Variable Display where installed, then Segoe UI/system sans-serif, at 18px/550 with slightly tight tracking and theme-derived charcoal. Keep branding independent of the user's chat/code font overrides. Existing narrow-header fitting and the 15px collapsed-sidebar preview still take priority; the application menu and its keyboard behavior are unchanged.
+- Agents uses a shared outline group icon in the rail and Settings, with a restrained blue-violet accent in the rail and a matching selection wash. Preserve its accessible label, disabled state and destination.

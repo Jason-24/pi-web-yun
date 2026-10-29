@@ -2726,7 +2726,7 @@ span.token.table {
   /* Except while its model picker is open: the picker's filter is the field
      the keyboard is for, and hiding its row would hide the picker (#1271).
      Its own rule, so a browser without :has() drops only this one. */
-  html[data-keyboard-open] .chat-input-controls:not(:has(.model-selector [role="listbox"])) {
+  html[data-keyboard-open] .chat-input-controls:not(:has(.model-selector [role="listbox"], .composer-model-trigger[aria-expanded="true"])) {
     display: none !important;
   }
   html[data-keyboard-open] .chat-content {

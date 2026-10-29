@@ -2754,6 +2754,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       thinkingLevelOverrideRef.current = null;
       setNewSessionThinkingLevel(null);
       setCurrentThinkingOverride(null);
+      // A live session already has a concrete level in pi. Restoring defaults
+      // must update that state as well as clearing the composer's override.
+      const sid = sessionIdRef.current;
+      if (sid) {
+        const pinned = displayModel && thinkingLevelPinsRef.current[`${displayModel.provider}/${displayModel.modelId}`];
+        const defaultLevel = asConcreteThinkingLevel(pinned) ?? defaultThinkingLevelRef.current ?? "medium";
+        try {
+          await sendAgentCommand(sid, { type: "set_thinking_level", level: defaultLevel });
+          const state = await sendAgentCommand<AgentStateResponse>(sid, { type: "get_state" });
+          if (sessionHookMountedRef.current && sessionIdRef.current === sid) {
+            setLiveThinkingLevel(asConcreteThinkingLevel(state?.thinkingLevel) ?? defaultLevel);
+          }
+        } catch (error) {
+          console.error("Failed to restore default thinking level:", error);
+        }
+      }
       return;
     }
     if (isNew) {
@@ -2774,7 +2790,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       console.error("Failed to set thinking level:", e);
       setCurrentThinkingOverride(null);
     }
-  }, [isNew]);
+  }, [isNew, displayModel]);
 
   const handleSetDefaultThinkingLevel = useCallback(async (level: ConcreteThinkingLevel) => {
     try {

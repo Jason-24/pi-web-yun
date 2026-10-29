@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { getFileName } from "@/lib/file-paths";
 import { sessionDisplayTitle } from "@/lib/session-fork-name";
 import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
 import type { SessionInfo } from "@/lib/types";
-import { ComposeIcon, FolderIcon, MessageIcon } from "./SidebarIcons";
+import { ChevronIcon, ComposeIcon, FolderIcon, MessageIcon } from "./SidebarIcons";
 import { WelcomeMark } from "./WelcomeMark";
+
+const RECENT_PAGE_SIZE = 8;
 
 interface Props {
   sessions: SessionInfo[];
@@ -19,10 +22,11 @@ interface Props {
 
 export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, onNewSession, onOpenProject }: Props) {
   const { t, locale } = useI18n();
+  const [visibleCount, setVisibleCount] = useState(RECENT_PAGE_SIZE);
   const recent = sessions
     .filter((session) => session.relation?.kind !== "subagent")
-    .sort((a, b) => Date.parse(b.modified) - Date.parse(a.modified))
-    .slice(0, 8);
+    .sort((a, b) => Date.parse(b.modified) - Date.parse(a.modified));
+  const hasMore = visibleCount < recent.length;
   const dateFormat = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
 
   return (
@@ -45,8 +49,8 @@ export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, on
         </div>
         <section className="home-recent" aria-labelledby="home-recent-title">
           <h2 id="home-recent-title">{t("home.recentTasks")}</h2>
-          {recent.length ? <div className="home-session-list">
-            {recent.map((session) => {
+          {recent.length ? <div className="home-session-list" id="home-session-list">
+            {recent.slice(0, visibleCount).map((session) => {
               const modified = new Date(session.modified);
               const title = sessionDisplayTitle(session);
               return (
@@ -67,6 +71,11 @@ export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, on
               );
             })}
           </div> : <p className="home-empty">{t("home.noTasks")}</p>}
+          {recent.length > RECENT_PAGE_SIZE && <button type="button" className="home-recent-more"
+            aria-controls="home-session-list" data-show-less={!hasMore}
+            onClick={() => setVisibleCount(hasMore ? visibleCount + RECENT_PAGE_SIZE : RECENT_PAGE_SIZE)}>
+            <span>{t(hasMore ? "home.showMore" : "home.showLess")}</span><ChevronIcon size={14} />
+          </button>}
         </section>
       </div>
     </div>

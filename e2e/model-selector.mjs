@@ -11,7 +11,8 @@ export async function checkModelSelector(page, { base, project, artifacts }) {
     modelList: models, defaultModel: { provider: "e2e", modelId: "model-0" }, defaultThinkingLevel: "medium",
     savedDefaultThinkingLevel: null, thinkingLevels: {}, thinkingLevelMaps: {}, thinkingLevelPins: {},
   } }));
-  const trigger = page.locator(".model-selector.is-toolbar > button");
+  const combined = page.locator(".composer-model-trigger");
+  const trigger = page.locator(".composer-model-card .model-selector > button");
   const filter = page.getByRole("textbox", { name: "Filter models…", exact: true });
   // A simulated keyboard: the visual viewport shrinks (and may pan) while the
   // layout viewport, and with it fixed coordinates, keeps its full height.
@@ -34,7 +35,8 @@ export async function checkModelSelector(page, { base, project, artifacts }) {
 
   try {
     await page.goto(`${base}/?cwd=${encodeURIComponent(project)}`, { waitUntil: "domcontentloaded" });
-    await trigger.filter({ hasText: "Model 0" }).waitFor();
+    await combined.filter({ hasText: "Model 0" }).waitFor();
+    await combined.click();
     await trigger.click();
     await filter.click();
     await filter.fill("Model 1");

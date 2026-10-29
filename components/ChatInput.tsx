@@ -33,8 +33,8 @@ import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import type { ToolPreset } from "@/lib/tool-presets";
-import { SelectorRow } from "./SelectorRow";
-import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
+import { ComposerModelControl } from "./ComposerModelControl";
+import type { ModelSelectorOption } from "./ModelSelector";
 
 export { filterModelOptions } from "./ModelSelector";
 
@@ -283,12 +283,6 @@ function subscribeUpwardMenuMaxHeight(
     if (frameId !== null) cancelAnimationFrame(frameId);
   };
 }
-
-const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
-const THINKING_LEVEL_LABEL_KEYS: Record<typeof THINKING_LEVELS[number], string> = {
-  auto: "chat.reasoningAuto", off: "chat.reasoningOff", minimal: "chat.reasoningMinimal", low: "chat.reasoningLow",
-  medium: "chat.reasoningMedium", high: "chat.reasoningHigh", xhigh: "chat.reasoningXhigh", max: "chat.reasoningMax",
-};
 
 function formatTokenCount(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
@@ -706,7 +700,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const enterSendMode = useEnterSendMode();
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
   const [controlsMenuOpen, setControlsMenuOpen] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -739,7 +732,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const toolDropdownRef = useRef<HTMLDivElement>(null);
-  const thinkingDropdownRef = useRef<HTMLDivElement>(null);
   const controlsMenuRef = useRef<HTMLDivElement>(null);
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1681,12 +1673,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const compactResultText = compactResult
     ? `${compactResult.reason && compactResult.reason !== "manual" ? `${compactResult.reason[0].toUpperCase()}${compactResult.reason.slice(1)} ` : t("chat.compacted")} ${formatTokenCount(compactResult.tokensBefore)} -> ${formatTokenCount(compactResult.estimatedTokensAfter)} tokens (${t("chat.tokensSaved", { saved: formatTokenCount(compactSavedTokens) })})`
     : null;
-  const resolvedThinkingLevel = thinkingLevel && thinkingLevel !== "auto" ? thinkingLevel : null;
-  const thinkingDisplayLabel = (() => {
-    const lvl = resolvedThinkingLevel ?? "auto";
-    const mapped = lvl !== "auto" ? thinkingLevelMap?.[lvl] : null;
-    return mapped != null && mapped !== lvl ? mapped : t(THINKING_LEVEL_LABEL_KEYS[lvl]);
-  })();
   const rawToolPresetLabel = Object.entries(TOOL_PRESET_MAP).find(([, v]) => v === (toolPreset ?? "configured"))?.[0] ?? "configured";
   const toolPresetLabel = t(TOOL_PRESET_LABEL_KEYS[rawToolPresetLabel as ToolPresetLabel]);
 
@@ -1695,9 +1681,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     const handler = (e: MouseEvent) => {
       if (toolDropdownRef.current && !toolDropdownRef.current.contains(e.target as Node)) {
         setToolDropdownOpen(false);
-      }
-      if (thinkingDropdownRef.current && !thinkingDropdownRef.current.contains(e.target as Node)) {
-        setThinkingDropdownOpen(false);
       }
       if (controlsMenuRef.current && !controlsMenuRef.current.contains(e.target as Node)) {
         setControlsMenuOpen(false);
@@ -2487,23 +2470,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 <polyline points="21 15 16 10 5 21" />
               </svg>
             </button>
-            {/* Model selector - visible always, disabled while the session or switch is busy */}
-            {(modelOptions.length > 0 || model || modelError) && onModelChange && (
-              <ModelSelector
-                options={modelOptions}
-                value={model}
-                onChange={onModelChange}
-                onReselect={onModelChange}
-                disabled={isStreaming}
-                busy={modelSwitching}
-                isAutoSelection={isAutoModelSelection}
-                defaultValue={defaultModel}
-                onSetDefault={onSetDefaultModel}
+            {(onThinkingLevelChange || ((modelOptions.length > 0 || model || modelError) && onModelChange)) && (
+              <ComposerModelControl
+                options={modelOptions} model={model} onModelChange={onModelChange}
+                isStreaming={isStreaming} modelSwitching={modelSwitching} isAutoModelSelection={isAutoModelSelection}
+                defaultModel={defaultModel} onSetDefaultModel={onSetDefaultModel}
+                thinkingLevel={thinkingLevel} isAutoThinkingSelection={isAutoThinkingSelection}
+                availableThinkingLevels={availableThinkingLevels} thinkingLevelMap={thinkingLevelMap}
+                onThinkingLevelChange={onThinkingLevelChange} savedDefaultThinkingLevel={savedDefaultThinkingLevel}
+                onSetDefaultThinkingLevel={onSetDefaultThinkingLevel}
               />
             )}
           </div>
 
-          {/* RIGHT: thinking + tools preset + compact + sound (idle) | Stop + sound (streaming) */}
+          {/* RIGHT: tools preset + compact + sound (idle) | Stop + sound (streaming) */}
           <div ref={controlsMenuRef} className="chat-composer-options" style={{
             flex: "0 0 auto",
             display: "flex",
@@ -2576,107 +2556,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 backdropFilter: "blur(10px)",
               } : null),
             }}>
-            {onThinkingLevelChange && (
-              <div ref={thinkingDropdownRef} style={{ position: "relative" }} onKeyDown={(event) => {
-                if (event.key !== "Escape" || !thinkingDropdownOpen) return;
-                event.preventDefault();
-                event.stopPropagation();
-                setThinkingDropdownOpen(false);
-                event.currentTarget.querySelector<HTMLButtonElement>(".chat-composer-control")?.focus({ preventScroll: true });
-              }}>
-                <button
-                  className="chat-composer-control"
-                  onClick={() => setThinkingDropdownOpen((v) => !v)}
-                  title={isStreaming
-                    ? t("chat.currentReasoning", { level: thinkingDisplayLabel })
-                    : t("chat.changeReasoning", { level: thinkingDisplayLabel })}
-                  aria-label={t("chat.changeReasoningLabel")}
-                  aria-haspopup="listbox"
-                  aria-expanded={thinkingDropdownOpen}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: isMobile ? "0 6px" : "8px 12px",
-                    width: isMobile ? "auto" : undefined,
-                    height: 32,
-                    background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none",
-                    borderRadius: 9,
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = thinkingDropdownOpen ? "var(--bg-hover)" : "none";
-                    e.currentTarget.style.color = "var(--text-muted)";
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
-                    <line x1="7" y1="18" x2="12" y2="18" />
-                    <line x1="8" y1="21" x2="11" y2="21" />
-                  </svg>
-                  {(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{thinkingDisplayLabel}</span>}
-                  <span className="chat-composer-caret" aria-hidden="true" />
-                </button>
-                {thinkingDropdownOpen && (
-                  <div className="chat-reasoning-menu" role="listbox" aria-label={t("chat.reasoningMenuTitle")}
-                    style={isMobile ? { left: 0 } : { right: 0 }}>
-                    <div className="reasoning-menu-heading" aria-hidden="true">{t("chat.reasoningMenuTitle")}</div>
-                    {THINKING_LEVELS.filter((lvl) => {
-                      if (!availableThinkingLevels) return true;
-                      if (lvl === "auto") return true;
-                      return availableThinkingLevels.includes(lvl);
-                    }).map((lvl) => {
-                      const isActive = lvl === "auto"
-                        ? isAutoThinkingSelection
-                        : !isAutoThinkingSelection && resolvedThinkingLevel === lvl;
-                      const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                      const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : t(THINKING_LEVEL_LABEL_KEYS[lvl]);
-                      const showOriginal = mappedVal != null && mappedVal !== lvl;
-                      return (
-                        <SelectorRow
-                          key={lvl}
-                          className={`reasoning-menu-row${lvl === "auto" ? " is-auto" : ""}`}
-                          active={isActive}
-                          onSelect={() => {
-                            setThinkingDropdownOpen(false);
-                            if (lvl === "auto") {
-                              if (!isAutoThinkingSelection) onThinkingLevelChange("auto");
-                              return;
-                            }
-                            if (!isActive || isAutoThinkingSelection) onThinkingLevelChange(lvl);
-                          }}
-                          gutter={Boolean(onSetDefaultThinkingLevel)}
-                          star={onSetDefaultThinkingLevel && lvl !== "auto"
-                            ? {
-                                isDefault: savedDefaultThinkingLevel === lvl,
-                                saveLabel: t("chat.saveDefaultThinking"),
-                                defaultLabel: t("chat.defaultThinking"),
-                                onSave: () => {
-                                  setThinkingDropdownOpen(false);
-                                  onSetDefaultThinkingLevel(lvl);
-                                },
-                              }
-                            : undefined}
-                        >
-                          <span className="reasoning-option-copy">
-                            <span className="reasoning-option-label">{displayLabel}
-                              {showOriginal && <span className="reasoning-option-original">({lvl})</span>}
-                            </span>
-                            {lvl === "auto" && <span className="reasoning-option-hint">{t("chat.reasoningAutoDescription")}</span>}
-                          </span>
-                        </SelectorRow>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
             {!isStreaming && onToolPresetChange && (
               <div ref={toolDropdownRef} style={{
                 // On a phone the menu opens from the strip's right edge, not
@@ -2685,7 +2564,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 position: isMobile ? "static" : "relative",
               }}>
                 <button
-                  className="chat-composer-control"
+                  className="chat-composer-control chat-composer-tool"
                   onClick={(e) => { if (!isStreaming && !isStrayClick(e)) setToolDropdownOpen((v) => !v); }}
                   disabled={isStreaming}
                   title={t("chat.changeToolPreset") + `: ${toolPresetLabel}`}
@@ -2715,10 +2594,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     e.currentTarget.style.color = "var(--text-muted)";
                   }}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                   </svg>
-                  {(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{toolPresetLabel}</span>}
+                  {(!isMobile || controlsMenuOpen) && <span style={{ whiteSpace: "nowrap" }}>{rawToolPresetLabel === "configured" ? t("chat.toolsButton") : toolPresetLabel}</span>}
                   <span className="chat-composer-caret" aria-hidden="true" />
                 </button>
                 {toolDropdownOpen && (
@@ -2893,7 +2772,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 aria-expanded={true}
                 onClick={() => {
                   setToolDropdownOpen(false);
-                  setThinkingDropdownOpen(false);
                   setControlsMenuOpen(false);
                 }}
                 style={{

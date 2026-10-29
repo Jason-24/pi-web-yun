@@ -30,6 +30,10 @@
 .workbench-settings-navigation button[aria-pressed="true"] { background: var(--bg-selected); color: var(--text); }
 .workbench-settings-navigation button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workbench-settings-navigation button:disabled { opacity: 0.35; cursor: default; }
+.workspace-shell .workbench-settings-navigation button[data-workspace-view="agents"] { color: #5572db; }
+.workspace-shell .workbench-settings-navigation button[data-workspace-view="agents"]:hover:not(:disabled),
+.workspace-shell .workbench-settings-navigation button[data-workspace-view="agents"][aria-current="page"] { color: #4866d4; background: color-mix(in srgb, #5572db 12%, var(--bg)); box-shadow: none; }
+:is(html.dark, [data-theme="dark"], [data-theme="pine"], [data-theme="dusk"], [data-theme="ember"], [data-theme="slate"], [data-theme="contrast-dark"], [data-theme="zenburn"]) .workspace-shell .workbench-settings-navigation button[data-workspace-view="agents"] { color: #9aaeff; }
 .workbench-settings-navigation button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); }
 .workbench-settings-navigation .workbench-home-button { margin-bottom: 8px; }
 .workbench-settings-navigation .workbench-home-button[aria-current="page"] { color: var(--text); background: var(--bg-selected); }

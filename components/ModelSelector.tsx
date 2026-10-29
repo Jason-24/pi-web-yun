@@ -194,6 +194,7 @@ export function ModelSelector({
         event.stopPropagation();
         setFilter("");
         setOpen(false);
+        rootRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
       }}
     >
       <button

@@ -8,6 +8,7 @@ import "./globals.css";
 import "./settings.css";
 import "./sidebar.css";
 import "./workbench.css";
+import "./composer-model.css";
 import "./navigation-rail.css";
 import "./home.css";
 import "./workspace-pages.css";
