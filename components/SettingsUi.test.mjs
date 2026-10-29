@@ -5,7 +5,7 @@ import test from "node:test";
 const configSources = await Promise.all(
   ["SkillsConfig", "AgentsConfig", "PluginsConfig", "McpConfig"].map(async (name) => [
     name,
-    await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8"),
+    (await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8")).replaceAll("\r\n", "\n"),
   ]),
 );
 

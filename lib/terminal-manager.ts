@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import type { IPty } from "node-pty";
 import { samePath } from "./paths";
+import type { DebugServerGlobal } from "./debug-types";
 
 export type TerminalEvent =
   | { type: "output"; data: string; offset: number; reset?: boolean }
@@ -21,6 +22,11 @@ interface TerminalRecord {
   exited: boolean;
   exitCode: number | null;
   cleanupTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * For the debug panel: when `cleanupTimer` removes the shell; null while no cleanup is armed
+   * (a stream is attached). A record created before a hot reload has none.
+   */
+  cleanupAt?: number | null;
 }
 
 declare global {
@@ -65,6 +71,7 @@ function emit(record: TerminalRecord, event: TerminalEvent): void {
 
 function scheduleCleanup(id: string, record: TerminalRecord): void {
   if (record.cleanupTimer || record.listeners.size || registry().get(id) !== record) return;
+  record.cleanupAt = Date.now() + TERMINAL_RECONNECT_MS;
   record.cleanupTimer = setTimeout(() => killTerminal(id), TERMINAL_RECONNECT_MS);
   record.cleanupTimer.unref?.();
 }
@@ -133,6 +140,7 @@ export function createTerminal(cwd: string, cols: number, rows: number, id: stri
     exited: false,
     exitCode: null,
     cleanupTimer: null,
+    cleanupAt: null,
   };
   registry().set(id, record);
   // Includes creations whose response or initial SSE connection never arrives.
@@ -146,6 +154,7 @@ export function createTerminal(cwd: string, cols: number, rows: number, id: stri
   pty.onExit(({ exitCode }) => {
     if (record.cleanupTimer) clearTimeout(record.cleanupTimer);
     record.cleanupTimer = null;
+    record.cleanupAt = null;
     record.exited = true;
     record.exitCode = exitCode;
     emit(record, { type: "exit", exitCode });
@@ -162,6 +171,30 @@ export function getTerminalCwd(id: string): string | undefined {
   return registry().get(id)?.cwd;
 }
 
+/**
+ * Counts for the debug panel. Reads the map as it is: `registry()` would create it and install
+ * the process handlers, and nothing here touches a timer or a stream. A record from before a hot
+ * reload has no `cleanupAt` and adds no deadline.
+ */
+export function getTerminalStats(now = Date.now()): DebugServerGlobal["terminals"] {
+  const stats: DebugServerGlobal["terminals"] = { count: 0, listeners: 0, detached: 0, exited: 0, nextCleanupAt: null };
+  const terminals = globalThis.__piWebTerminals;
+  if (!(terminals instanceof Map)) return stats;
+  for (const record of terminals.values()) {
+    const listeners = record.listeners?.size ?? 0;
+    stats.count += 1;
+    stats.listeners += listeners;
+    if (listeners === 0) stats.detached += 1;
+    if (record.exited) stats.exited += 1;
+    const cleanupAt = record.cleanupAt;
+    if (typeof cleanupAt !== "number") continue;
+    // A deadline already passed fires on the next turn of the loop.
+    const due = Math.max(cleanupAt, now);
+    if (stats.nextCleanupAt === null || due < stats.nextCleanupAt) stats.nextCleanupAt = due;
+  }
+  return stats;
+}
+
 export function subscribeTerminal(
   id: string,
   listener: TerminalListener,
@@ -172,6 +205,7 @@ export function subscribeTerminal(
   record.listeners.add(listener);
   if (record.cleanupTimer) clearTimeout(record.cleanupTimer);
   record.cleanupTimer = null;
+  record.cleanupAt = null;
   const start = record.offset - record.backlog.length;
   const reset = after === undefined || after < start || after > record.offset;
   return {
@@ -208,6 +242,7 @@ export function killTerminal(id: string, force = false): boolean {
   const record = registry().get(id);
   if (!record) return false;
   if (record.cleanupTimer) clearTimeout(record.cleanupTimer);
+  record.cleanupAt = null;
   registry().delete(id);
   if (!record.exited) {
     record.pty.kill(force ? "SIGKILL" : undefined);

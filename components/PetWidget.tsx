@@ -128,10 +128,10 @@ export function PetWidget() {
         try {
           const response = await fetch("/api/agent/running", { cache: "no-store", signal: controller.signal });
           if (response.ok) {
-            const body = await response.json() as { runningSessionIds?: unknown; awaitingInputSessionIds?: unknown };
+            const body = await response.json() as { runningSessionIds?: unknown; subagentsActiveSessionIds?: unknown; awaitingInputSessionIds?: unknown };
             if (cancelled) return;
             setBackground({
-              running: Array.isArray(body.runningSessionIds) ? body.runningSessionIds.filter((id): id is string => typeof id === "string") : [],
+              running: [...(Array.isArray(body.runningSessionIds) ? body.runningSessionIds : []), ...(Array.isArray(body.subagentsActiveSessionIds) ? body.subagentsActiveSessionIds : [])].filter((id): id is string => typeof id === "string"),
               waiting: Array.isArray(body.awaitingInputSessionIds) ? body.awaitingInputSessionIds.filter((id): id is string => typeof id === "string") : [],
             });
           }

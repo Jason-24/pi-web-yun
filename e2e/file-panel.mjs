@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { showSidebarFiles } from "./sidebar.mjs";
 
-export const filePanelFixture = `<!doctype html><html><body style="margin:20px;min-height:2400px">
+// Keep width changes from applying Chrome's automatic scroll anchoring: this
+// fixture checks retained iframe state, including its explicit scroll position.
+export const filePanelFixture = `<!doctype html><html><body style="margin:20px;min-height:2400px;overflow-anchor:none">
 <label>Notes <input id="notes"></label>
 <label>Filter <select id="filter"><option>All</option><option>Pending</option></select></label>
 <p>HTML preview state must survive layout changes.</p>

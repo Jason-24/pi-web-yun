@@ -7,13 +7,13 @@ import { SettingsSectionIcon } from "./SettingsPanel";
 import { PetWidget } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
 
-export type WorkspacePanel = "archive" | "history" | "system" | "tools" | "agents" | "branches" | "session";
+export type WorkspacePanel = "archive" | "history" | "system" | "tools" | "agents" | "branches" | "session" | "debug";
 export type WorkspaceView = "home" | "chat" | "settings" | WorkspacePanel;
 
 export const WORKSPACE_VIEW_LABELS: Record<WorkspaceView, string> = {
   home: "navigation.home", chat: "navigation.chat", settings: "common.settings", archive: "sidebar.archived",
   history: "history.full", system: "system.prompt", tools: "tools.title",
-  agents: "agentSwitcher.title", branches: "i18n.branches", session: "session.title",
+  agents: "agentSwitcher.title", branches: "i18n.branches", session: "session.title", debug: "debug.title",
 };
 
 function ViewIcon({ view }: { view: WorkspaceView }) {

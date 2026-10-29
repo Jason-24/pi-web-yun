@@ -75,7 +75,8 @@
 }
 .file-panel-header > div:first-child { display: flex; align-self: stretch; min-width: 0; }
 .file-tab-strip { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 100%; padding: 10px 0 10px 12px; }
-.file-tab-list { display: flex; align-items: stretch; gap: 5px; min-width: 0; max-width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.file-tab-list { display: flex; align-items: stretch; gap: 5px; min-width: 0; max-width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.file-tab-list::-webkit-scrollbar { display: none; }
 .file-tab { display: flex; align-items: center; flex: 0 0 auto; gap: 10px; min-width: 100px; max-width: 260px; padding: 0 8px 0 13px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--text-muted); font-size: 14px; cursor: pointer; white-space: nowrap; user-select: none; transition: background 120ms ease, border-color 120ms ease, color 120ms ease; }
 .file-tab:hover { background: var(--bg-hover); color: var(--text); }
 .file-tab.is-active { min-width: 240px; max-width: 300px; background: var(--bg-selected); border-color: color-mix(in srgb, var(--text-dim) 28%, var(--border)); color: var(--text); }

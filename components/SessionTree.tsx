@@ -581,9 +581,10 @@ const SessionRowView = memo(function SessionRowView({
   const tooltip = `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
 
   // The right column says the one thing worth knowing: awaiting input, else
-  // running, else unread, else when (a pinned row names its project instead, an
-  // archived row says when it was archived). Nothing sits before the title, so it
-  // gets the room.
+  // running, else unread, else when (a pinned row names its project instead).
+  // An archived row shows its family's time like every row, never the archive
+  // time: an old session archived today read as "just now" (#1351).
+  // Nothing sits before the title, so it gets the room.
   let meta: ReactNode;
   let metaState = "";
   let metaTitle: string | undefined;
@@ -604,8 +605,6 @@ const SessionRowView = memo(function SessionRowView({
     metaTitle = t("sidebar.newActivity");
   } else if (context === "pinned") {
     meta = <span className="session-tree-project">{row.project.name}</span>;
-  } else if (context === "archive" && row.archivedAt !== null) {
-    meta = formatShortRelativeTime(new Date(row.archivedAt), locale, nowDate);
   } else {
     meta = formatShortRelativeTime(family.latestModified, locale, nowDate);
   }
@@ -813,11 +812,12 @@ function DeleteConfirm({
 }
 
 /**
- * Spinner + count and dot + count; the label carries the count for screen
- * readers. Also a project's badge in the project menus (ProjectWorktreePicker).
+ * Spinner + count, amber dot + count (awaiting input) and dot + count; the
+ * label carries the count for screen readers. Also a project's badge in the
+ * project menus (ProjectWorktreePicker), which counts no awaiting.
  */
-export function ActivitySummary({ running, unread, t }: { running: number; unread: number; t: (key: string) => string }) {
-  if (running === 0 && unread === 0) return null;
+export function ActivitySummary({ running, awaiting = 0, unread, t }: { running: number; awaiting?: number; unread: number; t: (key: string) => string }) {
+  if (running === 0 && awaiting === 0 && unread === 0) return null;
   return (
     <span className="session-tree-summary">
       {running > 0 && (
@@ -829,6 +829,17 @@ export function ActivitySummary({ running, unread, t }: { running: number; unrea
         >
           <SpinnerIcon size={10} />
           {running}
+        </span>
+      )}
+      {awaiting > 0 && (
+        <span
+          className="session-tree-summary-awaiting"
+          role="img"
+          title={t("sidebar.agentAwaitingInput")}
+          aria-label={`${t("sidebar.agentAwaitingInput")} (${awaiting})`}
+        >
+          <span className="session-tree-summary-dot is-awaiting" />
+          {awaiting}
         </span>
       )}
       {unread > 0 && (
@@ -929,7 +940,7 @@ const GroupRowView = memo(function GroupRowView({
             below align with the project name. Icons are decorative. */}
         <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
-        {!expanded && <ActivitySummary running={row.running} unread={row.unread} t={t} />}
+        {!expanded && <ActivitySummary running={row.running} awaiting={row.awaiting} unread={row.unread} t={t} />}
       </button>
       <span className="session-tree-group-actions">
         <button
@@ -1029,6 +1040,14 @@ const PlainRowView = memo(function PlainRowView({
                 role="img"
                 title={t("sidebar.agentRunning")}
                 aria-label={`${t("sidebar.agentRunning")} (${row.running})`}
+              />
+            )}
+            {row.collapsed && row.awaiting > 0 && (
+              <span
+                className="session-tree-pinned-dot is-awaiting"
+                role="img"
+                title={t("sidebar.agentAwaitingInput")}
+                aria-label={`${t("sidebar.agentAwaitingInput")} (${row.awaiting})`}
               />
             )}
             {row.collapsed && row.unread > 0 && (

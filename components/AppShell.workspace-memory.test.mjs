@@ -23,7 +23,6 @@ test("a linked session that is gone gets no other session in its place (#1168)",
     callbackBody("handleCwdChange", "handleSelectSession"),
     callbackBody("handleInitialRestoreDone", "handleSessionDeleted"),
   ].join("\n");
-  const parkedKeyHelper = source.slice(source.indexOf("function parkedNewSessionDraftKey"), source.indexOf("export function AppShell"));
   const lastOpen = { id: "p1-last", cwd: "/p1", projectKey: "/p1" };
   const otherLastOpen = { id: "p2-last", cwd: "/p2", projectKey: "/p2" };
 
@@ -31,6 +30,8 @@ test("a linked session that is gone gets no other session in its place (#1168)",
     await t.test(label, () => {
       const urls = [];
       const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
         ...draftStore,
         crypto: globalThis.crypto,
         URLSearchParams,
@@ -61,7 +62,7 @@ test("a linked session that is gone gets no other session in its place (#1168)",
           context[state] = typeof value === "function" ? value(context[state]) : value;
         };
       }
-      vm.runInContext(stripTypeScriptTypes(`${parkedKeyHelper}\n${callbacks}
+      vm.runInContext(stripTypeScriptTypes(`${callbacks}
         globalThis.navigate = { handleCwdChange, handleInitialRestoreDone };
       `), context);
 
@@ -95,7 +96,6 @@ test("New restores the draft after session navigation and workspace auto-restore
     callbackBody("handleSelectSession", "handleNewSession"),
     callbackBody("handleNewSession", "hydrateSelectedSession"),
   ].join("\n");
-  const parkedKeyHelper = source.slice(source.indexOf("function parkedNewSessionDraftKey"), source.indexOf("export function AppShell"));
   const hookSource = await readFile(new URL("../hooks/useAgentSession.ts", import.meta.url), "utf8");
   const cleanupStart = hookSource.indexOf("    return () => {", hookSource.indexOf("  // Load session on mount"));
   const cleanupEnd = hookSource.indexOf("    // eslint-disable-next-line", cleanupStart);
@@ -106,9 +106,12 @@ test("New restores the draft after session navigation and workspace auto-restore
       const session = { id: "remembered", cwd: rememberedCwd, projectKey: cwd };
       const response = Promise.withResolvers();
       const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
         ...draftStore,
         crypto: globalThis.crypto,
         queueMicrotask,
+        requestAnimationFrame: () => {},
         URLSearchParams,
         window: { location: { pathname: "/", search: "" } },
         router: { replace() {} },
@@ -126,6 +129,8 @@ test("New restores the draft after session navigation and workspace auto-restore
         branchLeafChangeFnRef: { current: null },
         liveFollowFrameRef: { current: null },
         bashRecoveryIdRef: { current: 0 },
+        chatInputRef: { current: null },
+        newSessionBarFocusRef: { current: null },
         cancelEventStreamGrace() {},
         closeEvents() {},
         changeFileWorkspace() {},
@@ -145,13 +150,14 @@ test("New restores the draft after session navigation and workspace auto-restore
           context[state] = typeof value === "function" ? value(context[state]) : value;
         };
       }
-      vm.runInContext(stripTypeScriptTypes(`${parkedKeyHelper}\n${callbacks}
+      vm.runInContext(stripTypeScriptTypes(`${callbacks}
         globalThis.navigate = { handleCwdChange, handleSelectSession, handleNewSession };
       `), context);
       // Run the actual hook cleanup with the outgoing mount's captured draft key.
       const makeCleanup = vm.runInContext(stripTypeScriptTypes(`((isNew, newSessionDraftKey) => {
         const sessionHookMountedRef = { current: true };
         const newSessionPromotedRef = { current: false };
+        const releaseUnconfirmedSendRef = { current() {} };
         const sessionIdRef = { current: null };
         const dataRef = { current: null };
         const messagesRef = { current: [] };
@@ -211,9 +217,10 @@ test("New in another project adopts it up front and parks the composer's draft",
     callbackBody("handleSelectSession", "handleNewSession"),
     callbackBody("handleNewSession", "hydrateSelectedSession"),
   ].join("\n");
-  const parkedKeyHelper = source.slice(source.indexOf("function parkedNewSessionDraftKey"), source.indexOf("export function AppShell"));
   const fileTab = { id: "file:/p1/notes.md", filePath: "/p1/notes.md" };
   const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
     ...draftStore,
     crypto: globalThis.crypto,
     URLSearchParams,
@@ -231,6 +238,9 @@ test("New in another project adopts it up front and parks the composer's draft",
     suppressCwdBumpRef: { current: false },
     skipWorkspaceRestoreRef: { current: false },
     branchLeafChangeFnRef: { current: null },
+    chatInputRef: { current: null },
+    newSessionBarFocusRef: { current: null },
+    requestAnimationFrame: () => {},
     isMobile: false,
     activeCwd: "/p1",
     activeFileTabId: fileTab.id,
@@ -254,7 +264,7 @@ test("New in another project adopts it up front and parks the composer's draft",
     context.activeFileTabId = null;
     context.rightPanelOpen = false;
   };
-  vm.runInContext(stripTypeScriptTypes(`${parkedKeyHelper}\n${callbacks}
+  vm.runInContext(stripTypeScriptTypes(`${callbacks}
     globalThis.navigate = { handleCwdChange, handleSelectSession, handleNewSession };
   `), context);
   const draft = { value: "half-written in p1", images: [] };
@@ -294,10 +304,11 @@ test("the composer's bar moves the fresh composer's draft and model picks instea
     callbackBody("handleSelectSession", "handleNewSession"),
     callbackBody("handleNewSession", "hydrateSelectedSession"),
   ].join("\n");
-  const parkedKeyHelper = source.slice(source.indexOf("function parkedNewSessionDraftKey"), source.indexOf("export function AppShell"));
   const fileTab = { id: "file:/p1/notes.md", filePath: "/p1/notes.md" };
   const choices = { model: { provider: "custom", modelId: "fast" }, thinkingLevel: "high" };
   const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
     ...draftStore,
     crypto: globalThis.crypto,
     URLSearchParams,
@@ -316,6 +327,8 @@ test("the composer's bar moves the fresh composer's draft and model picks instea
     skipWorkspaceRestoreRef: { current: false },
     branchLeafChangeFnRef: { current: null },
     chatInputRef: { current: null },
+    newSessionBarFocusRef: { current: null },
+    requestAnimationFrame: () => {},
     newSessionChoicesRef: { current: choices },
     carriedNewSessionChoices: null,
     isMobile: false,
@@ -341,7 +354,7 @@ test("the composer's bar moves the fresh composer's draft and model picks instea
     context.activeFileTabId = null;
     context.rightPanelOpen = false;
   };
-  vm.runInContext(stripTypeScriptTypes(`${parkedKeyHelper}\n${callbacks}
+  vm.runInContext(stripTypeScriptTypes(`${callbacks}
     globalThis.navigate = { handleCwdChange, handleNewSession };
   `), context);
   const draft = { value: "half-written in p1", images: [{ data: "aGVsbG8=", mimeType: "image/png" }] };
@@ -401,6 +414,8 @@ test("the bar of the new composer shows the bar's own move until the sidebar rep
   ].join("\n");
   const starts = [];
   const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
     Error,
     useCallback: (callback) => callback,
     newSessionMoveRef: { current: null },
@@ -456,4 +471,84 @@ test("the bar of the new composer shows the bar's own move until the sidebar rep
   context.bar.handlePickNewSessionContext({ cwd: "/work/app", projectKey: app.key, projectRoot: app.root }, "worktree");
   assert.equal(context.newSessionMoveRef.current, null);
   assert.equal(starts.length, 2);
+});
+
+test("a new session puts the caret in the fresh composer on desktop only (#1313)", () => {
+  const callbacks = [
+    callbackBody("restoreWorkspaceContext", "handleCwdChange"),
+    callbackBody("handleCwdChange", "handleSelectSession"),
+    callbackBody("handleSelectSession", "handleNewSession"),
+    callbackBody("handleNewSession", "hydrateSelectedSession"),
+  ].join("\n");
+  const frames = [];
+  const focused = [];
+  const context = vm.createContext({
+        homeOpen: false,
+        dismissSidebarPeek() {},
+    ...draftStore,
+    crypto: globalThis.crypto,
+    URLSearchParams,
+    window: { location: { pathname: "/", search: "" } },
+    router: { replace() {} },
+    fetch: () => new Promise(() => {}),
+    getLastOpenSession: () => null,
+    clearLastOpen() {},
+    workspaceKeyOf: (value) => value.projectKey ?? value.cwd,
+    useCallback: (callback) => callback,
+    useGlobalKeyboardShortcuts() {},
+    activeNewSessionDraftKeyRef: { current: "new:first:/p1" },
+    activeProjectKeyRef: { current: "/p1" },
+    workspaceRestoreTokenRef: { current: 0 },
+    suppressCwdBumpRef: { current: false },
+    skipWorkspaceRestoreRef: { current: false },
+    branchLeafChangeFnRef: { current: null },
+    chatInputRef: { current: { focus: () => focused.push("composer"), rekeyDraft: () => {} } },
+    newSessionBarFocusRef: { current: null },
+    newSessionChoicesRef: { current: null },
+    requestAnimationFrame: (cb) => frames.push(cb),
+    document: { activeElement: null },
+    isMobile: false,
+    activeCwd: "/p1",
+    activeFileTabId: null,
+    newSessionCwd: "/p1",
+    newSessionDraftId: "first",
+    selectedSession: null,
+    sessionCatalog: [],
+    sessionKey: 0,
+  });
+  context.invalidateWorkspaceRestore = () => context.workspaceRestoreTokenRef.current++;
+  for (const [setter] of callbacks.matchAll(/\bset[A-Z]\w*(?=\()/g)) {
+    const state = setter[3].toLowerCase() + setter.slice(4);
+    context[setter] = (value) => {
+      context[state] = typeof value === "function" ? value(context[state]) : value;
+    };
+  }
+  context.changeFileWorkspace = () => {};
+  vm.runInContext(stripTypeScriptTypes(`${callbacks}
+    globalThis.navigate = { handleNewSession };
+  `), context);
+
+  // Ctrl+Alt+N: the fresh composer takes the caret once it renders.
+  context.navigate.handleNewSession("kb-1", "/p1");
+  assert.equal(frames.length, 1);
+  frames.splice(0).forEach((cb) => cb());
+  assert.deepEqual(focused, ["composer"]);
+
+  // A dialog still open over the page (Settings) keeps the focus.
+  context.document.activeElement = { closest: (selector) => selector === "[aria-modal='true']" ? {} : null };
+  context.navigate.handleNewSession("kb-dialog", "/p1");
+  frames.splice(0).forEach((cb) => cb());
+  assert.deepEqual(focused, ["composer"]);
+  context.document.activeElement = null;
+
+  // The bar's move keeps its control, so no caret request is made for it.
+  context.newSessionBarFocusRef.current = "worktree";
+  context.navigate.handleNewSession("p2-new", "/p2", "/p2-key", { carryComposer: true });
+  assert.equal(frames.length, 0);
+  context.newSessionBarFocusRef.current = null;
+
+  // A phone never raises the keyboard uninvited.
+  context.isMobile = true;
+  context.navigate.handleNewSession("kb-2", "/p1");
+  assert.equal(frames.length, 0);
 });

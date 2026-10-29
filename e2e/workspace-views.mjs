@@ -228,7 +228,8 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await scroller.evaluate(element => { element.scrollTop = 120; });
     const scrollPosition = await scroller.evaluate(element => element.scrollTop);
     const positions = await nav.locator("button").evaluateAll(elements => elements.map(el => ({ view: el.dataset.workspaceView ?? el.dataset.workspaceAction, y: el.getBoundingClientRect().y })));
-    assert.equal(positions.length, 9);
+    // Seven view entries, plus the update, companion and Settings controls.
+    assert.equal(positions.length, 10);
     const originalReads = sessionReads;
     const checkEmbedded = async id => {
       await view(id).click();
@@ -368,7 +369,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.equal(await page.locator('[data-workspace-page="pet"]').count(), 0);
     assert.equal(await pet.evaluate(el => getComputedStyle(el).position), "fixed");
     const petBox = await pet.boundingBox();
-    await pet.getByRole("button", { name: "移动桌宠", exact: true }).press("ArrowLeft");
+    await pet.getByRole("button", { name: "与小云互动", exact: true }).press("ArrowLeft");
     assert.ok((await pet.boundingBox()).x < petBox.x);
     await pet.getByRole("button", { name: "桌宠互动", exact: true }).click();
     await pet.getByRole("button", { name: "打招呼", exact: true }).click();
@@ -390,7 +391,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await toggleSidebar();
     await view("home").click();
     await page.locator(".home-view").waitFor();
-    assert.equal(await nav.locator("button").count(), 9);
+    assert.equal(await nav.locator("button").count(), 10);
     await view("chat").click();
     await page.waitForURL(`**/?session=${session.id}`);
     await input.waitFor();

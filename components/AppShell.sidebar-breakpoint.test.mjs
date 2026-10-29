@@ -17,6 +17,7 @@ function setup(collapsed = false) {
   const effect = nodes.find((node) => ts.isCallExpression(node) && node.expression.getText(source) === "useEffect" && node.arguments[1]?.getText(source) === "[isMobile]" && node.arguments[0].getText(source).includes("setSidebarOpen"));
   const toggle = nodes.find((node) => ts.isVariableDeclaration(node) && node.name.getText(source) === "handleSidebarToggle");
   const context = createContext({
+    dismissSidebarPeek() {},
     initialNavigation: { sidebarCollapsed: collapsed }, isMobile: false, sidebarOpen: !collapsed,
     useRef: (current) => ({ current }), setActiveTopPanel() {}, setMobileToolbarMoreOpen() {},
   });

@@ -24,7 +24,10 @@ const THINKING_LEVEL_SUFFIXES = new Set<ThinkingLevel>([
  * fuzzy matching for non-glob patterns, plus an optional `:thinkingLevel` suffix
  * (`anthropic/*:high`). Exact string comparison silently drops every model
  * behind a pattern like `my-gateway/*` (#307), so delegate to pi's own resolver
- * instead of reimplementing the matching rules here.
+ * instead of reimplementing the matching rules here. That includes a bare id
+ * several providers offer (`claude-sonnet-5` on anthropic and a gateway): since
+ * pi 1.3 the resolver scopes every one of them and warns that the entry is
+ * ambiguous, so pi-web shows that warning instead of refusing the entry.
  */
 
 export interface ModelScopeResult {

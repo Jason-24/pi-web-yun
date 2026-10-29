@@ -31,22 +31,45 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
 
+  // The strip has no scrollbar (globals.css), so a vertical wheel scrolls it
+  // sideways. Non-passive: the page must not scroll as well.
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
-    const revealActive = () => list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || list.scrollWidth <= list.clientWidth) return;
+      event.preventDefault();
+      list.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1);
+    };
+    list.addEventListener("wheel", onWheel, { passive: false });
+    return () => list.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // Bring an opened or selected tab into view by moving the strip only:
+  // scrollIntoView could also scroll the panels around it.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const revealActive = () => {
+      const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+      if (!tab) return;
+      const strip = list.getBoundingClientRect();
+      const { left, right } = tab.getBoundingClientRect();
+      if (left < strip.left) list.scrollLeft -= strip.left - left;
+      else if (right > strip.right) list.scrollLeft += right - strip.right;
+    };
     revealActive();
     const resize = new ResizeObserver(revealActive);
     resize.observe(list);
     return () => resize.disconnect();
-  }, [activeTabId]);
+  }, [activeTabId, tabs.length]);
 
   return (
     <div className="file-tab-strip">
     <div
       ref={listRef}
       role="tablist"
-      className="file-tab-list"
+      className="file-tab-list tabbar-scroll"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
