@@ -5,6 +5,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { HomeIcon, MessageIcon, RestoreIcon } from "./SidebarIcons";
 import { SettingsSectionIcon } from "./SettingsPanel";
 import { PetWidget } from "./PetWidget";
+import { AppUpdateButton } from "./AppUpdateButton";
 
 export type WorkspacePanel = "archive" | "history" | "system" | "tools" | "agents" | "branches" | "session";
 export type WorkspaceView = "home" | "chat" | "settings" | WorkspacePanel;
@@ -47,10 +48,11 @@ interface Props {
 
 export function WorkspaceNavigation({ activeView, conversationAvailable, inspectionAvailable, sessionAvailable, mobile, covered = false, homeButtonRef, onHomeHover, onHomeLeave, onNavigate }: Props) {
   const { t } = useI18n();
-  const items: (WorkspaceView | "pet")[] = mobile ? ["home", "chat", "history", "pet", "settings"]
-    : ["home", "chat", "history", "system", "tools", "agents", "branches", "pet", "settings"];
+  const items: (WorkspaceView | "pet" | "update")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
+    : ["home", "chat", "history", "system", "tools", "agents", "branches", "update", "pet", "settings"];
   return <nav className={`workbench-settings-navigation${mobile ? " is-mobile" : ""}`} aria-label={t("navigation.workspace")} inert={covered}>
     {items.map((view) => {
+      if (view === "update") return <AppUpdateButton key="update" mobile={mobile} />;
       if (view === "pet") return <PetWidget key="pet" />;
       const disabled = view === "chat" ? !conversationAvailable : view === "system" || view === "tools" ? !inspectionAvailable
         : view === "history" || view === "agents" || view === "branches" ? !sessionAvailable : false;

@@ -252,7 +252,7 @@ export function PetWidget() {
   const status = asleep ? "sleeping" : mood;
 
   return <>
-    <button ref={toggleRef} type="button" className="workbench-view-button workbench-utility-start" data-workspace-action="pet" onClick={() => {
+    <button ref={toggleRef} type="button" className="workbench-view-button" data-workspace-action="pet" onClick={() => {
       if (visible) { hide(); return; }
       wake(); setVisible(true); storePreference(VISIBLE_KEY, "1"); speak("pet.welcome", "wave");
     }} title={t("pet.title")} aria-label={t("pet.title")} aria-pressed={visible}>

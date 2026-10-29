@@ -161,7 +161,7 @@ export function untrustedProjectServerEntries(cwd: string): [name: string, value
       length += read;
     }
     if (length > stats.size) return [];
-    const parsed: unknown = JSON.parse(buffer.toString("utf8", 0, length));
+    const parsed: unknown = JSON.parse(buffer.toString("utf8", 0, length).replace(/^\uFEFF/, ""));
     return isRecord(parsed) && isRecord(parsed.mcpServers) ? Object.entries(parsed.mcpServers) : [];
   } catch {
     // Missing, unreadable, swapped for a link, or not JSON: there are no names to report.

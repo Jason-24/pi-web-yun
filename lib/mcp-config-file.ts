@@ -189,10 +189,11 @@ export function serializeMcpConfig(document: Record<string, unknown>, originalTe
 /**
  * The document the SDK's editors read: `{}` for a missing file, else the
  * parsed text, which must be an object whose `mcpServers` is an object when
- * present. No byte-order mark is stripped, as the SDK strips none. A syntax
+ * present. A leading UTF-8 BOM is stripped, as in pi 1.4. A syntax
  * error never quotes the file (`jsonErrorMessage()`), which may hold secrets.
  */
 export function parseMcpConfigDocument(text: string | undefined, path: string): Record<string, unknown> {
+  text = text?.replace(/^\uFEFF/, "");
   let parsed: unknown;
   try {
     parsed = text === undefined ? {} : JSON.parse(text);

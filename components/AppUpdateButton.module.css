@@ -1,0 +1,26 @@
+.trigger {
+  --update-blue: #3b82f6;
+}
+
+:global(.workbench-settings-navigation) .trigger.available,
+:global(.workbench-settings-navigation) .trigger.available:hover {
+  color: var(--update-blue);
+  background: color-mix(in srgb, var(--update-blue) 10%, transparent);
+}
+
+.panel {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.panel p { margin: 12px 0; color: var(--text-muted); }
+.panel a { color: var(--text); text-decoration: underline; }
+.panel a:focus-visible, .check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.versions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 16px 0; }
+.versions dt { color: var(--text-muted); }
+.versions dd { margin: 0; }
+.command { display: block; padding: 8px; border-radius: 6px; background: var(--bg-hover); overflow-wrap: anywhere; }
+.check { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel); color: var(--text); cursor: pointer; }
+.check:hover:not(:disabled) { background: var(--bg-hover); }
+.check:disabled { opacity: 0.5; cursor: default; }

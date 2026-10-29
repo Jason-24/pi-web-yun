@@ -286,9 +286,10 @@ function readProjectFile(cwd: string, allowedRoots: Set<string>): { info: McpCon
 
 /** The file's `mcpServers` entries, parsed as the SDK's `loadMcpConfig()` parses them. */
 function parseConfigText(info: McpConfigFileInfo, text: string): [name: string, value: unknown][] {
+  // pi 1.4 accepts the UTF-8 BOM PowerShell 5.1 writes.
+  text = text.replace(/^\uFEFF/, "");
   let parsed: unknown;
   try {
-    // No byte-order mark is stripped: the SDK does not strip one either.
     parsed = JSON.parse(text);
   } catch (error) {
     problem(info, "unparsable", jsonErrorMessage(error, text));
