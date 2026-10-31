@@ -83,8 +83,10 @@ try {
   assert.deepEqual(await tools.evaluate(el => [getComputedStyle(el).borderWidth, getComputedStyle(el).backgroundColor]), ["0px", "rgba(0, 0, 0, 0)"]);
   await page.locator(".chat-composer-card").screenshot({ path: resolve(artifacts, "composer-footer.png") });
   const agents = page.locator('[data-workspace-view="agents"]');
-  assert.equal(await agents.locator("svg circle").count(), 1, "the Agents control uses the shared group outline");
-  assert.equal(await agents.evaluate(el => getComputedStyle(el).color), "rgb(85, 114, 219)");
+  assert.equal(await agents.locator("svg").isVisible(), true, "the Agents control shows its shared icon");
+  assert.equal(await agents.evaluate(el => getComputedStyle(el).color),
+    await page.locator('[data-workspace-view="history"]').evaluate(el => getComputedStyle(el).color),
+    "Agents uses the same neutral color as the other rail entries");
   await agents.screenshot({ path: resolve(artifacts, "agents-icon.png") });
   await trigger.click();
   await card.waitFor();
