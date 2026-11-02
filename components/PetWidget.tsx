@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/hooks/useI18n";
@@ -13,6 +13,9 @@ import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
 import type { SessionInfo } from "@/lib/types";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePetPlacement } from "@/hooks/usePetPlacement";
+import { usePetActivity } from "@/hooks/usePetActivity";
+import { usePetPreferences } from "@/hooks/usePetPreferences";
+import { PetPreferencesControls } from "./PetPreferencesControls";
 
 const VISIBLE_KEY = "pi-yun-pet-visible";
 const POSITION_KEY = "pi-yun-pet-pos";
@@ -58,8 +61,10 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const mobile = useIsMobile();
   const [smallPreference, setSmallPreference] = useState<boolean | null>(null);
   const small = smallPreference ?? mobile;
-  const [background, setBackground] = useState<{ running: string[]; waiting: string[] }>({ running: [], waiting: [] });
+  const { preferences, updatePreferences } = usePetPreferences();
+  const petName = preferences.name || t("pet.name");
   const activity = useSyncExternalStore(petChatActivity.subscribe, petChatActivity.getSnapshot, petChatActivity.getServerSnapshot);
+  const { background, results, dismissResult } = usePetActivity(visible, activity.sessionId);
   // Live state owns the selected chat; stale polls must never re-add its old wait.
   const waitingIds = [...new Set([
     ...(activity.phase === "waiting" && activity.sessionId ? [activity.sessionId] : []),
@@ -73,13 +78,16 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const [resting, setResting] = useState(false);
   const [action, setAction] = useState<Pose | null>(null);
   const [greeting, setGreeting] = useState("");
+  const [greetingKey, setGreetingKey] = useState("");
   const [greetingSessionId, setGreetingSessionId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuTab, setMenuTab] = useState<"actions" | "notices" | "preferences">("actions");
   const [dragging, setDragging] = useState(false);
   const [reaction, setReaction] = useState(0);
   const [hop, setHop] = useState(0);
   const [menuSide, setMenuSide] = useState<"left" | "right" | "inside">("inside");
   const petRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; origin: Position; moved: boolean } | null>(null);
@@ -92,22 +100,31 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const replyPickerRef = useRef<ReturnType<typeof createPetReplyPicker> | null>(null);
+  const automaticGreetingRef = useRef(false);
   const placement = usePetPlacement(petRef, { visible, preferred: position, small, frozen: dragging || menuOpen, dragging });
 
-  const speak = useCallback((key: string, pose?: Pose, sessionId: string | null = null) => {
+  const speak = useCallback((key: string, pose?: Pose, sessionId: string | null = null, automatic = false) => {
     clearTimeout(bubbleTimerRef.current);
     replyPickerRef.current ??= createPetReplyPicker();
-    const line = t(replyPickerRef.current(key));
+    automaticGreetingRef.current = automatic && key !== "pet.failed";
+    const line = automaticGreetingRef.current && preferences.quiet ? "" : t(replyPickerRef.current(key), { name: petName });
     setGreeting(line);
+    setGreetingKey(key);
     setGreetingSessionId(sessionId);
     // Longer lines get enough reading time in Chinese as well as English.
-    bubbleTimerRef.current = setTimeout(() => setGreeting(""), Math.min(8000, Math.max(4500, Array.from(line).length * 130)));
+    if (line) bubbleTimerRef.current = setTimeout(() => setGreeting(""), Math.min(8000, Math.max(4500, Array.from(line).length * 130)));
     if (pose) {
       clearTimeout(actionTimerRef.current);
       setAction(pose);
       actionTimerRef.current = setTimeout(() => setAction(null), 2800);
     }
-  }, [t]);
+  }, [t, petName, preferences.quiet]);
+
+  useEffect(() => {
+    if (preferences.quiet && automaticGreetingRef.current) {
+      clearTimeout(bubbleTimerRef.current); setGreeting(""); setGreetingSessionId(null);
+    }
+  }, [preferences.quiet]);
 
   useEffect(() => {
     try {
@@ -118,33 +135,6 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) setPosition(stored);
     } catch { /* Ignore unavailable storage or malformed coordinates. */ }
   }, []);
-
-  // Waiting sessions are also running: awaiting input must take precedence.
-  // Closing the companion aborts its request; background tabs do not poll.
-  useEffect(() => {
-    if (!visible) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const controller = new AbortController();
-    const tick = async () => {
-      if (!document.hidden) {
-        try {
-          const response = await fetch("/api/agent/running", { cache: "no-store", signal: controller.signal });
-          if (response.ok) {
-            const body = await response.json() as { runningSessionIds?: unknown; subagentsActiveSessionIds?: unknown; awaitingInputSessionIds?: unknown };
-            if (cancelled) return;
-            setBackground({
-              running: [...(Array.isArray(body.runningSessionIds) ? body.runningSessionIds : []), ...(Array.isArray(body.subagentsActiveSessionIds) ? body.subagentsActiveSessionIds : [])].filter((id): id is string => typeof id === "string"),
-              waiting: Array.isArray(body.awaitingInputSessionIds) ? body.awaitingInputSessionIds.filter((id): id is string => typeof id === "string") : [],
-            });
-          }
-        } catch { /* Preserve the last known state on a network failure. */ }
-      }
-      if (!cancelled) timer = setTimeout(tick, 2500);
-    };
-    void tick();
-    return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
-  }, [visible]);
 
   // The selected chat updates immediately on send; the poll only supplies other sessions.
   useEffect(() => {
@@ -158,7 +148,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       && (previousPhaseRef.current === "idle" || contextChanged);
     // Speak once at the start, never on reply/tool switches or after confirmation.
     if (!waitingSessionId && (started || (mood === "busy" && previousMoodRef.current === "idle"))) {
-      speak(activity.phase === "sending" ? "pet.received" : "pet.greetRun", undefined, workingSessionId);
+      speak(activity.phase === "sending" ? "pet.received" : "pet.greetRun", undefined, workingSessionId, true);
     } else if (waitingSessionId || (previousMoodRef.current === "waiting" && mood !== "waiting")) {
       clearTimeout(bubbleTimerRef.current); setGreeting(""); setGreetingSessionId(null);
     }
@@ -170,7 +160,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       const kind = activity.result.kind;
       if (!waitingSessionId) {
         setHop(0);
-        speak(kind === "complete" ? "pet.greetDone" : kind === "stopped" ? "pet.stopped" : "pet.failed", kind === "complete" ? "happy" : "wave", activity.sessionId);
+        speak(kind === "complete" ? "pet.greetDone" : kind === "stopped" ? "pet.stopped" : "pet.failed", kind === "complete" ? "happy" : "wave", activity.sessionId, true);
       }
     }
   }, [visible, mood, waitingSessionId, workingSessionId, activity.owner, activity.sessionId, activity.phase, activity.result, speak]);
@@ -209,6 +199,23 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     place(); window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
   }, [visible, menuOpen, placement.position, small]);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!visible || !menuOpen || !menu) return;
+    const fit = () => {
+      const viewport = window.visualViewport;
+      const top = (viewport?.offsetTop ?? 0) + 8;
+      const bottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight) - 8;
+      menu.style.maxHeight = `${Math.max(80, bottom - top)}px`;
+      menu.style.removeProperty("translate");
+      const rect = menu.getBoundingClientRect();
+      menu.style.translate = `0 ${Math.max(top - rect.top, Math.min(0, bottom - rect.bottom))}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit);
+    return () => { window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
+  }, [visible, menuOpen, menuTab, menuSide, petName, results.length, waitingIds.length, placement.position]);
 
   const wake = () => {
     setResting(false);
@@ -258,10 +265,26 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const asleep = mood === "idle" && resting;
   const pose: Pose = asleep ? "sleep" : action ?? (mood === "busy" ? "thinking" : mood === "waiting" ? "wave" : "idle");
   const status = asleep ? "sleeping" : mood;
-  const bubbleSessionId = waitingSessionId ?? greetingSessionId;
+  const pending = [
+    ...waitingIds.map((sessionId) => ({ sessionId, kind: "waiting" as const })),
+    ...results.filter((result) => !waitingIds.includes(result.sessionId)),
+  ];
+  const resultNotice = results.find((result) => result.kind === "error") ?? (preferences.quiet ? undefined : results[0]);
+  const bubbleResult = waitingSessionId || (greeting && greetingKey === "pet.failed") ? undefined : resultNotice;
+  const bubbleSessionId = waitingSessionId ?? bubbleResult?.sessionId ?? greetingSessionId;
   const bubbleSession = sessions.find((session) => session.id === bubbleSessionId);
   const sessionLabel = bubbleSession?.name?.trim() || bubbleSession?.firstMessage?.trim()
     || t("pet.unnamedSession", { id: bubbleSessionId?.slice(0, 8) ?? "" });
+  const labelForSession = (id: string) => {
+    const session = sessions.find((session) => session.id === id);
+    return session?.name?.trim() || session?.firstMessage?.trim() || t("pet.unnamedSession", { id: id.slice(0, 8) });
+  };
+  const openSession = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    if (!isPlainActivation(event)) return;
+    const session = sessions.find((session) => session.id === id);
+    if (!session) return;
+    event.preventDefault(); setMenuOpen(false); dismissResult(id); onSelectSession(session);
+  };
 
   return <>
     <button ref={toggleRef} type="button" className="workbench-view-button" data-workspace-action="pet" onClick={() => {
@@ -274,17 +297,15 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging}
         style={placement.position ? { left: placement.position.x, top: placement.position.y, right: "auto", bottom: "auto" } : undefined}>
         <div className={styles.speech} role="status" aria-live="polite" aria-atomic="true">
-          {(waitingSessionId || greeting) && <div key={waitingSessionId ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : "transient"}>
-            <span>{waitingSessionId ? t("pet.attention") : greeting}</span>
+          {(waitingSessionId || bubbleResult || greeting) && <div key={waitingSessionId ?? bubbleResult?.id ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : bubbleResult ? "result" : "transient"}>
+            <span>{waitingSessionId ? t("pet.attention") : bubbleResult ? t(`pet.background.${bubbleResult.kind}`) : greeting}</span>
             {waitingIds.length > 1 && <span className={styles.waitingCount}>{t("pet.moreWaiting", { count: waitingIds.length - 1 })}</span>}
+            {(pending.length > 1 || bubbleResult) && <button type="button" className={styles.noticeCount} onClick={() => { setMenuTab("notices"); setMenuOpen(true); }} aria-controls="pet-actions" aria-expanded={menuOpen && menuTab === "notices"}>{t("pet.noticesCount", { count: pending.length })}</button>}
             {bubbleSessionId && <a className={styles.sessionLink} href={sessionDeepLink(bubbleSessionId)} title={sessionLabel}
-              onClick={(event) => {
-                if (!bubbleSession || !isPlainActivation(event)) return;
-                event.preventDefault(); setMenuOpen(false); onSelectSession(bubbleSession);
-              }}><span>{sessionLabel}</span><span aria-hidden="true"> →</span><span className={styles.linkHint}>{t("pet.viewSession")}</span></a>}
+              onClick={(event) => openSession(event, bubbleSessionId)}><span>{sessionLabel}</span><span aria-hidden="true"> →</span><span className={styles.linkHint}>{t("pet.viewSession")}</span></a>}
           </div>}
         </div>
-        <button type="button" className={styles.character} aria-label={t("pet.interact")} title={t("pet.hint")}
+        <button type="button" data-pet-character="" className={styles.character} aria-label={t("pet.interact", { name: petName })} title={t("pet.hint")}
           onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={(event) => finishDrag(event)}
           onPointerCancel={(event) => finishDrag(event, true)}
           onLostPointerCapture={() => { dragRef.current = null; setDragging(false); }}
@@ -310,12 +331,23 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
               const rect = petRef.current?.getBoundingClientRect();
               setMenuSide(rect && rect.left >= 240 ? "left" : rect && window.innerWidth - rect.right >= 240 ? "right" : "inside");
               setMenuOpen((value) => !value);
-            }}><Icon name="more" /></button>
-        {menuOpen && <div id="pet-actions" className={styles.actions} role="group" aria-label={t("pet.actions")}>
-          <div className={styles.actionHeading}><div>{t("pet.menuTitle")}<span>{t("pet.menuHint")}</span></div>
+            }}><Icon name="more" />{pending.length > 0 && <span className={styles.badge} aria-hidden="true">{pending.length}</span>}</button>
+        {menuOpen && <div ref={menuRef} id="pet-actions" className={styles.actions} role="group" aria-label={t("pet.actions")}>
+          <div className={styles.actionHeading}><div>{t("pet.menuTitle", { name: petName })}<span>{t("pet.menuHint")}</span></div>
             <button type="button" aria-label={t("pet.closeActions")} onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}><Icon name="close" /></button>
           </div>
-          <div className={styles.actionGrid}>
+          <div className={styles.menuTabs} role="group" aria-label={t("pet.menuSections")}>
+            {(["actions", "notices", "preferences"] as const).map((tab) => <button key={tab} type="button" aria-pressed={menuTab === tab} onClick={() => setMenuTab(tab)}>{t(`pet.tab.${tab}`)}{tab === "notices" && pending.length > 0 ? ` (${pending.length})` : ""}</button>)}
+          </div>
+          {menuTab === "notices" && <div className={styles.notices}>
+            {pending.length === 0 && <p>{t("pet.noNotices")}</p>}
+            {pending.map((notice) => <div key={notice.sessionId} className={styles.noticeRow}>
+              <a href={sessionDeepLink(notice.sessionId)} onClick={(event) => openSession(event, notice.sessionId)} title={labelForSession(notice.sessionId)}><span>{t(`pet.notice.${notice.kind}`)}</span><strong>{labelForSession(notice.sessionId)}</strong></a>
+              {notice.kind !== "waiting" && <button type="button" onClick={() => dismissResult(notice.sessionId)} aria-label={t("pet.dismissResult", { session: labelForSession(notice.sessionId) })}><Icon name="close" /></button>}
+            </div>)}
+          </div>}
+          {menuTab === "preferences" && <PetPreferencesControls preferences={preferences} defaultName={t("pet.name")} onChange={updatePreferences} />}
+          {menuTab === "actions" && <div className={styles.actionGrid}>
             <button type="button" onClick={() => interact("wave")}><Icon name="wave" />{t("pet.hello")}</button>
             <button type="button" onClick={() => interact("happy")}><span className={styles.patIcon}><Icon name="heart" /></span>{t("pet.pat")}</button>
             <button type="button" onClick={() => interact("cheer")}><Icon name="cheer" />{t("pet.encourage")}</button>
@@ -324,7 +356,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
               menuButtonRef.current?.focus();
               speak(asleep ? "pet.wakeReply" : "pet.sleepReply", asleep ? "wave" : "sleep");
             }}><Icon name="moon" />{t(asleep ? "pet.wake" : "pet.rest")}</button>
-          </div>
+          </div>}
           <div className={styles.actionFooter}>
             <button type="button" onClick={() => { setSmallPreference(!small); storePreference(SMALL_KEY, small ? "0" : "1"); }}><Icon name="size" />{t(small ? "pet.enlarge" : "pet.shrink")}</button>
             <button type="button" onClick={hide}><Icon name="close" />{t("pet.hide")}</button>

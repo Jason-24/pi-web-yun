@@ -116,9 +116,26 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-pet-companion]')?.innerText.includes("遇到一点问题"));
   await phase("idle"); assert.equal(await input.inputValue(), "验证发送失败");
   assert.doesNotMatch(await pet.innerText(), /任务完成/);
-  assert.equal(commands.filter((command) => command.type === "prompt").length, 4);
+  // Quiet mode suppresses automatic start/end text, but errors still speak.
+  rejectPrompt = false;
+  await pet.getByRole("button", { name: "桌宠互动", exact: true }).click();
+  await pet.locator("#pet-actions").getByRole("button", { name: "偏好", exact: true }).click();
+  await pet.getByLabel("安静陪伴", { exact: true }).check();
+  await page.keyboard.press("Escape");
+  await input.fill("验证安静完成"); await input.press("Enter"); await phase("sending");
+  assert.equal(await pet.getByRole("status").innerText(), "");
+  emit({ type: "agent_start" }); emit({ type: "message_end", message: reply });
+  running = false; emit({ type: "agent_end" }); emit({ type: "prompt_done" }); emit({ type: "agent_settled" });
+  await phase("idle"); assert.equal(await pet.getByRole("status").innerText(), "");
+  assert.equal(await pet.getAttribute("data-pose"), "happy");
+  await input.fill("验证安静错误"); await input.press("Enter"); await phase("sending");
+  emit({ type: "agent_start" });
+  emit({ type: "message_end", message: { ...reply, content: [], stopReason: "error", errorMessage: "Fixture failure in quiet mode" } });
+  running = false; emit({ type: "agent_end" }); emit({ type: "prompt_done" }); emit({ type: "agent_settled" });
+  await phase("idle"); assert.match(await pet.getByRole("status").innerText(), /遇到一点问题/);
+  assert.equal(commands.filter((command) => command.type === "prompt").length, 6);
   assert.deepEqual(errors, []);
-  console.log("PASS: quiet reply/tool transitions, persistent actionable confirmation, in-place navigation, complete/stopped/error results with stale polling");
+  console.log("PASS: quiet transitions, persistent confirmation, in-place navigation, ended/stopped/error results and quiet-mode start/end/error handling");
 } finally {
   await browser.close(); for (const stream of streams) stream.end();
   server.closeAllConnections(); await new Promise((resolve) => server.close(resolve));

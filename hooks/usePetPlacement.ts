@@ -23,7 +23,7 @@ export function usePetPlacement(petRef: RefObject<HTMLDivElement | null>, {
     const update = () => {
       frame = null;
       const bounds = pet.getBoundingClientRect();
-      const character = pet.querySelector("button")?.getBoundingClientRect();
+      const character = pet.querySelector("[data-pet-character]")?.getBoundingClientRect();
       const style = getComputedStyle(pet);
       const figureHeight = parseFloat(style.getPropertyValue("--preferred-figure-height"));
       if (!character || !Number.isFinite(figureHeight)) return;

@@ -7,6 +7,7 @@ import {
 } from "@/lib/rpc-manager";
 import { getSessionUiStateRevision } from "@/lib/session-ui-state";
 import { getSessionIdsWithUnsettledSubagentRuns } from "@/lib/subagent-runtime";
+import { agentRunResults } from "@/lib/agent-run-results";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export async function GET() {
       completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
       subagentsActiveSessionIds: getSessionIdsWithUnsettledSubagentRuns(),
       sessionUiStateRevision: getSessionUiStateRevision(),
+      recentRunResults: agentRunResults.read(),
     },
     { headers: { "Cache-Control": "no-store" } },
   );

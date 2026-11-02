@@ -2,6 +2,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { createAgentSessionFromServices, createAgentSessionServices, getAgentDir, initTheme, SessionManager, SettingsManager, Theme, type ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager as TuiKeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { randomUUID } from "crypto";
+import { agentRunResults } from "./agent-run-results";
 import { existsSync, realpathSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { isDeepStrictEqual } from "util";
@@ -375,6 +376,7 @@ export class AgentSessionWrapper {
   private agentRunNeedsCompletion = false;
   // Whether the last run ended because it was stopped (pi 1.1's `agent_settled.aborted`), not finished.
   private lastRunAborted = false;
+  private lastRunFailed = false;
   private promptAdmissionTail: Promise<void> = Promise.resolve();
   private extensionsBound = false;
   private extensionBindingPromise: Promise<void> | null = null;
@@ -583,6 +585,11 @@ export class AgentSessionWrapper {
       if (event.type === "agent_start") {
         this.agentRunNeedsCompletion = true;
         this.lastRunAborted = false;
+        this.lastRunFailed = false;
+      }
+      if (event.type === "message_end") {
+        const message = event.message as { role?: string; stopReason?: string } | undefined;
+        if (message?.role === "assistant") this.lastRunFailed = message.stopReason === "error";
       }
       if (event.type === "agent_settled") this.lastRunAborted = event.aborted === true;
       if (event.type === "agent_end") {
@@ -663,6 +670,9 @@ export class AgentSessionWrapper {
       this.onDirectTurnSettled?.(this.lastRunAborted);
     } catch (error) {
       console.error("[pi-web] could not settle the subagent turn:", error instanceof Error ? error.message : error);
+    }
+    if (!this.suppressCompletionNotifications && !hasUnsettledSubagentRun(this.sessionId)) {
+      agentRunResults.record(this.sessionId, this.lastRunAborted ? "stopped" : this.lastRunFailed ? "error" : "complete");
     }
     // A stopped run did not finish a task, as pi's own status reporting has it: nothing to announce.
     if (this.suppressCompletionNotifications || this.lastRunAborted) return;
@@ -1295,6 +1305,7 @@ export class AgentSessionWrapper {
               return;
             }
             rejectPreflight(error);
+            if (preflightAccepted) this.lastRunFailed = true;
             finishPrompt();
             invalidateSessionListCache();
             // A preflight rejection is returned by the POST itself. Only an
