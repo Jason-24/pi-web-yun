@@ -1,9 +1,8 @@
 "use client";
 
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { AgentsIcon, HomeIcon, MessageIcon, RestoreIcon } from "./SidebarIcons";
-import { SettingsSectionIcon } from "./SettingsPanel";
+import { AgentsIcon } from "./SidebarIcons";
 import { PetWidget } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
 
@@ -17,21 +16,34 @@ export const WORKSPACE_VIEW_LABELS: Record<WorkspaceView, string> = {
 };
 
 function ViewIcon({ view }: { view: WorkspaceView }) {
-  if (view === "home") return <HomeIcon size={18} />;
-  if (view === "chat") return <MessageIcon size={18} />;
-  if (view === "history") return <RestoreIcon size={18} />;
-  if (view === "agents") return <AgentsIcon size={20} />;
-  if (view === "branches") return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M15 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2v3l3-3" />
-    <path d="M11 9h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2v3l-3-3h-5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z" />
-    <path d="M12 13h6" />
-  </svg>;
-  if (view === "settings") return <SettingsSectionIcon section="general" size={19} />;
-  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {view === "system" ? <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></>
-      : view === "tools" ? <path d="M14.7 6.3a5 5 0 0 0-6.1 6.1L3 18a2.1 2.1 0 0 0 3 3l5.6-5.6a5 5 0 0 0 6.1-6.1L14 13l-3-3Z" />
-        : <><path d="M4 10a8 8 0 0 1 16 0v3a8 8 0 0 1-16 0ZM4 10c4 0 6-2 8-4 2 2 4 4 8 4M9 16q3 2 6 0" /><path d="M9 12h.01M15 12h.01" /></>}
-  </svg>;
+  if (view === "agents") return <AgentsIcon size={20} strokeWidth={1.7} />;
+  let shape: ReactNode;
+  switch (view) {
+    case "home":
+      shape = <><path d="m3.5 10 8.5-7 8.5 7v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" /><path d="M9 20.5v-6h6v6" /></>;
+      break;
+    case "chat":
+      shape = <path d="M5 4.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 3v-14a2 2 0 0 1 1-2Z" />;
+      break;
+    case "history":
+      shape = <><path d="M4 8a8.5 8.5 0 1 1-1 4" /><path d="M4 3.5V8h4.5M12 7.5v5l3.5 2" /></>;
+      break;
+    case "system":
+      shape = <><path d="M6 3.5h8l4 4v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path d="M14 3.5v4h4M8 11l2 2-2 2m4 0h3" /></>;
+      break;
+    case "tools":
+      shape = <><rect x="3.5" y="7.5" width="17" height="13" rx="2" /><path d="M9 7.5v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3.5 13h17M10.5 13v1.5h3V13" /></>;
+      break;
+    case "branches":
+      shape = <><path d="M14.5 7V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2v2l2.5-2" /><path d="M11 9h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2v2.5L16.5 18H11a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z" /><path d="M12 13.5h5.5" /></>;
+      break;
+    case "settings":
+      shape = <><path d="M4 7h10M18 7h2M4 17h2m4 0h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>;
+      break;
+    default:
+      return null;
+  }
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shape}</svg>;
 }
 
 interface Props {

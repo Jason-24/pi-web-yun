@@ -148,6 +148,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cacheMis
     <div style={{ marginBottom: 14 }}>
       <button
         type="button"
+        className="process-details-toggle"
         aria-expanded={expanded || reveal}
         aria-label={[t("chat.processDetails"), ...parts, ...(cacheMissText ? [cacheMissText] : [])].join(" · ")}
         onClick={() => setExpanded((v) => !v)}
@@ -172,6 +173,8 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cacheMis
           <polyline points="4 2.5 7.5 6 4 9.5" />
         </svg>
         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span className="process-details-label">{t("chat.processDetails")}</span>
+          <span aria-hidden="true"> · </span>
           {parts.join(" · ")}
           {cacheMissText && <span style={{ color: TRANSCRIPT_NOTICE_WARNING_COLOR }}>{` · ${cacheMissText}`}</span>}
         </span>

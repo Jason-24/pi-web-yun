@@ -383,10 +383,11 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   }, [isStreaming, highlighted, languagesReady]);
 
   const copy = () => {
+    setCopied(false);
     copyText(code).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }, () => {});
   };
 
   return (

@@ -11,6 +11,13 @@ export const RIGHT_PANEL_MAX_WIDTH = 1200;
 
 const COMPACT_CHAT_MIN_WIDTH = 320;
 const DESKTOP_CHAT_MIN_WIDTH = 420;
+const FILE_READING_MIN_WIDTH = 400;
+
+/** On the first file choice, give a narrow split enough room to read. */
+export function shouldCollapseFileTreeForReading(panelWidth: number, treeWidth: number): boolean {
+  return Number.isFinite(panelWidth) && Number.isFinite(treeWidth)
+    && panelWidth > 0 && treeWidth > 0 && panelWidth - treeWidth < FILE_READING_MIN_WIDTH;
+}
 
 export function clampPanelWidth(width: number, minWidth: number, maxWidth: number): number {
   const finiteWidth = Number.isFinite(width) ? width : minWidth;

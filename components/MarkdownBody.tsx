@@ -70,10 +70,11 @@ function MathDisplay({ source, children }: { source: string; children: ReactNode
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copy = () => {
+    setCopied(false);
     copyText(source).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }, () => {});
   };
   return (
     <div className="markdown-math-display">

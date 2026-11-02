@@ -274,8 +274,12 @@
   border-radius: 8px; color: var(--text-muted);
 }
 .workspace-shell .session-tree-recent .session-tree-main { gap: 8px; }
-.workspace-shell .session-tree-recent:hover,
-.workspace-shell .session-tree-recent.is-selected { background: var(--bg-selected); color: var(--text); }
+.workspace-shell .session-tree-recent:hover { background: var(--bg-hover); color: var(--text); }
+.workspace-shell .session-tree-recent.is-selected {
+  background: color-mix(in srgb, var(--bg-selected) 50%, transparent);
+  color: var(--text);
+}
+.workspace-shell .session-tree-recent.is-selected:hover { background: var(--bg-selected); }
 .workspace-shell .session-tree-recent .session-tree-title { font-size: 13px; font-weight: 400; }
 .workspace-shell .session-tree-recent a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 
@@ -359,3 +363,75 @@
 }
 .workspace-shell .sidebar-container.is-peeking .sidebar-brand { font-size: 15px; }
 .workspace-new-session { display: flex; align-items: center; justify-content: center; flex: 0 0 30px; width: 30px; padding: 0; color: var(--text-muted); background: transparent; cursor: pointer; }
+
+/* Give the primary action and current conversation a clear, quiet hierarchy. */
+.workspace-shell .sidebar-header .sidebar-new-button {
+  background: color-mix(in srgb, var(--bg) 72%, var(--bg-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 85%, transparent);
+  font-weight: 500;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.workspace-shell .sidebar-header .sidebar-new-button:hover {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border), 0 1px 3px rgb(0 0 0 / .04);
+}
+.workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming) {
+  background: color-mix(in srgb, var(--bg-selected) 85%, var(--bg));
+}
+.workspace-shell .session-tree-session.is-selected .session-tree-title { color: var(--text); font-weight: 600; }
+.workspace-shell .session-tree-group-toggle { font-weight: 500; }
+
+/* The composer is the main action surface; controls remain available in place. */
+.workspace-shell .chat-composer-card {
+  border-color: color-mix(in srgb, var(--border) 90%, var(--text-muted));
+  box-shadow: 0 1px 3px rgb(0 0 0 / .035), 0 8px 24px -16px rgb(0 0 0 / .14);
+}
+.workspace-shell .chat-composer-card:focus-within {
+  border-color: color-mix(in srgb, var(--text-muted) 38%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 5%, transparent), 0 4px 16px rgb(0 0 0 / .04);
+}
+.workspace-shell .chat-composer-send { transition: background 0.15s, transform 0.15s; }
+.workspace-shell .chat-composer-send:hover:not(:disabled) { transform: translateY(-1px); }
+.clipboard-notice-region { position: fixed; z-index: 3000; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
+.clipboard-notice { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); box-shadow: 0 4px 20px rgb(0 0 0 / .14); font-size: 13px; line-height: 1.4; }
+.workspace-shell .tool-call-toggle { min-height: 32px; transition: background 0.15s; }
+.workspace-shell .tool-call-toggle:hover { background: var(--bg-hover) !important; }
+.workspace-shell .tool-call-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.workspace-shell .process-details-toggle {
+  border-radius: 7px;
+  transition: color 0.15s, background 0.15s;
+}
+.workspace-shell .process-details-toggle:hover { color: var(--text) !important; background: var(--bg-subtle) !important; }
+.workspace-shell .process-details-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workspace-shell .process-details-label { color: var(--text); font-weight: 500; }
+.workspace-shell .message-hover-actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s, color 0.12s;
+}
+.workspace-shell .message-hover-actions[data-visible="true"],
+.workspace-shell .message-hover-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.workspace-shell .message-hover-actions :focus-visible,
+.workspace-shell button.message-hover-actions:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+@media (hover: none) {
+  .workspace-shell .message-hover-actions { opacity: 1; pointer-events: auto; }
+}
+@media (pointer: coarse) {
+  .workspace-shell .user-message-actions-row { flex-wrap: wrap; }
+  .workspace-shell .message-hover-actions > button,
+  .workspace-shell button.message-hover-actions { min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell .sidebar-header .sidebar-new-button,
+  .workspace-shell .chat-composer-send,
+  .workspace-shell .tool-call-toggle,
+  .workspace-shell .process-details-toggle,
+  .workspace-shell .message-hover-actions { transition: none; }
+  .workspace-shell .chat-composer-send:hover:not(:disabled) { transform: none; }
+}

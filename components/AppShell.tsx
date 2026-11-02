@@ -36,7 +36,7 @@ import { useIsMobile, useIsNarrowMobile, useIsWorkbenchDesktop } from "@/hooks/u
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { useResizablePanel } from "@/hooks/useResizablePanel";
 import { useAudio } from "@/hooks/useAudio";
-import { copyText } from "@/lib/clipboard";
+import { CLIPBOARD_FAILURE_EVENT, copyText } from "@/lib/clipboard";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { getFileName } from "@/lib/file-paths";
 import { buildAtMentionText, buildFileAtMentionsText, buildFileLineMentionText } from "@/lib/file-fuzzy";
@@ -70,6 +70,7 @@ import {
   getDefaultRightPanelWidth,
   getRightPanelMaxWidth,
   getSidebarMaxWidth,
+  shouldCollapseFileTreeForReading,
   RIGHT_PANEL_FALLBACK_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
@@ -117,6 +118,17 @@ export function AppShell() {
   // Restore fonts even when Settings and the chat composer have not been opened.
   useFontPreferences();
   const { locale, t: translate } = useI18n();
+  const [clipboardFailed, setClipboardFailed] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onFailure = () => {
+      clearTimeout(timer);
+      setClipboardFailed(true);
+      timer = setTimeout(() => setClipboardFailed(false), 4000);
+    };
+    window.addEventListener(CLIPBOARD_FAILURE_EVENT, onFailure);
+    return () => { window.removeEventListener(CLIPBOARD_FAILURE_EVENT, onFailure); clearTimeout(timer); };
+  }, []);
   const isMobile = useIsMobile();
   const isNarrowMobile = useIsNarrowMobile();
   const isWorkbenchDesktop = useIsWorkbenchDesktop();
@@ -461,11 +473,12 @@ export function AppShell() {
   const [copiedSessionField, setCopiedSessionField] = useState<SessionCopyField | null>(null);
   const sessionCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleCopySessionField = useCallback((field: SessionCopyField, value: string) => {
+    setCopiedSessionField(null);
     void copyText(value).then(() => {
       if (sessionCopyTimerRef.current) clearTimeout(sessionCopyTimerRef.current);
       setCopiedSessionField(field);
       sessionCopyTimerRef.current = setTimeout(() => setCopiedSessionField(null), 1400);
-    });
+    }, () => {});
   }, []);
 
   useEffect(() => {
@@ -1300,6 +1313,12 @@ export function AppShell() {
     options?: { sourceSessionId?: string | null; modeHint?: "diff"; page?: number },
   ) => {
     setExpandedPane("file");
+    // When a first file replaces the chooser, avoid leaving a sliver of text
+    // beside the directory. An explicit later directory choice is preserved.
+    if (filePickerActive && !rightPanelReadingExpanded &&
+        shouldCollapseFileTreeForReading(rightPanelWidthRef.current, fileTreeWidthRef.current)) {
+      setFileTreeCollapsed(true);
+    }
     const sourceSessionId = options?.sourceSessionId;
     const modeHint = options?.modeHint;
     const page = options?.page;
@@ -1316,7 +1335,7 @@ export function AppShell() {
     setRightPanelOpen(true);
     // On mobile the file panel is full-screen; close the drawer so it shows.
     if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
+  }, [filePickerActive, isMobile, rightPanelReadingExpanded]);
 
   const handleOpenLinkedFile = useCallback((filePath: string, page?: number) => {
     handleOpenFile(filePath, getFileName(filePath), { sourceSessionId: selectedSession?.id ?? null, page });
@@ -2199,6 +2218,9 @@ export function AppShell() {
 
   return (
     <>
+    <div className="clipboard-notice-region" role="status" aria-live="polite">
+      {clipboardFailed && <div className="clipboard-notice">{translate("i18n.copyFailed")}</div>}
+    </div>
     <style>{`
       .mobile-session-stats {
         container-type: inline-size;

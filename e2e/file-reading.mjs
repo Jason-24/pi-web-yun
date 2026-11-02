@@ -73,6 +73,7 @@ await page.route("**/api/**", async route => {
 });
 
 try {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`${base}/?session=${session.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
   await page.locator(".workspace-chat-view textarea").first().waitFor({ timeout: 90000 });
   assert.equal(await page.locator(".file-panel-header").isVisible(), false, "closed resources leave no header controls above chat");
@@ -85,6 +86,19 @@ try {
     await panel.locator(".file-viewer-content").waitFor();
   };
   const opener = panel.getByRole("tab", { name: "打开文件", exact: true });
+  await opener.waitFor();
+  await openFile("reading.txt");
+  assert.equal(await panel.locator(".file-tree-toggle").getAttribute("aria-expanded"), "false", "a narrow first file leaves room for reading");
+  await panel.locator(".file-tree-toggle").click();
+  await openFile("notes.md");
+  assert.equal(await panel.locator(".file-tree-toggle").getAttribute("aria-expanded"), "true", "opening another file keeps the user's directory choice");
+  await panel.getByRole("tab", { name: "reading.txt", exact: true }).getByRole("button").click();
+  await panel.getByRole("tab", { name: "notes.md", exact: true }).getByRole("button").click();
+  await opener.waitFor();
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator(".workspace-chat-view textarea").first().waitFor({ timeout: 90000 });
+  await page.locator(".workspace-files-toggle").filter({ visible: true }).first().click();
   await opener.waitFor();
   assert.equal(await opener.getAttribute("aria-selected"), "true");
   assert.equal(await panel.locator(".workbench-file-empty").isVisible(), true, "the empty picker keeps a visible preview placeholder");

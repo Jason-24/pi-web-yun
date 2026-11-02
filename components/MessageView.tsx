@@ -411,10 +411,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const canCancelEdit = !!isEditing && !!onCancelEdit;
 
   const copyContent = () => {
+    setCopied(false);
     copyText(copyTarget).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }, () => {});
   };
 
   return (
@@ -513,16 +514,11 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
       {/* Bottom row: action buttons + timestamp */}
       {(time || canFork || canEdit || true) && (
-        <div style={{
+        <div className="user-message-actions-row" style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           gap: 6, marginTop: 3,
         }}>
-          <div style={{
-            display: "flex", gap: 3,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
-            transition: "opacity 0.12s",
-          }}>
+          <div className="message-hover-actions" data-visible={hovered} style={{ display: "flex", gap: 3 }}>
             <button
               onClick={copyContent}
                title={t("i18n.copyMessage")}
@@ -554,12 +550,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             </button>
           </div>
           {(canFork || canEdit || canCancelEdit) && (
-            <div style={{
-              display: "flex", gap: 3,
-              opacity: (hovered || forking || canCancelEdit) ? 1 : 0,
-              pointerEvents: (hovered || forking || canCancelEdit) ? "auto" : "none",
-              transition: "opacity 0.12s",
-            }}>
+            <div className="message-hover-actions" data-visible={hovered || forking || canCancelEdit} style={{ display: "flex", gap: 3 }}>
               {canEdit && !canCancelEdit && (
                 <button
                   onClick={() => onEditContent!(editTarget, entryId!)}
@@ -763,10 +754,11 @@ function AssistantMessageView({
   }
 
   const copyContent = () => {
+    setCopied(false);
     copyText(textContent).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }, () => {});
   };
 
   useEffect(() => {
@@ -965,6 +957,8 @@ function AssistantMessageView({
         {textContent && !isStreaming && (
           <button
             onClick={copyContent}
+            className="message-hover-actions"
+            data-visible={hovered}
              title={t("i18n.copyMessage")}
             style={{
               display: "flex", alignItems: "center", gap: 4,
@@ -975,9 +969,6 @@ function AssistantMessageView({
               cursor: "pointer",
               fontSize: 11, fontWeight: 400,
               whiteSpace: "nowrap",
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.12s, color 0.12s",
             }}
             onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
             onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
@@ -1242,16 +1233,19 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
   return (
     <div
       style={{
-        borderRadius: 7,
+        borderRadius: 9,
         overflow: "hidden",
         fontSize: 12,
-        border: isError ? "1px solid rgba(248,113,113,0.45)" : "1px solid rgba(34,197,94,0.25)",
-        background: isError ? "rgba(248,113,113,0.05)" : "rgba(34,197,94,0.04)",
+        border: isError ? "1px solid rgba(248,113,113,0.45)" : "1px solid var(--border)",
+        background: isError ? "rgba(248,113,113,0.05)" : "var(--bg-subtle)",
       }}
     >
       {/* ── Tool call header ── */}
       <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
         <button
+          type="button"
+          className="tool-call-toggle"
+          aria-expanded={expanded}
           onClick={toggleExpanded}
           style={{
             display: "flex",
@@ -1270,7 +1264,7 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
         >
           <span
             title={mcpLabel ? block.toolName : undefined}
-            style={{ color: isError ? "#f87171" : "#16a34a", fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 11, flexShrink: 0 }}
+            style={{ color: isError ? "#f87171" : "color-mix(in srgb, #16a34a 72%, var(--text))", fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 11, flexShrink: 0 }}
           >
             {mcpLabel ? (
               <>
@@ -1316,7 +1310,7 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
             style={{
               padding: "6px 10px 8px",
               background: "var(--bg-subtle)",
-              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(34,197,94,0.2)",
+              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
             }}
           >
             <ToolFieldRows fields={toolFields} />
@@ -1331,7 +1325,7 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
               lineHeight: 1.5,
               overflow: "auto",
               background: "var(--bg-subtle)",
-              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(34,197,94,0.2)",
+              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
               whiteSpace: "pre-wrap",
               wordBreak: "break-all",
             }}
@@ -1351,7 +1345,7 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
 
       {/* ── Expanded: applied-patch split diff ── */}
       {expanded && patchFiles && (
-        <div style={{ borderTop: "1px solid rgba(34,197,94,0.15)", background: "var(--bg)" }}>
+        <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
           <SplitFilesView files={patchFiles} />
         </div>
       )}
@@ -1391,7 +1385,7 @@ function PairedDiffResult({ diff }: {
   return (
     <div
       style={{
-        borderTop: "1px solid rgba(34,197,94,0.15)",
+        borderTop: "1px solid var(--border)",
         background: "var(--bg)",
       }}
     >
@@ -1754,7 +1748,7 @@ function ResultImages({ images, isError }: { images: ImageContent[]; isError: bo
         flexWrap: "wrap",
         padding: "10px",
         background: "var(--bg)",
-        borderTop: `1px solid ${isError ? "rgba(248,113,113,0.3)" : "rgba(34,197,94,0.15)"}`,
+        borderTop: `1px solid ${isError ? "rgba(248,113,113,0.3)" : "var(--border)"}`,
       }}
     >
       {images.map((image, index) => {
@@ -1796,7 +1790,7 @@ function PairedResult({ text, isEmpty, isError }: {
   return (
     <div
       style={{
-        borderTop: `1px solid ${isError ? "rgba(248,113,113,0.3)" : "rgba(34,197,94,0.15)"}`,
+        borderTop: `1px solid ${isError ? "rgba(248,113,113,0.3)" : "var(--border)"}`,
         background: isError ? "rgba(248,113,113,0.04)" : "var(--bg-subtle)",
       }}
     >
@@ -1969,10 +1963,11 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
   const time = formatTime(message.timestamp);
 
   const copyContent = () => {
+    setCopied(false);
     copyText(text || detailsText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }, () => {});
   };
 
   return (

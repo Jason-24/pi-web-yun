@@ -993,6 +993,7 @@ export const enLocale: LocalePlugin = {
     "i18n.close": "Close",
     "i18n.copy": "Copy",
     "i18n.copied": "Copied",
+    "i18n.copyFailed": "Couldn't copy. Please try again or copy manually.",
     "i18n.cancel": "Cancel",
     "i18n.save": "Save",
     "i18n.saving": "Saving…",

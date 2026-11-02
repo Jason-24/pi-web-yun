@@ -33,7 +33,13 @@ for (const [name, content] of Object.entries(documents)) {
   await writeFile(join(skillDir, name), content);
 }
 await writeFile(join(skillDir, "unsupported.txt"), "not Markdown");
-await symlink(join(skillDir, "unsupported.txt"), join(skillDir, "text.md"));
+let symlinksAvailable = true;
+try {
+  await symlink(join(skillDir, "unsupported.txt"), join(skillDir, "text.md"));
+} catch (error) {
+  if (process.platform !== "win32" || !["EPERM", "EACCES"].includes(error.code)) throw error;
+  symlinksAvailable = false;
+}
 await mkdir(join(skillDir, "directory.md"));
 await writeFile(join(skillDir, "limit.md"), "x".repeat(1024 * 1024));
 await writeFile(join(skillDir, "large.md"), "x".repeat(1024 * 1024 + 1));
@@ -43,13 +49,15 @@ await writeFile(join(outsideDir, "secret.md"), "PRIVATE CONTENT");
 // Prefix sibling is not contained in the root either.
 await mkdir(`${skillDir}-sibling`);
 await writeFile(join(`${skillDir}-sibling`, "secret.md"), "PRIVATE CONTENT");
-await symlink(join(outsideDir, "secret.md"), join(skillDir, "escape.md"));
-await symlink(outsideDir, join(skillDir, "escape-dir"));
-await symlink(`${skillDir}-sibling`, join(skillDir, "prefix-dir"));
-await symlink(join(skillDir, "references"), join(skillDir, "inside-dir"));
-await symlink(join(skillDir, "references", "other.markdown"), join(skillDir, "inside.md"));
-await symlink(join(root, "missing.md"), join(skillDir, "dangling.md"));
-await symlink("loop.md", join(skillDir, "loop.md"));
+if (symlinksAvailable) {
+  await symlink(join(outsideDir, "secret.md"), join(skillDir, "escape.md"));
+  await symlink(outsideDir, join(skillDir, "escape-dir"));
+  await symlink(`${skillDir}-sibling`, join(skillDir, "prefix-dir"));
+  await symlink(join(skillDir, "references"), join(skillDir, "inside-dir"));
+  await symlink(join(skillDir, "references", "other.markdown"), join(skillDir, "inside.md"));
+  await symlink(join(root, "missing.md"), join(skillDir, "dangling.md"));
+  await symlink("loop.md", join(skillDir, "loop.md"));
+}
 if (process.platform !== "win32") execFileSync("mkfifo", [join(skillDir, "pipe.md")]);
 await writeFile(join(skillDir, "unreadable.md"), "PRIVATE CONTENT");
 await chmod(join(skillDir, "unreadable.md"), 0);
@@ -59,8 +67,10 @@ const linkedSkillPath = join(skillsDir, "linked", "SKILL.md");
 await mkdir(linkedDir);
 await writeFile(join(linkedDir, "SKILL.md"), "---\nname: linked\ndescription: Linked skill\n---\n# Linked\n");
 await writeFile(join(linkedDir, "reference.md"), "# Linked reference\n");
-await symlink(join(outsideDir, "secret.md"), join(linkedDir, "escape.md"));
-await symlink(linkedDir, join(skillsDir, "linked"));
+if (symlinksAvailable) {
+  await symlink(join(outsideDir, "secret.md"), join(linkedDir, "escape.md"));
+  await symlink(linkedDir, join(skillsDir, "linked"));
+}
 
 const jiti = createJiti(import.meta.url, { alias: { "@": process.cwd() } });
 const { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed } = await jiti.import("../../../../lib/file-access.ts");
@@ -139,7 +149,7 @@ test("rejects parent, absolute, Windows, URL, backslash and NUL paths", async ()
 });
 
 test("rejects unsupported extensions, missing documents, directories and oversized files", async () => {
-  for (const document of ["", "unsupported.txt", "SKILL", "references", "SKILL.md.html", "SKILL.md#heading", "text.md"]) {
+  for (const document of ["", "unsupported.txt", "SKILL", "references", "SKILL.md.html", "SKILL.md#heading", ...(symlinksAvailable ? ["text.md"] : [])]) {
     await assertError(await getContent(skillPath, { document }), 415);
   }
   for (const document of ["missing.md", "missing/file.md", "unsupported.txt/child.md", "dangling.md", "loop.md"]) {
@@ -159,7 +169,7 @@ test("rejects unsupported extensions, missing documents, directories and oversiz
   }
 });
 
-test("permits contained symlinks but refuses file, directory and prefix-sibling escapes", async () => {
+test("permits contained symlinks but refuses file, directory and prefix-sibling escapes", { skip: !symlinksAvailable && "Creating symbolic links requires additional privileges" }, async () => {
   for (const document of ["inside.md", "inside-dir/other.markdown"]) {
     const response = await getContent(skillPath, { document });
     assert.equal(response.status, 200);
@@ -170,7 +180,7 @@ test("permits contained symlinks but refuses file, directory and prefix-sibling 
   }
 });
 
-test("permits a symlink skill root without granting broader file access", async () => {
+test("permits a symlink skill root without granting broader file access", { skip: !symlinksAvailable && "Creating symbolic links requires additional privileges" }, async () => {
   const response = await getContent(linkedSkillPath, { document: "reference.md" });
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { content: "# Linked reference\n" });

@@ -363,7 +363,7 @@ test("renders subagents as standard tool calls with only an extra side-panel but
     onOpenSubagent() {},
   });
 
-  assert.match(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
+  assert.match(html, /class="tool-call-toggle" aria-expanded="false"/);
   assert.match(html, />Agent</);
   assert.match(html, />Explore</);
   assert.match(html, /aria-label="View sub-agent work in side panel"/);
@@ -379,6 +379,7 @@ test("renders subagents as standard tool calls with only an extra side-panel but
     toolResults: new Map(),
     onOpenSubagent() {},
   });
+  assert.match(ordinaryHtml, /class="tool-call-toggle" aria-expanded="false"/);
   assert.doesNotMatch(ordinaryHtml, /View sub-agent work in side panel/);
 });
 

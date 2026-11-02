@@ -993,6 +993,7 @@ export const zhTWLocale: LocalePlugin = {
     "i18n.close": "關閉",
     "i18n.copy": "複製",
     "i18n.copied": "已複製",
+    "i18n.copyFailed": "複製失敗，請重試或手動複製。",
     "i18n.cancel": "取消",
     "i18n.save": "儲存",
     "i18n.saving": "儲存中…",

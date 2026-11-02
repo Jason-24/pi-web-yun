@@ -241,6 +241,7 @@ export function DebugPanel({ readerRef, selectedSessionId, sessions, onClose }: 
 
   const handleCopy = () => {
     const payload = { client: page, server: server.reply };
+    setCopied(false);
     void copyText(JSON.stringify(payload, null, 2)).then(() => {
       if (disposedRef.current) return;
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
