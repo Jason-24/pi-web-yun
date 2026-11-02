@@ -17,7 +17,7 @@ const sessions = Array.from({ length: 17 }, (_, i) => ({
   name: `最近任务 ${String(i + 1).padStart(2, "0")}`, firstMessage: "测试最近任务", messageCount: 1,
   created: "2026-10-29T00:00:00Z", modified: new Date(Date.UTC(2026, 9, 29, 12, 0, 0) - i * 60000).toISOString(),
 }));
-let catalog = sessions;
+let catalog = [...sessions, { ...sessions[0], id: "side-chat", name: "隐藏的侧边对话", relation: { kind: "side", parentSessionId: sessions[0].id }, modified: "2026-10-30T00:00:00Z" }];
 const errors = [];
 const commands = [];
 page.on("pageerror", error => errors.push(error.message));

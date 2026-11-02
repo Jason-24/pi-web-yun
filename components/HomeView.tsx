@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { getFileName } from "@/lib/file-paths";
+import { isHiddenRelation } from "@/lib/session-family";
 import { sessionDisplayTitle } from "@/lib/session-fork-name";
 import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
 import type { SessionInfo } from "@/lib/types";
@@ -24,7 +25,7 @@ export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, on
   const { t, locale } = useI18n();
   const [visibleCount, setVisibleCount] = useState(RECENT_PAGE_SIZE);
   const recent = sessions
-    .filter((session) => session.relation?.kind !== "subagent")
+    .filter((session) => !isHiddenRelation(session.relation))
     .sort((a, b) => Date.parse(b.modified) - Date.parse(a.modified));
   const hasMore = visibleCount < recent.length;
   const dateFormat = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
