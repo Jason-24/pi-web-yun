@@ -96,6 +96,7 @@
   .workspace-page-header { padding: 16px 20px; }
 }
 @media (max-width: 640px) {
+  .settings-dialog-backdrop.is-embedded .settings-dialog-header { padding: 0 4px; }
   .workspace-location { display: none; }
   .workbench-settings-navigation.is-mobile { overflow-x: auto; overflow-y: hidden; gap: 4px; }
   .workbench-settings-navigation.is-mobile .workbench-view-button { flex: 1; min-width: 44px; min-height: 44px; flex-direction: column; gap: 4px; height: auto; font-size: 10px; padding: 5px 2px; }

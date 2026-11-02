@@ -349,6 +349,7 @@ Files: `lib/markdown.ts` (`markdownClobberPrefix`, `rehypeMatchClobberedIds`, `j
 - Home is the preview trigger; the collapsed edge only restores the docked sidebar on click. Clicking Home retains ordinary home navigation. The preview uses a compact width capped at 260px, a fine border, modest corner radius and light shadow. When the desktop sidebar is collapsed, a labelled compose icon before the conversation title starts a new chat in the current directory through `SessionSidebarControl.startNewSessionIn`; with no directory it opens the existing folder picker. It keeps the sidebar collapsed and never sends a prompt merely to create a composer.
 
 ## Upstream v0.13 compatibility
+- The v0.14.2 merge keeps PI-YUN's file-tab shelf and CSS sizing, including its hidden scrollbar, while using the upstream touch toolbar height and visible narrow-phone Agents button. The upstream release workflow remains gated to `agegr/pi-web` at its shared prerequisite job.
 - The read-only Debug view uses the fork's embedded workspace panels and follows session switches. Usage remains in the composer, while Debug opens from the conversation header. Keep the archive view open when its selected session is deleted.
 - Completion retains both `failed` and `subagentsActive`: failed or aborted runs never celebrate, and a parent waiting for subagent reports never announces task completion. The visible companion's background poll includes `subagentsActiveSessionIds`.
 

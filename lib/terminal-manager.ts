@@ -3,6 +3,7 @@ import { chmodSync, statSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import type { IPty } from "node-pty";
+import { getPowerShellConfig } from "@earendil-works/pi-coding-agent";
 import { samePath } from "./paths";
 import type { DebugServerGlobal } from "./debug-types";
 
@@ -65,6 +66,19 @@ function shellEnvironment(): Record<string, string> {
   return env;
 }
 
+/**
+ * A new terminal's shell. Windows: PowerShell as pi's `powershell` tool resolves it (PowerShell 7,
+ * then Windows PowerShell; `where` keeps a Store install's WindowsApps alias), else ComSpec / cmd.
+ */
+function terminalShell(): { file: string; args: string[] } {
+  if (process.platform !== "win32") return { file: process.env.SHELL || "/bin/sh", args: ["-l"] };
+  try {
+    return { file: getPowerShellConfig().shell, args: [] };
+  } catch {
+    return { file: process.env.ComSpec ?? "cmd.exe", args: [] };
+  }
+}
+
 function emit(record: TerminalRecord, event: TerminalEvent): void {
   for (const listener of record.listeners) listener(event);
 }
@@ -120,11 +134,8 @@ export function createTerminal(cwd: string, cols: number, rows: number, id: stri
       { cause: error },
     );
   }
-  const shell = process.platform === "win32"
-    ? process.env.ComSpec ?? "cmd.exe"
-    : process.env.SHELL || "/bin/sh";
-  const args = process.platform === "win32" ? [] : ["-l"];
-  const pty = spawn(shell, args, {
+  const shell = terminalShell();
+  const pty = spawn(shell.file, shell.args, {
     name: "xterm-256color",
     cols: dimension(cols, 80),
     rows: dimension(rows, 24),

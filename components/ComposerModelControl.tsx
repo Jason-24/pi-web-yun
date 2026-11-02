@@ -16,6 +16,8 @@ export function getReasoningSteps(available?: string[] | null, mapping?: Record<
 
 interface Props {
   options: ModelSelectorOption[];
+  allOptions?: ModelSelectorOption[] | null;
+  onShowAll?: () => void;
   model?: ModelValue | null;
   isAutoModelSelection?: boolean;
   onModelChange?: (provider: string, modelId: string) => void;
@@ -32,7 +34,7 @@ interface Props {
   onSetDefaultThinkingLevel?: (level: ExplicitLevel) => void;
 }
 
-export function ComposerModelControl({ options, model, isAutoModelSelection, onModelChange,
+export function ComposerModelControl({ options, allOptions, onShowAll, model, isAutoModelSelection, onModelChange,
   defaultModel, onSetDefaultModel, isStreaming, modelSwitching, thinkingLevel,
   isAutoThinkingSelection, availableThinkingLevels, thinkingLevelMap, onThinkingLevelChange,
   savedDefaultThinkingLevel, onSetDefaultThinkingLevel }: Props) {
@@ -53,7 +55,8 @@ export function ComposerModelControl({ options, model, isAutoModelSelection, onM
     return mapped != null && mapped !== level ? mapped : t(`chat.reasoningShort.${level}`);
   };
   const reasoningLabel = label(explicit ?? "auto");
-  const modelName = model ? options.find(item => item.provider === model.provider && item.modelId === model.modelId)?.name ?? model.modelId
+  const modelName = model ? (options.find(item => item.provider === model.provider && item.modelId === model.modelId)
+    ?? allOptions?.find(item => item.provider === model.provider && item.modelId === model.modelId))?.name ?? model.modelId
     : options.length ? t("chat.selectModel") : t("chat.noModels");
   const selectedIndex = explicit ? steps.indexOf(explicit) : -1;
   const sliderIndex = Math.max(0, selectedIndex);
@@ -165,7 +168,7 @@ export function ComposerModelControl({ options, model, isAutoModelSelection, onM
         </button>}
       </div>
       {onModelChange && <div ref={modelRef} className="model-reasoning-model">
-        <ModelSelector options={options} value={model} variant="field" placement="auto" ariaLabel={t("chat.selectModel")}
+        <ModelSelector options={options} allOptions={allOptions} onShowAll={onShowAll} value={model} variant="field" placement="auto" ariaLabel={t("chat.selectModel")}
           isAutoSelection={isAutoModelSelection} disabled={isStreaming} busy={modelSwitching}
           onChange={(provider, modelId) => { onModelChange(provider, modelId); focusModel(); }}
           onReselect={(provider, modelId) => { onModelChange(provider, modelId); focusModel(); }}
