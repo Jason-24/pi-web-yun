@@ -9,6 +9,10 @@ import { PetLivingPortrait } from "./PetLivingPortrait";
 import type { PortraitPose as Pose } from "./PetPortraitMotion";
 import { petChatActivity } from "@/lib/pet-chat-activity";
 import { createPetReplyPicker } from "@/lib/pet-replies";
+import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
+import type { SessionInfo } from "@/lib/types";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { usePetPlacement } from "@/hooks/usePetPlacement";
 
 const VISIBLE_KEY = "pi-yun-pet-visible";
 const POSITION_KEY = "pi-yun-pet-pos";
@@ -42,19 +46,34 @@ function storePreference(key: string, value: string) {
   try { window.localStorage.setItem(key, value); } catch { /* Private browsing still works. */ }
 }
 
-export function PetWidget() {
+export interface PetWidgetProps {
+  sessions: readonly SessionInfo[];
+  onSelectSession(session: SessionInfo): void;
+}
+
+export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
-  const [small, setSmall] = useState(false);
+  const mobile = useIsMobile();
+  const [smallPreference, setSmallPreference] = useState<boolean | null>(null);
+  const small = smallPreference ?? mobile;
   const [background, setBackground] = useState<{ running: string[]; waiting: string[] }>({ running: [], waiting: [] });
   const activity = useSyncExternalStore(petChatActivity.subscribe, petChatActivity.getSnapshot, petChatActivity.getServerSnapshot);
-  const backgroundMood: Mood = background.waiting.some((id) => id !== activity.sessionId) ? "waiting"
-    : background.running.some((id) => id !== activity.sessionId) ? "busy" : "idle";
-  const mood: Mood = activity.phase === "waiting" ? "waiting" : activity.phase !== "idle" ? "busy" : backgroundMood;
+  // Live state owns the selected chat; stale polls must never re-add its old wait.
+  const waitingIds = [...new Set([
+    ...(activity.phase === "waiting" && activity.sessionId ? [activity.sessionId] : []),
+    ...background.waiting.filter((id) => id !== activity.sessionId).sort(),
+  ])];
+  const waitingSessionId = waitingIds[0] ?? null;
+  const workingSessionId = activity.phase !== "idle" ? activity.sessionId
+    : background.running.find((id) => id !== activity.sessionId) ?? null;
+  const mood: Mood = waitingSessionId ? "waiting" : activity.phase !== "idle"
+    || background.running.some((id) => id !== activity.sessionId) ? "busy" : "idle";
   const [resting, setResting] = useState(false);
   const [action, setAction] = useState<Pose | null>(null);
   const [greeting, setGreeting] = useState("");
+  const [greetingSessionId, setGreetingSessionId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reaction, setReaction] = useState(0);
@@ -67,16 +86,20 @@ export function PetWidget() {
   const suppressClickRef = useRef(false);
   const previousMoodRef = useRef<Mood>("idle");
   const previousPhaseRef = useRef(activity.phase);
+  const previousOwnerRef = useRef(activity.owner);
+  const previousSessionRef = useRef(activity.sessionId);
   const previousResultRef = useRef<number | undefined>(undefined);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const replyPickerRef = useRef<ReturnType<typeof createPetReplyPicker> | null>(null);
+  const placement = usePetPlacement(petRef, { visible, preferred: position, small, frozen: dragging || menuOpen, dragging });
 
-  const speak = useCallback((key: string, pose?: Pose) => {
+  const speak = useCallback((key: string, pose?: Pose, sessionId: string | null = null) => {
     clearTimeout(bubbleTimerRef.current);
     replyPickerRef.current ??= createPetReplyPicker();
     const line = t(replyPickerRef.current(key));
     setGreeting(line);
+    setGreetingSessionId(sessionId);
     // Longer lines get enough reading time in Chinese as well as English.
     bubbleTimerRef.current = setTimeout(() => setGreeting(""), Math.min(8000, Math.max(4500, Array.from(line).length * 130)));
     if (pose) {
@@ -89,32 +112,12 @@ export function PetWidget() {
   useEffect(() => {
     try {
       setVisible(localStorage.getItem(VISIBLE_KEY) === "1");
-      setSmall(localStorage.getItem(SMALL_KEY) === "1");
+      const savedSize = localStorage.getItem(SMALL_KEY);
+      if (savedSize === "1" || savedSize === "0") setSmallPreference(savedSize === "1");
       const stored = JSON.parse(localStorage.getItem(POSITION_KEY) || "null") as Position | null;
       if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) setPosition(stored);
     } catch { /* Ignore unavailable storage or malformed coordinates. */ }
   }, []);
-
-  // The body portal escapes sidebar clipping; clamp after restoring, resizing or changing size.
-  useEffect(() => {
-    if (!visible || !petRef.current) return;
-    const keepInView = () => {
-      const rect = petRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setPosition((current) => {
-        const x = Math.max(8, Math.min(current?.x ?? rect.left, window.innerWidth - rect.width - 8));
-        const y = Math.max(8, Math.min(current?.y ?? rect.top, window.innerHeight - rect.height - 8));
-        if (current?.x === x && current?.y === y) return current;
-        storePreference(POSITION_KEY, JSON.stringify({ x, y }));
-        return { x, y };
-      });
-    };
-    keepInView();
-    window.addEventListener("resize", keepInView);
-    const observer = new ResizeObserver(keepInView);
-    observer.observe(petRef.current);
-    return () => { observer.disconnect(); window.removeEventListener("resize", keepInView); };
-  }, [visible, small]);
 
   // Waiting sessions are also running: awaiting input must take precedence.
   // Closing the companion aborts its request; background tabs do not poll.
@@ -146,26 +149,31 @@ export function PetWidget() {
   // The selected chat updates immediately on send; the poll only supplies other sessions.
   useEffect(() => {
     if (!visible) { previousResultRef.current = activity.result?.sequence; return; }
-    const changed = mood !== previousMoodRef.current || activity.phase !== previousPhaseRef.current;
-    if (changed) {
-      if (mood !== "idle") {
-        setResting(false); clearTimeout(actionTimerRef.current); setAction(null);
-        const key = mood === "waiting" ? "pet.attention" : activity.phase === "replying" ? "pet.replying"
-          : activity.phase === "working" ? "pet.working" : activity.phase === "sending" ? "pet.received" : "pet.greetRun";
-        speak(key, mood === "waiting" ? "wave" : "thinking");
-      } else if (!activity.result) {
-        clearTimeout(actionTimerRef.current); setAction(null); speak("pet.backToYou");
-      }
+    const contextChanged = activity.owner !== previousOwnerRef.current || activity.sessionId !== previousSessionRef.current;
+    const changed = mood !== previousMoodRef.current || activity.phase !== previousPhaseRef.current || contextChanged;
+    if (changed && mood !== "idle") {
+      setResting(false); clearTimeout(actionTimerRef.current); setAction(null);
+    }
+    const started = activity.phase !== "idle" && activity.phase !== "waiting"
+      && (previousPhaseRef.current === "idle" || contextChanged);
+    // Speak once at the start, never on reply/tool switches or after confirmation.
+    if (!waitingSessionId && (started || (mood === "busy" && previousMoodRef.current === "idle"))) {
+      speak(activity.phase === "sending" ? "pet.received" : "pet.greetRun", undefined, workingSessionId);
+    } else if (waitingSessionId || (previousMoodRef.current === "waiting" && mood !== "waiting")) {
+      clearTimeout(bubbleTimerRef.current); setGreeting(""); setGreetingSessionId(null);
     }
     previousMoodRef.current = mood; previousPhaseRef.current = activity.phase;
+    previousOwnerRef.current = activity.owner; previousSessionRef.current = activity.sessionId;
     if (activity.phase === "idle" && activity.result && activity.result.sequence !== previousResultRef.current) {
       previousResultRef.current = activity.result.sequence;
       setResting(false);
       const kind = activity.result.kind;
-      speak(kind === "complete" ? "pet.greetDone" : kind === "stopped" ? "pet.stopped" : "pet.failed", kind === "complete" ? "cheer" : "wave");
-      if (kind === "complete") setHop((value) => value + 1);
+      if (!waitingSessionId) {
+        setHop(0);
+        speak(kind === "complete" ? "pet.greetDone" : kind === "stopped" ? "pet.stopped" : "pet.failed", kind === "complete" ? "happy" : "wave", activity.sessionId);
+      }
     }
-  }, [visible, mood, activity.phase, activity.result, speak]);
+  }, [visible, mood, waitingSessionId, workingSessionId, activity.owner, activity.sessionId, activity.phase, activity.result, speak]);
 
   useEffect(() => {
     if (!visible) {
@@ -200,7 +208,7 @@ export function PetWidget() {
     };
     place(); window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [visible, menuOpen, position, small]);
+  }, [visible, menuOpen, placement.position, small]);
 
   const wake = () => {
     setResting(false);
@@ -250,6 +258,10 @@ export function PetWidget() {
   const asleep = mood === "idle" && resting;
   const pose: Pose = asleep ? "sleep" : action ?? (mood === "busy" ? "thinking" : mood === "waiting" ? "wave" : "idle");
   const status = asleep ? "sleeping" : mood;
+  const bubbleSessionId = waitingSessionId ?? greetingSessionId;
+  const bubbleSession = sessions.find((session) => session.id === bubbleSessionId);
+  const sessionLabel = bubbleSession?.name?.trim() || bubbleSession?.firstMessage?.trim()
+    || t("pet.unnamedSession", { id: bubbleSessionId?.slice(0, 8) ?? "" });
 
   return <>
     <button ref={toggleRef} type="button" className="workbench-view-button" data-workspace-action="pet" onClick={() => {
@@ -259,10 +271,18 @@ export function PetWidget() {
       <Icon name="paw" /><span className="workbench-settings-label">{t("pet.title")}</span>
     </button>
     {visible && createPortal(
-      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide}
-        style={position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined}>
+      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging}
+        style={placement.position ? { left: placement.position.x, top: placement.position.y, right: "auto", bottom: "auto" } : undefined}>
         <div className={styles.speech} role="status" aria-live="polite" aria-atomic="true">
-          {greeting && <div key={greeting} className={styles.bubble}>{greeting}</div>}
+          {(waitingSessionId || greeting) && <div key={waitingSessionId ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : "transient"}>
+            <span>{waitingSessionId ? t("pet.attention") : greeting}</span>
+            {waitingIds.length > 1 && <span className={styles.waitingCount}>{t("pet.moreWaiting", { count: waitingIds.length - 1 })}</span>}
+            {bubbleSessionId && <a className={styles.sessionLink} href={sessionDeepLink(bubbleSessionId)} title={sessionLabel}
+              onClick={(event) => {
+                if (!bubbleSession || !isPlainActivation(event)) return;
+                event.preventDefault(); setMenuOpen(false); onSelectSession(bubbleSession);
+              }}><span>{sessionLabel}</span><span aria-hidden="true"> →</span><span className={styles.linkHint}>{t("pet.viewSession")}</span></a>}
+          </div>}
         </div>
         <button type="button" className={styles.character} aria-label={t("pet.interact")} title={t("pet.hint")}
           onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={(event) => finishDrag(event)}
@@ -306,7 +326,7 @@ export function PetWidget() {
             }}><Icon name="moon" />{t(asleep ? "pet.wake" : "pet.rest")}</button>
           </div>
           <div className={styles.actionFooter}>
-            <button type="button" onClick={() => { setSmall(!small); storePreference(SMALL_KEY, small ? "0" : "1"); }}><Icon name="size" />{t(small ? "pet.enlarge" : "pet.shrink")}</button>
+            <button type="button" onClick={() => { setSmallPreference(!small); storePreference(SMALL_KEY, small ? "0" : "1"); }}><Icon name="size" />{t(small ? "pet.enlarge" : "pet.shrink")}</button>
             <button type="button" onClick={hide}><Icon name="close" />{t("pet.hide")}</button>
           </div>
         </div>}

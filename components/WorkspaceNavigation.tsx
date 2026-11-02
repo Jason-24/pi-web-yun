@@ -3,7 +3,7 @@
 import type { ReactNode, Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { AgentsIcon } from "./SidebarIcons";
-import { PetWidget } from "./PetWidget";
+import { PetWidget, type PetWidgetProps } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
 
 export type WorkspacePanel = "archive" | "history" | "system" | "tools" | "agents" | "branches" | "session" | "debug";
@@ -47,6 +47,8 @@ function ViewIcon({ view }: { view: WorkspaceView }) {
 }
 
 interface Props {
+  petSessions: PetWidgetProps["sessions"];
+  onPetSelectSession: PetWidgetProps["onSelectSession"];
   activeView: WorkspaceView;
   conversationAvailable: boolean;
   inspectionAvailable: boolean;
@@ -59,14 +61,14 @@ interface Props {
   onNavigate(view: WorkspaceView): void;
 }
 
-export function WorkspaceNavigation({ activeView, conversationAvailable, inspectionAvailable, sessionAvailable, mobile, covered = false, homeButtonRef, onHomeHover, onHomeLeave, onNavigate }: Props) {
+export function WorkspaceNavigation({ petSessions, onPetSelectSession, activeView, conversationAvailable, inspectionAvailable, sessionAvailable, mobile, covered = false, homeButtonRef, onHomeHover, onHomeLeave, onNavigate }: Props) {
   const { t } = useI18n();
   const items: (WorkspaceView | "pet" | "update")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
     : ["home", "chat", "history", "system", "tools", "agents", "branches", "update", "pet", "settings"];
   return <nav className={`workbench-settings-navigation${mobile ? " is-mobile" : ""}`} aria-label={t("navigation.workspace")} inert={covered}>
     {items.map((view) => {
       if (view === "update") return <AppUpdateButton key="update" mobile={mobile} />;
-      if (view === "pet") return <PetWidget key="pet" />;
+      if (view === "pet") return <PetWidget key="pet" sessions={petSessions} onSelectSession={onPetSelectSession} />;
       const disabled = view === "chat" ? !conversationAvailable : view === "system" || view === "tools" ? !inspectionAvailable
         : view === "history" || view === "agents" || view === "branches" ? !sessionAvailable : false;
       const label = t(WORKSPACE_VIEW_LABELS[view]);

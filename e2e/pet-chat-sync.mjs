@@ -39,6 +39,7 @@ await context.route((url) => url.pathname.startsWith("/api/agent/") || url.pathn
     sessionId: sid, filePath: session.path, totalActiveMs: 0, tree: [], leafId: null,
     context: { messages: [], entryIds: [], oldestEntryId: null, hasMore: false, turnsBefore: 0, thinkingLevel: "off", model },
   } });
+  if (path.endsWith("/lease")) return route.fulfill({ json: { running, awaitingInput: false, subagentsActive: false } });
   if (route.request().method() === "POST") {
     const command = route.request().postDataJSON(); commands.push(command);
     if (command.type === "prompt" && rejectPrompt) return route.fulfill({ status: 400, json: { error: "Fixture rejection", code: "prompt_rejected", accepted: false } });
@@ -71,17 +72,35 @@ try {
   await page.getByRole("button", { name: "休息一下", exact: true }).click();
   assert.equal(await pet.getAttribute("data-status"), "sleeping");
   await send("验证消息同步");
+  const openingLine = await pet.getByRole("status").innerText();
   emit({ type: "agent_start" }); emit({ type: "message_start", message: reply });
-  await phase("replying"); assert.match(await pet.innerText(), /正在回复/);
+  await phase("replying"); assert.equal(await pet.getByRole("status").innerText(), openingLine);
   emit({ type: "tool_execution_start", toolCallId: "fixture-tool", toolName: "read", args: {} });
-  await phase("working"); assert.match(await pet.innerText(), /正在处理/);
+  await phase("working"); assert.equal(await pet.getByRole("status").innerText(), openingLine);
   emit({ type: "extension_ui_request", id: "fixture-confirm", method: "confirm", title: "Fixture confirmation", message: "Continue?" });
   await phase("waiting"); assert.equal(await pet.getAttribute("data-status"), "waiting");
+  await pet.locator('[data-pet-notice="waiting"]').waitFor();
+  await page.waitForTimeout(8500);
+  assert.match(await pet.getByRole("status").innerText(), /等你确认/);
+  // Interactions cannot replace a persistent confirmation notice.
+  await pet.getByRole("button", { name: "与小云互动", exact: true }).click();
+  assert.match(await pet.getByRole("status").innerText(), /等你确认/);
+  // Opening the current chat keeps its live stream mounted.
+  const streamCount = streams.size;
+  const samePage = await page.evaluate(() => performance.timeOrigin);
+  await pet.getByRole("link", { name: /Companion sync fixture/ }).click();
+  assert.equal(await page.evaluate(() => performance.timeOrigin), samePage);
+  assert.equal(streams.size, streamCount);
   emit({ type: "extension_ui_closed", id: "fixture-confirm" });
   await phase("working");
+  assert.equal(await pet.locator('[data-pet-notice="waiting"]').count(), 0);
+  assert.equal(await pet.getByRole("status").innerText(), "", "Resuming after confirmation stays quiet");
   running = false; emit({ type: "agent_end" }); emit({ type: "prompt_done" }); emit({ type: "agent_settled" });
   await phase("idle");
-  assert.match(await pet.innerText(), /任务完成/); assert.equal(await pet.getAttribute("data-pose"), "cheer");
+  assert.match(await pet.innerText(), /这轮|这一轮/); assert.doesNotMatch(await pet.innerText(), /任务完成/);
+  assert.equal(await pet.getAttribute("data-pose"), "happy");
+  assert.equal(await pet.locator("[data-living]").evaluate((el) => el.getAnimations().length), 0, "A finished turn gets a smile without a celebration hop");
+  assert.equal(await pet.getByRole("link", { name: /Companion sync fixture/ }).getAttribute("href"), `?session=${sid}`);
   // A second complete run is short enough to fit between two background polls.
   await send("验证停止状态");
   running = false; emit({ type: "agent_end" }); emit({ type: "prompt_done", aborted: true }); emit({ type: "agent_settled", aborted: true });
@@ -99,7 +118,7 @@ try {
   assert.doesNotMatch(await pet.innerText(), /任务完成/);
   assert.equal(commands.filter((command) => command.type === "prompt").length, 4);
   assert.deepEqual(errors, []);
-  console.log("PASS: actual composer send → SSE reply/tools/confirmation → complete, stopped and rejected; polling remains stale throughout");
+  console.log("PASS: quiet reply/tool transitions, persistent actionable confirmation, in-place navigation, complete/stopped/error results with stale polling");
 } finally {
   await browser.close(); for (const stream of streams) stream.end();
   server.closeAllConnections(); await new Promise((resolve) => server.close(resolve));

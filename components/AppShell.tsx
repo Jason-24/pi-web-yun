@@ -1685,6 +1685,7 @@ export function AppShell() {
   };
 
   const settingsNavigation = <WorkspaceNavigation activeView={currentView}
+    petSessions={sessionsWithSelection} onPetSelectSession={handleSelectSession}
     conversationAvailable={Boolean(selectedSession || effectiveNewSessionCwd)} inspectionAvailable={showChat} sessionAvailable={Boolean(selectedSession)} mobile={isMobile}
     homeButtonRef={sidebarHomeRef} onHomeHover={sidebarPeek.show} onHomeLeave={sidebarPeek.scheduleHide} onNavigate={navigateWorkspace} />;
 
