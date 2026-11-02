@@ -38,14 +38,16 @@ export function HomeView({ sessions, runningSessionIds, cwd, onSelectSession, on
           <p>{t("home.description")}</p>
         </div>
         <div className="home-actions">
-          <button type="button" className="home-new-task" onClick={onNewSession}>
-            <ComposeIcon size={20} />
-            <span><strong>{t("home.newTask")}</strong><small title={cwd ?? undefined}>{cwd ? getFileName(cwd) || cwd : t("home.chooseProject")}</small></span>
-            <span className="home-action-arrow" aria-hidden="true">↗</span>
+          <button type="button" className="home-new-task" aria-describedby="home-project-context" onClick={onNewSession}>
+            <ComposeIcon size={16} /><span>{t("home.newTask")}</span>
           </button>
           <button type="button" className="home-open-project" onClick={onOpenProject}>
-            <FolderIcon size={18} /><span>{t("home.openProject")}</span>
+            <FolderIcon size={16} /><span>{t("home.openProject")}</span>
           </button>
+          <span id="home-project-context" className="home-project-context" title={cwd ?? undefined}>
+            {cwd && <FolderIcon size={14} />}
+            <span>{cwd ? getFileName(cwd) || cwd : t("home.chooseProject")}</span>
+          </span>
         </div>
         <section className="home-recent" aria-labelledby="home-recent-title">
           <h2 id="home-recent-title">{t("home.recentTasks")}</h2>

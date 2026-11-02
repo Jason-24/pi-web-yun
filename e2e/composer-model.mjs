@@ -83,8 +83,10 @@ try {
   assert.deepEqual(await tools.evaluate(el => [getComputedStyle(el).borderWidth, getComputedStyle(el).backgroundColor]), ["0px", "rgba(0, 0, 0, 0)"]);
   await page.locator(".chat-composer-card").screenshot({ path: resolve(artifacts, "composer-footer.png") });
   const agents = page.locator('[data-workspace-view="agents"]');
-  assert.equal(await agents.locator("svg circle").count(), 1, "the Agents control uses the shared group outline");
-  assert.equal(await agents.evaluate(el => getComputedStyle(el).color), await page.locator('[data-workspace-view="tools"]').evaluate(el => getComputedStyle(el).color), "rail icons use the same theme color");
+  assert.equal(await agents.locator("svg rect").count(), 3, "the Agents control shows the shared delegation icon");
+  for (const view of ["tools", "history"]) {
+    assert.equal(await agents.evaluate(el => getComputedStyle(el).color), await page.locator(`[data-workspace-view="${view}"]`).evaluate(el => getComputedStyle(el).color), "rail icons use the same theme color");
+  }
   await agents.screenshot({ path: resolve(artifacts, "agents-icon.png") });
   await trigger.click();
   await card.waitFor();
