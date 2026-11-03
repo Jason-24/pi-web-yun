@@ -16,6 +16,9 @@ import { usePetPlacement } from "@/hooks/usePetPlacement";
 import { usePetActivity } from "@/hooks/usePetActivity";
 import { usePetPreferences } from "@/hooks/usePetPreferences";
 import { PetPreferencesControls } from "./PetPreferencesControls";
+import { usePetCare } from "@/hooks/usePetCare";
+import { PetCareControls } from "./PetCareControls";
+import { PetCareNotice } from "./PetCareNotice";
 
 const VISIBLE_KEY = "pi-yun-pet-visible";
 const POSITION_KEY = "pi-yun-pet-pos";
@@ -81,7 +84,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const [greetingKey, setGreetingKey] = useState("");
   const [greetingSessionId, setGreetingSessionId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuTab, setMenuTab] = useState<"actions" | "notices" | "preferences">("actions");
+  const [menuTab, setMenuTab] = useState<"actions" | "notices" | "preferences" | "care">("actions");
   const [dragging, setDragging] = useState(false);
   const [reaction, setReaction] = useState(0);
   const [hop, setHop] = useState(0);
@@ -102,12 +105,14 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const replyPickerRef = useRef<ReturnType<typeof createPetReplyPicker> | null>(null);
   const automaticGreetingRef = useRef(false);
   const placement = usePetPlacement(petRef, { visible, preferred: position, small, frozen: dragging || menuOpen, dragging });
+  const care = usePetCare(visible, menuOpen || dragging || resting || !!waitingSessionId
+    || (greetingKey === "pet.failed" && !!greeting) || results.some((result) => result.kind === "error"));
 
   const speak = useCallback((key: string, pose?: Pose, sessionId: string | null = null, automatic = false) => {
     clearTimeout(bubbleTimerRef.current);
     replyPickerRef.current ??= createPetReplyPicker();
     automaticGreetingRef.current = automatic && key !== "pet.failed";
-    const line = automaticGreetingRef.current && preferences.quiet ? "" : t(replyPickerRef.current(key), { name: petName });
+    const line = automaticGreetingRef.current && (preferences.quiet || care.focusing) ? "" : t(replyPickerRef.current(key), { name: petName });
     setGreeting(line);
     setGreetingKey(key);
     setGreetingSessionId(sessionId);
@@ -118,13 +123,13 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       setAction(pose);
       actionTimerRef.current = setTimeout(() => setAction(null), 2800);
     }
-  }, [t, petName, preferences.quiet]);
+  }, [t, petName, preferences.quiet, care.focusing]);
 
   useEffect(() => {
-    if (preferences.quiet && automaticGreetingRef.current) {
+    if ((preferences.quiet || care.focusing) && automaticGreetingRef.current) {
       clearTimeout(bubbleTimerRef.current); setGreeting(""); setGreetingSessionId(null);
     }
-  }, [preferences.quiet]);
+  }, [preferences.quiet, care.focusing]);
 
   useEffect(() => {
     try {
@@ -194,7 +199,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     if (!visible || !menuOpen) return;
     const place = () => {
       const rect = petRef.current?.getBoundingClientRect();
-      setMenuSide(rect && rect.left >= 240 ? "left" : rect && window.innerWidth - rect.right >= 240 ? "right" : "inside");
+      setMenuSide(rect && rect.left >= 304 ? "left" : rect && window.innerWidth - rect.right >= 304 ? "right" : "inside");
     };
     place(); window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
@@ -206,16 +211,20 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     const fit = () => {
       const viewport = window.visualViewport;
       const top = (viewport?.offsetTop ?? 0) + 8;
+      const left = (viewport?.offsetLeft ?? 0) + 8;
+      const right = (viewport?.offsetLeft ?? 0) + (viewport?.width ?? innerWidth) - 8;
       const bottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight) - 8;
       menu.style.maxHeight = `${Math.max(80, bottom - top)}px`;
       menu.style.removeProperty("translate");
       const rect = menu.getBoundingClientRect();
-      menu.style.translate = `0 ${Math.max(top - rect.top, Math.min(0, bottom - rect.bottom))}px`;
+      menu.style.translate = `${Math.max(left - rect.left, Math.min(0, right - rect.right))}px ${Math.max(top - rect.top, Math.min(0, bottom - rect.bottom))}px`;
     };
     fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(menu);
     window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit);
-    return () => { window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
-  }, [visible, menuOpen, menuTab, menuSide, petName, results.length, waitingIds.length, placement.position]);
+    return () => { observer.disconnect(); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
+  }, [visible, menuOpen, menuTab, menuSide, petName, results.length, waitingIds.length, placement.position, care.state.focus.phase]);
 
   const wake = () => {
     setResting(false);
@@ -263,15 +272,16 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   };
 
   const asleep = mood === "idle" && resting;
-  const pose: Pose = asleep ? "sleep" : action ?? (mood === "busy" ? "thinking" : mood === "waiting" ? "wave" : "idle");
+  const pose: Pose = asleep ? "sleep" : action ?? (care.notice ? care.notice.focusDone ? "happy" : "wave" : mood === "busy" ? "thinking" : mood === "waiting" ? "wave" : "idle");
   const status = asleep ? "sleeping" : mood;
   const pending = [
     ...waitingIds.map((sessionId) => ({ sessionId, kind: "waiting" as const })),
     ...results.filter((result) => !waitingIds.includes(result.sessionId)),
   ];
   const resultNotice = results.find((result) => result.kind === "error") ?? (preferences.quiet ? undefined : results[0]);
-  const bubbleResult = waitingSessionId || (greeting && greetingKey === "pet.failed") ? undefined : resultNotice;
-  const bubbleSessionId = waitingSessionId ?? bubbleResult?.sessionId ?? greetingSessionId;
+  const careNotice = care.notice;
+  const bubbleResult = waitingSessionId || careNotice || (greeting && greetingKey === "pet.failed") ? undefined : resultNotice;
+  const bubbleSessionId = careNotice ? null : waitingSessionId ?? bubbleResult?.sessionId ?? greetingSessionId;
   const bubbleSession = sessions.find((session) => session.id === bubbleSessionId);
   const sessionLabel = bubbleSession?.name?.trim() || bubbleSession?.firstMessage?.trim()
     || t("pet.unnamedSession", { id: bubbleSessionId?.slice(0, 8) ?? "" });
@@ -294,11 +304,11 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       <Icon name="paw" /><span className="workbench-settings-label">{t("pet.title")}</span>
     </button>
     {visible && createPortal(
-      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging}
+      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging} data-pet-focusing={care.focusing}
         style={placement.position ? { left: placement.position.x, top: placement.position.y, right: "auto", bottom: "auto" } : undefined}>
         <div className={styles.speech} role="status" aria-live="polite" aria-atomic="true">
-          {(waitingSessionId || bubbleResult || greeting) && <div key={waitingSessionId ?? bubbleResult?.id ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : bubbleResult ? "result" : "transient"}>
-            <span>{waitingSessionId ? t("pet.attention") : bubbleResult ? t(`pet.background.${bubbleResult.kind}`) : greeting}</span>
+          {(waitingSessionId || bubbleResult || careNotice || greeting) && <div key={waitingSessionId ?? bubbleResult?.id ?? careNotice?.id ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : bubbleResult ? "result" : careNotice ? "care" : "transient"}>
+            {careNotice ? <PetCareNotice notice={careNotice} onRespond={care.respond} /> : <span>{waitingSessionId ? t("pet.attention") : bubbleResult ? t(`pet.background.${bubbleResult.kind}`) : greeting}</span>}
             {waitingIds.length > 1 && <span className={styles.waitingCount}>{t("pet.moreWaiting", { count: waitingIds.length - 1 })}</span>}
             {(pending.length > 1 || bubbleResult) && <button type="button" className={styles.noticeCount} onClick={() => { setMenuTab("notices"); setMenuOpen(true); }} aria-controls="pet-actions" aria-expanded={menuOpen && menuTab === "notices"}>{t("pet.noticesCount", { count: pending.length })}</button>}
             {bubbleSessionId && <a className={styles.sessionLink} href={sessionDeepLink(bubbleSessionId)} title={sessionLabel}
@@ -323,21 +333,20 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
           }}>
           <span className={styles.ground} aria-hidden="true" />
           <PetLivingPortrait pose={pose} dragging={dragging} hop={hop} />
-          {asleep && <span className={styles.zzz} aria-hidden="true">z <span>z</span> Z</span>}
           {reaction > 0 && <span key={reaction} className={styles.hearts} aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} style={{ "--i": item } as CSSProperties}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 3.5 12.7C-2 7.3 5.8-.5 11.2 4.9l.8.8.8-.8C18.2-.5 26 7.3 20.5 12.7Z" /></svg></span>)}</span>}
         </button>
         <button ref={menuButtonRef} type="button" className={styles.more} aria-label={t("pet.actions")} title={t("pet.actions")}
             aria-expanded={menuOpen} aria-controls="pet-actions" onClick={() => {
               const rect = petRef.current?.getBoundingClientRect();
-              setMenuSide(rect && rect.left >= 240 ? "left" : rect && window.innerWidth - rect.right >= 240 ? "right" : "inside");
+              setMenuSide(rect && rect.left >= 304 ? "left" : rect && window.innerWidth - rect.right >= 304 ? "right" : "inside");
               setMenuOpen((value) => !value);
             }}><Icon name="more" />{pending.length > 0 && <span className={styles.badge} aria-hidden="true">{pending.length}</span>}</button>
         {menuOpen && <div ref={menuRef} id="pet-actions" className={styles.actions} role="group" aria-label={t("pet.actions")}>
-          <div className={styles.actionHeading}><div>{t("pet.menuTitle", { name: petName })}<span>{t("pet.menuHint")}</span></div>
+          <div className={styles.actionHeading}><div>{t("pet.menuTitle", { name: petName })}{menuTab === "actions" && <span>{t("pet.menuHint")}</span>}</div>
             <button type="button" aria-label={t("pet.closeActions")} onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}><Icon name="close" /></button>
           </div>
           <div className={styles.menuTabs} role="group" aria-label={t("pet.menuSections")}>
-            {(["actions", "notices", "preferences"] as const).map((tab) => <button key={tab} type="button" aria-pressed={menuTab === tab} onClick={() => setMenuTab(tab)}>{t(`pet.tab.${tab}`)}{tab === "notices" && pending.length > 0 ? ` (${pending.length})` : ""}</button>)}
+            {(["actions", "notices", "care", "preferences"] as const).map((tab) => <button key={tab} type="button" aria-pressed={menuTab === tab} onClick={() => setMenuTab(tab)}>{t(`pet.tab.${tab}`)}{tab === "notices" && pending.length > 0 ? ` (${pending.length})` : ""}</button>)}
           </div>
           {menuTab === "notices" && <div className={styles.notices}>
             {pending.length === 0 && <p>{t("pet.noNotices")}</p>}
@@ -347,6 +356,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
             </div>)}
           </div>}
           {menuTab === "preferences" && <PetPreferencesControls preferences={preferences} defaultName={t("pet.name")} onChange={updatePreferences} />}
+          {menuTab === "care" && <PetCareControls state={care.state} configure={care.configure} startFocus={care.startFocus} controlFocus={care.controlFocus} />}
           {menuTab === "actions" && <div className={styles.actionGrid}>
             <button type="button" onClick={() => interact("wave")}><Icon name="wave" />{t("pet.hello")}</button>
             <button type="button" onClick={() => interact("happy")}><span className={styles.patIcon}><Icon name="heart" /></span>{t("pet.pat")}</button>

@@ -60,6 +60,8 @@ try {
   await page.locator("body").click({ position: { x: 700, y: 10 } });
   await page.mouse.move(0, 0);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".workbench-settings-navigation.is-mobile").waitFor({ state: "attached" });
+  await pet.waitFor();
   await opacity("1");
   const petBox = await pet.boundingBox(), controlBox = await actions.boundingBox();
   assert.ok(controlBox.x >= petBox.x && controlBox.x + controlBox.width <= petBox.x + petBox.width, "Actions stay within the clamped footprint");
