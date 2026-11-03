@@ -24,6 +24,8 @@ const { wireChildProcessLifecycle } = require("./process-lifecycle");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { rotatePreviewSecrets, getRotationWarning } = require("./rotate-preview-secrets");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+const { verifyNextBuild } = require("./verify-next-build");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { openWhenServing } = require("./browser-opener");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createRunRecordTracker, getOpenUrl, getRunDir } = require("./run-records");
@@ -98,8 +100,15 @@ function startServer({ port, hostname, openBrowser }) {
     process.exit(1);
   }
 
-  // Replace the published preview-mode secrets with fresh random values so the
-  // previewModeId baked into the npm tarball cannot be used to skip the proxy
+  try {
+    verifyNextBuild(pkgDir);
+  } catch (error) {
+    console.error(`[pi-web] ${error.message}`);
+    process.exit(1);
+  }
+
+  // Replace the published preview-mode secrets in either Next.js manifest
+  // layout so the previewModeId baked into the tarball cannot skip the proxy
   // (via the x-prerender-revalidate header). Must happen before `next start`.
   const rotation = rotatePreviewSecrets(nextDir);
   if (!rotation.ok) {

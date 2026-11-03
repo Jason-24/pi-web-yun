@@ -1,7 +1,8 @@
 "use strict";
 
-// The published npm tarball ships `.next/prerender-manifest.json`, whose
-// `preview` block holds the build's preview-mode secrets. One of them,
+// The published npm tarball ships the build's preview-mode secrets in
+// `.next/server/preview-props.json` (Next 16.4+) and/or the `preview` block
+// of `.next/prerender-manifest.json`. One of them,
 // `previewModeId`, is the value Next compares against the `x-prerender-revalidate`
 // request header: when they match, Next treats the request as an on-demand
 // revalidation and skips middleware/proxy entirely (see next-server.js
@@ -9,7 +10,7 @@
 // attacker who reads the tarball can send that header and bypass `proxy.ts` —
 // the central password gate and the Host/Origin/Fetch-Metadata checks.
 //
-// `next start` reads these secrets only from this file (there is no runtime env
+// `next start` reads these secrets from these files (there is no runtime env
 // override) and never regenerates them, so we rewrite the three preview secrets
 // with fresh random values before launching Next. That makes the published
 // values useless and unique per launch. Done at startup rather than in a
@@ -24,6 +25,7 @@ const fs = require("fs");
 const path = require("path");
 
 const PRERENDER_MANIFEST = "prerender-manifest.json";
+const PREVIEW_PROPS = path.join("server", "preview-props.json");
 
 function freshPreviewSecrets() {
   return {
@@ -35,8 +37,8 @@ function freshPreviewSecrets() {
 }
 
 /**
- * Rewrite the preview-mode secrets in `.next/prerender-manifest.json` with fresh
- * random values. Never throws: returns a status the caller can surface so a
+ * Rewrite the preview-mode secrets in either Next.js manifest layout with the
+ * same fresh random values. Never throws: returns a status the caller can surface so a
  * read-only install (where the rewrite cannot happen) is visible rather than a
  * silent bypass.
  *
@@ -44,37 +46,50 @@ function freshPreviewSecrets() {
  * @returns {{ ok: boolean, reason?: string, error?: Error }}
  */
 function rotatePreviewSecrets(nextDir) {
-  const manifestPath = path.join(nextDir, PRERENDER_MANIFEST);
-
-  let manifest;
-  try {
-    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  } catch (error) {
-    if (error && error.code === "ENOENT") {
-      return { ok: false, reason: "missing" };
+  const targets = [];
+  for (const file of [PREVIEW_PROPS, PRERENDER_MANIFEST]) {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(nextDir, file), "utf8"));
+    } catch (error) {
+      if (error && error.code === "ENOENT") continue;
+      return { ok: false, reason: "unreadable", error };
     }
-    return { ok: false, reason: "unreadable", error };
+    const isSeparate = file === PREVIEW_PROPS;
+    // Newer prerender manifests can omit preview entirely; the separate file
+    // remains authoritative. Never fall back from a malformed separate file.
+    if (!isSeparate && manifest && typeof manifest === "object"
+      && !Array.isArray(manifest) && !("preview" in manifest) && targets.length) continue;
+    const preview = isSeparate ? manifest : manifest?.preview;
+    if (!preview || typeof preview !== "object" || Array.isArray(preview)
+      || !["previewModeId", "previewModeSigningKey", "previewModeEncryptionKey"]
+        .every((key) => typeof preview[key] === "string")) {
+      return { ok: false, reason: "unexpected-shape" };
+    }
+    targets.push({ file, manifest, isSeparate });
   }
-
-  if (!manifest || typeof manifest !== "object" || typeof manifest.preview !== "object") {
-    return { ok: false, reason: "unexpected-shape" };
-  }
-
-  manifest.preview = { ...manifest.preview, ...freshPreviewSecrets() };
+  if (!targets.length) return { ok: false, reason: "missing" };
+  const secrets = freshPreviewSecrets();
 
   // Write to a sibling temp file and rename so a concurrent `next start` never
   // reads a half-written manifest.
-  const tempPath = path.join(nextDir, `${PRERENDER_MANIFEST}.${process.pid}.tmp`);
-  try {
-    fs.writeFileSync(tempPath, JSON.stringify(manifest));
-    fs.renameSync(tempPath, manifestPath);
-  } catch (error) {
+  for (const { file, manifest, isSeparate } of targets) {
+    const updated = isSeparate
+      ? { ...manifest, ...secrets }
+      : { ...manifest, preview: { ...manifest.preview, ...secrets } };
+    const manifestPath = path.join(nextDir, file);
+    const tempPath = `${manifestPath}.${process.pid}.tmp`;
     try {
-      fs.rmSync(tempPath, { force: true });
-    } catch {
-      // Best effort: leaving a stray temp file is harmless.
+      fs.writeFileSync(tempPath, JSON.stringify(updated));
+      fs.renameSync(tempPath, manifestPath);
+    } catch (error) {
+      try {
+        fs.rmSync(tempPath, { force: true });
+      } catch {
+        // Best effort: leaving a stray temp file is harmless.
+      }
+      return { ok: false, reason: "unwritable", error };
     }
-    return { ok: false, reason: "unwritable", error };
   }
 
   return { ok: true };
@@ -85,13 +100,13 @@ function getRotationWarning(reason) {
     reason === "unwritable"
       ? "the install directory is not writable"
       : reason === "missing"
-        ? "its prerender manifest is missing"
+        ? "its preview manifests are missing"
         : reason === "unreadable"
-          ? "its prerender manifest could not be read"
-          : "its prerender manifest has an unexpected format";
+          ? "a preview manifest could not be read"
+          : "a preview manifest has an unexpected format";
   return [
     `Warning: could not rotate pi-web's preview-mode secrets because ${detail}.`,
-    "This instance keeps the published preview id, so a client that knows it can",
+    "This instance may keep the published preview id, so a client that knows it can",
     "bypass the proxy's authentication and Host/Origin checks via the",
     "x-prerender-revalidate header. Run from a writable install, or restrict",
     "network access to this instance.",
@@ -100,6 +115,7 @@ function getRotationWarning(reason) {
 
 module.exports = {
   PRERENDER_MANIFEST,
+  PREVIEW_PROPS,
   rotatePreviewSecrets,
   getRotationWarning,
 };

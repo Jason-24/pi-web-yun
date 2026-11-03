@@ -5,6 +5,16 @@
 > release` command. The imported publish workflow runs only in `agegr/pi-web`;
 > pushing a fork tag does not publish through upstream's npm identity.
 
+For a local `pi-yun` release, use a clean release checkout and run
+`npm run release`. It first runs `npm ci` so the build uses the exact dependency
+versions in package-lock.json, then bumps the version, builds and publishes.
+The `prebuild` check refuses an installed Next.js
+version different from package.json; `prepack` refuses stale framework/app
+versions or missing startup artifacts, including Next 16.4's
+`.next/server/preview-props.json`. Do not build over a running development
+checkout. An already published package with this mismatch needs a rebuilt,
+new version; reinstalling the same broken tarball cannot repair its output.
+
 Upstream publishes three artifacts for each release:
 
 - npm package: `@agegr/pi-web`, published by GitHub Actions (`.github/workflows/publish.yml`) when a `v*` tag is pushed
