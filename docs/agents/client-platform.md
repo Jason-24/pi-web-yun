@@ -1,5 +1,8 @@
 # Mobile and browser behavior
 
+## Bundled fonts (`app/layout.tsx`, `app/fonts.css`, `public/fonts/noto-sans-mono/`)
+- Noto Sans Mono is bundled as seven variable WOFF2 subsets from Fontsource 5.3.0, with its OFL license in the public folder. The layout imports local CSS and preloads Latin/Cyrillic; the CSS retains `--font-noto-mono`, weights 100–900, Unicode ranges and the previous fallback metrics. Do not restore `next/font/google`: it fetches font CSS/files during builds and fails with `ECONNREFUSED` when Google Fonts is unreachable. Release verification must work without font-response mocks or a prior font cache.
+
 ## Mobile software keyboard (`hooks/useViewportHeight.ts`)
 - While an editor has focus and the visual viewport is more than `KEYBOARD_MIN_HEIGHT_PX` (60px) shorter than `innerHeight / scale`, the hook writes `visualViewport.height` to `--app-viewport-height`; smaller shrinks are Safari toolbars. Always compare against that zoom-corrected height, or iOS auto-zoom and pinch zoom leave the composer behind the keyboard.
 - WebKit settles the shrunken height only after the keyboard animation, often without another `resize` (bugs.webkit.org 265578), and an IME candidate bar resizes the keyboard with no viewport event at all. So every trigger, composition/input/keyup events on a focused editor included, starts one non-restarting chain of re-reads (`SETTLE_DELAYS_MS`). Reading once per event keeps the full-screen height, and `scrollTo(0, 0)` then fights the page scrolling to the caret: a jittering composer.
