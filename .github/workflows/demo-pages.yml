@@ -1,22 +1,10 @@
 name: Demo
 
 # Builds the static Pi Web demo in demo/ and publishes it to GitHub Pages.
-# main deploys it when the demo or package.json changes: a release bumps the
-# version the demo reports, so each release redeploys it. (The github-pages
-# environment accepts main only, so a release tag cannot deploy it.) Pull
-# requests that touch the demo only build it.
+# This fork does not host the upstream demo. Run it manually from main only
+# after enabling Settings > Pages > Source: GitHub Actions.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "demo/**"
-      - "package.json"
-      - ".github/workflows/demo-pages.yml"
-  pull_request:
-    paths:
-      - "demo/**"
-      - ".github/workflows/demo-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,7 +12,7 @@ permissions:
 
 concurrency:
   group: demo-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -41,7 +29,6 @@ jobs:
           cache: npm
           cache-dependency-path: demo/package-lock.json
       - id: pages
-        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run lint
@@ -49,13 +36,11 @@ jobs:
         env:
           # "/<repo>" for a project site, empty for a custom domain.
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-      - if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: demo/out
 
   deploy:
-    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

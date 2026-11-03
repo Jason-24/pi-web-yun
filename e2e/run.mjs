@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { appendFileSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -29,7 +29,8 @@ assert.ok(mode === "dev" || mode === "start", "E2E_SERVER_MODE must be dev or st
 assert.ok(mode !== "dev" || !existsSync(join(root, ".next/dev/lock")), "Use a checkout without an active dev server");
 const artifacts = join(root, "test-results/e2e");
 mkdirSync(artifacts, { recursive: true });
-const agentDir = mkdtempSync(join(tmpdir(), "pi-web-e2e-"));
+// Git expands Windows 8.3 paths; use the same canonical spelling in fixtures.
+const agentDir = realpathSync.native(mkdtempSync(join(tmpdir(), "pi-web-e2e-")));
 const project = join(agentDir, "project");
 const sessionDir = join(agentDir, "sessions", "e2e");
 mkdirSync(project);
@@ -163,7 +164,7 @@ try {
   const base = `http://127.0.0.1:${port}`;
   server = spawn(process.execPath, [join(root, "node_modules/next/dist/bin/next"), mode, "-H", "127.0.0.1", "-p", String(port)], {
     cwd: root,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_WEB_PASSWORD: "", NEXT_TELEMETRY_DISABLED: "1" },
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_WEB_PASSWORD: "", PI_WEB_SKIP_VERSION_CHECK: "1", NEXT_TELEMETRY_DISABLED: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.once("error", (error) => { serverError = error; });
@@ -509,10 +510,12 @@ try {
         await page.waitForTimeout(200);
       }
       await hideSidebar.waitFor({ state: "visible" });
-      // The files sit below the sessions on a desktop; Settings › General ›
-      // File browser brings the tabs back, and goes back.
+      // Below the dock breakpoint, the compatibility preference still switches
+      // the inline explorer between below and tab layouts.
+      await page.setViewportSize({ width: 1199, height: viewport.height });
       await checkFilesPlacement(page);
-      console.log("PASS: files below the sessions by default, tabs from Settings and back");
+      await page.setViewportSize(viewport);
+      console.log("PASS: inline file browser placement preserves the explorer and search");
       await checkModelDiscovery(page);
     }
     await checkModelContext(page);

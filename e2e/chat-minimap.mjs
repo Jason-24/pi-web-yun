@@ -39,8 +39,9 @@ export async function checkChatMinimap({ browser, base, artifacts }) {
     if (path === "/api/web-auth") return reply({ enabled: false });
     if (path === `/api/sessions/${session.id}/context`) return reply({ context: chatContext });
     if (path === `/api/sessions/${session.id}`) return reply({ sessionId: session.id, info: session, context: chatContext, filePath: "", tree: [], leafId: "entry-23", totalActiveMs: 0 });
+    if (path === `/api/agent/${session.id}/lease`) return reply({ running: false, awaitingInput: false, subagentsActive: false });
     if (path.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: 'data: {"type":"connected","isStreaming":false}\n\n' });
-    if (path.startsWith("/api/agent/") && request.method() === "POST") {
+    if (path === `/api/agent/${session.id}` && request.method() === "POST") {
       commands.push(request.postDataJSON().type);
       return reply({ success: true, data: {} });
     }

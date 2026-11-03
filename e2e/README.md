@@ -15,6 +15,9 @@ shares `.next/dev/lock` within a checkout. All fixtures are created before
 startup in a temporary `PI_CODING_AGENT_DIR` and removed on completion.
 No model credentials or existing Pi sessions are needed. Git is required for
 the linked-worktree fixture.
+The fixture server sets `PI_WEB_SKIP_VERSION_CHECK=1` so routine navigation
+does not depend on npm availability. Update behavior has its own isolated
+coverage in `app-update.mjs` and the update route's unit tests.
 
 CI runs lint, type checking, and unit tests in one job. A separate job builds
 the application in a clean checkout and runs the same browser tests with
@@ -35,16 +38,19 @@ Coverage:
 - Interface/chat and monospace font lists and weights apply live, survive
   refresh, sync between tabs and reset independently without changing width or
   font size. Headings and Markdown emphasis retain their weights.
-- On a desktop the sidebar shows the files below the sessions; Settings ›
-  General › File browser brings back the Sessions | Files tabs and returns,
-  without remounting the file tree (its file search keeps its query).
+- At desktop widths the explorer opens in the right file dock, including when
+  opening a file automatically collapses its directory. Below 1200px the compatibility
+  placement preference switches the inline explorer between below and tab
+  layouts without remounting its tree or clearing its file search.
+- Settings checks use the embedded workspace region, desktop navigation and
+  phone section/detail navigation, rather than the former modal dialog.
 - Unknown sessions and paths outside the fixture project are rejected.
 - Sidebar sessions open in browser tabs (`session-navigation.mjs`, desktop
   Chromium, one context so tabs share storage): a plain click and Enter
   select in place without a page load; Ctrl+click, middle-click and the row
   menu's Open in new tab (right-click, ⋯, T; just before Delete) open the clicked row's session in
   a new tab while the original keeps its own; both tabs keep their session
-  through reloads; pinned and archived rows link the same way; nothing
+  through reloads; pinned sidebar rows and rows in the archive workspace link the same way; nothing
   creates, copies or prompts a session; a missing session's link selects none
   in a fresh profile; a keyboard Fork puts focus on the copy row's link.
 - Project groups offer Open in new tab (`project-navigation.mjs`, desktop

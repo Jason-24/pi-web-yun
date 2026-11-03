@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import { showSidebarFiles } from "./sidebar.mjs";
 
 export async function checkWorkspaceViews({ browser, base, artifacts }) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
@@ -306,6 +307,8 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await filePanel.getByRole("tab", { name: "打开文件", exact: true }).waitFor();
     await directory.getByText("example.ts", { exact: true }).click();
     await preview.getByText("export const layout", { exact: false }).waitFor();
+    // Opening the first file may collapse the directory to reserve reading space.
+    await showSidebarFiles(page);
     const assertFileOrder = async () => {
       await page.waitForFunction(() => document.querySelector(".workbench-file-preview").getBoundingClientRect().width >= 275);
       await directory.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {}))));
@@ -338,8 +341,8 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await assertFileOrder();
     assert.equal(await directory.evaluate(el => el.inert), false, "expanded reading keeps the directory available beside the file");
     assert.equal(await input.isVisible(), false, "expanded reading fills the content area");
-    await page.locator(".workspace-context-tab").click();
-    assert.equal(await input.isVisible(), true, "the top context entry restores the conversation");
+    await view("chat").click();
+    assert.equal(await input.isVisible(), true, "the conversation navigation restores the conversation");
     assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
     await filePanel.getByRole("tab", { name: "example.ts", exact: true }).click();
     assert.equal(await preview.isVisible(), true);

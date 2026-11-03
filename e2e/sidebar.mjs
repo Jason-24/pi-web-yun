@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
 
 /*
- * The sidebar's sessions and files in either layout: on a desktop the files
- * sit below the sessions by default (both in view; the files section may be
- * folded to its header row), phones and the legacy saved "tab" preference
- * show one tab at a time. Both panels keep their ids in both.
+ * Desktop files live in the right dock. Below 1200px the inline explorer uses
+ * the below or tab preference; phones show one tab at a time. The explorer
+ * keeps the same panel id in every placement.
  */
 
-/** Shows the explorer: the Files tab, or the files section opened. */
+/** Opens the desktop directory, the Files tab, or the inline files section. */
 export async function showSidebarFiles(page) {
+  if (page.viewportSize().width >= 1200) {
+    const toggle = page.locator(".workspace-files-toggle").filter({ visible: true }).first();
+    await toggle.waitFor();
+    if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+    await page.locator("#file-panel.right-panel-open").waitFor();
+    const directory = page.locator("#file-panel .file-tree-toggle");
+    if (await directory.isVisible() && await directory.getAttribute("aria-expanded") !== "true") await directory.click();
+    await page.waitForFunction(() => document.querySelector("#workbench-file-tree")?.getBoundingClientRect().width > 100);
+    await page.locator("#workbench-file-tree #session-sidebar-panel-files").waitFor();
+    return;
+  }
   const files = page.locator("#session-sidebar-panel-files");
   const tab = page.getByRole("tab", { name: "Files", exact: true });
   const toggle = files.locator(".sidebar-files-section-toggle");

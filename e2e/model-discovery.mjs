@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { closeSettings, openSettings } from "./settings.mjs";
 
 // The UI must preserve omitted protocols so discovery can resolve them through
 // pi's catalogue. These routes isolate the panel from credentials and upstreams.
@@ -25,9 +26,7 @@ export async function checkModelDiscovery(page) {
     } });
   });
   try {
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    const settings = page.getByRole("dialog", { name: "Settings", exact: true });
-    await settings.getByRole("button", { name: "Models", exact: true }).click();
+    const settings = await openSettings(page, "Models");
     const modelRows = settings.locator(".models-sidebar-indented-item");
     await modelRows.filter({ hasText: /^claude-existing$/ }).waitFor(); // a model without a name is listed by its id
     assert.equal(await modelRows.filter({ hasText: /^Relay Existing$/ }).count(), 1, "A model is listed by its models.json name");
@@ -55,7 +54,7 @@ export async function checkModelDiscovery(page) {
     await saveResponse;
     assert.equal(saved.providers.anthropic.api, undefined, "Visiting a provider must not persist a guessed protocol");
     assert.equal(saved.providers.relay.api, "openai-responses");
-    await settings.getByRole("button", { name: "Close", exact: true }).click();
+    await closeSettings(page);
     console.log("PASS: discovery preserves catalog protocols and explicit overrides without changing them on Save");
   } finally {
     await page.unroute(configRoute);

@@ -44,12 +44,7 @@ document.documentElement.dataset.largeStorage = JSON.stringify({
 export async function checkFilePanel(page, filePath) {
   const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
   if (await showSidebar.isVisible()) await showSidebar.click();
-  if (page.viewportSize().width >= 1200) {
-    const files = page.locator(".workspace-files-toggle").filter({ visible: true }).first();
-    if (await files.getAttribute("aria-expanded") !== "true") await files.click();
-  } else {
-    await showSidebarFiles(page);
-  }
+  await showSidebarFiles(page);
   // The DOM title normalizes Windows paths to forward slashes
   // (lib/file-paths.ts normalizeFilePathSlashes), so match in that form.
   await page.getByTitle(filePath.replace(/\\/g, "/"), { exact: true }).click();
@@ -101,7 +96,7 @@ export async function checkFilePanel(page, filePath) {
       assert.equal(Math.round(expandedWidth), Math.round((await page.locator(".workspace-main").boundingBox()).width));
       assert.equal(await page.locator("#session-sidebar").evaluate(el => el.inert), false);
       assert.equal(await page.locator("#workspace-conversation-content").evaluate(el => el.inert), true);
-      await page.locator(".workspace-context-tab").click();
+      await page.locator('[data-workspace-view="chat"]').filter({ visible: true }).click();
       assert.equal(await page.locator("#workspace-conversation-content").evaluate(el => el.inert), false);
       await panel.getByRole("tab", { name: filePath.split(/[\\/]/).pop(), exact: true }).click();
       assert.equal(await frame.evaluate(() => window.previewInstance), instance);
@@ -128,12 +123,14 @@ export async function checkLargeHtmlStorage(page, filePath) {
   const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
   if (await showSidebar.isVisible()) await showSidebar.click();
   await showSidebarFiles(page);
-  const download = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return url.pathname.endsWith("/large-storage.html") && url.searchParams.get("type") === "download";
-  });
-  await page.getByTitle(filePath.replace(/\\/g, "/"), { exact: true }).click();
-  assert.equal((await download).status(), 200);
+  const [download] = await Promise.all([
+    page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith("/large-storage.html") && url.searchParams.get("type") === "download";
+    }),
+    page.getByTitle(filePath.replace(/\\/g, "/"), { exact: true }).click(),
+  ]);
+  assert.equal(download.status(), 200);
   const panel = page.locator("#file-panel");
   const iframe = panel.locator('iframe[sandbox="allow-scripts"]');
   await iframe.waitFor();

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { closeSettings, openSettings } from "./settings.mjs";
 
 /** Starts and ends in General settings, with both font overrides reset. */
 export async function checkFontPreferences(page) {
@@ -10,11 +11,6 @@ export async function checkFontPreferences(page) {
   const resetUi = page.getByRole("button", { name: "Reset interface font", exact: true });
   const resetMono = page.getByRole("button", { name: "Reset monospace font", exact: true });
   const font = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).fontFamily);
-  const openSettings = async () => {
-    const sidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
-    if (await sidebar.isVisible()) await sidebar.click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-  };
   assert.equal(await ui.inputValue(), "");
   assert.equal(await mono.inputValue(), "");
   assert.equal(await uiWeight.inputValue(), "400");
@@ -46,7 +42,7 @@ export async function checkFontPreferences(page) {
   assert.match(await font(".markdown-code-block code"), /^monospace,/);
   assert.equal(await weight(".markdown-user-message"), "500");
   assert.equal(await weight(".markdown-code-block code"), "600");
-  await openSettings();
+  await openSettings(page);
   assert.equal(await ui.inputValue(), "Times New Roman, serif");
   assert.equal(await mono.inputValue(), "monospace");
   assert.equal(await uiWeight.inputValue(), "500");
@@ -79,17 +75,21 @@ export async function checkFontPreferences(page) {
   await resetUi.click();
 
   // Changing font metrics must refit a draft without requiring another keystroke.
-  await page.keyboard.press("Escape");
+  await closeSettings(page);
   const textarea = page.locator(".chat-input-textarea");
-  await textarea.fill("iiii llll mmmm wwww sample text ".repeat(12));
-  await openSettings();
+  await textarea.fill("iiii llll ".repeat(60));
+  await openSettings(page);
   await ui.fill("serif");
+  await closeSettings(page);
   const serifHeight = await textarea.evaluate((el) => el.clientHeight);
+  await openSettings(page);
   await ui.fill("monospace");
+  await closeSettings(page);
   await page.waitForFunction((oldHeight) => {
     const input = document.querySelector(".chat-input-textarea");
     return input.clientHeight !== oldHeight && (input.scrollHeight <= input.clientHeight + 1 || input.clientHeight >= 199);
   }, serifHeight);
+  await openSettings(page);
   await resetUi.click();
 
   assert.deepEqual(await page.evaluate(() => ({

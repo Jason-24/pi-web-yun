@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { checkFontPreferences } from "./font-preferences.mjs";
+import { closeSettings, openSettings } from "./settings.mjs";
 
 export async function checkChatAppearanceReset(page) {
   const width = page.getByRole("slider", { name: "Chat content width", exact: true });
@@ -23,9 +24,7 @@ export async function checkChatAppearanceReset(page) {
     appliedFontSize: document.documentElement.style.getPropertyValue("--chat-content-font-size"),
   })), { width: "820", fontSize: "14", appliedWidth: "820px", appliedFontSize: "14px" });
   await page.reload({ waitUntil: "networkidle" });
-  const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
-  if (await showSidebar.isVisible()) await showSidebar.click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   assert.equal(await width.inputValue(), "820");
   assert.equal(await fontSize.inputValue(), "14");
   assert.equal(await resetWidth.isDisabled(), true);
@@ -35,8 +34,6 @@ export async function checkChatAppearanceReset(page) {
 export async function checkChatAppearance(page) {
   await page.setViewportSize({ width: 2560, height: 1100 });
   const textarea = page.locator(".chat-input-textarea");
-  const openSettings = () => page.getByRole("button", { name: "Settings", exact: true }).click();
-  const closeSettings = () => page.keyboard.press("Escape");
   const width = page.getByRole("slider", { name: "Chat content width", exact: true });
   const fontSize = page.getByRole("slider", { name: "Chat & terminal font size", exact: true });
   const font = (locator) => locator.evaluate((el) => getComputedStyle(el).fontSize);
@@ -48,29 +45,29 @@ export async function checkChatAppearance(page) {
     return textarea.evaluate((el) => el.clientHeight);
   };
 
-  await openSettings();
+  await openSettings(page);
   assert.equal(await width.inputValue(), "820");
   assert.equal(await fontSize.inputValue(), "14");
   await width.press("End");
-  await closeSettings();
+  await closeSettings(page);
   const draft = "Existing drafts resize when the available width or the reading font changes. ".repeat(6);
   await textarea.fill(draft);
   const wideHeight = await fittedHeight();
-  await openSettings();
+  await openSettings(page);
   await width.press("Home");
-  await closeSettings();
+  await closeSettings(page);
   const narrowHeight = await fittedHeight();
   assert.ok(narrowHeight > wideHeight, "Narrowing must grow the draft without another keystroke");
 
-  await openSettings();
+  await openSettings(page);
   await fontSize.press("End");
-  await closeSettings();
+  await closeSettings(page);
   assert.ok(await fittedHeight() > narrowHeight, "Increasing the font must grow the draft");
-  await openSettings();
+  await openSettings(page);
   await width.press("End");
   await fontSize.press("Home");
   for (let i = 12; i < 18; i++) await fontSize.press("ArrowRight");
-  await closeSettings();
+  await closeSettings(page);
   assert.equal(await textarea.inputValue(), draft);
   assert.ok(await fittedHeight() < narrowHeight, "Widening must shrink the existing draft");
   await page.reload({ waitUntil: "networkidle" });
@@ -79,7 +76,7 @@ export async function checkChatAppearance(page) {
   assert.equal(await font(page.locator(".markdown-user-message")), "18px");
   assert.equal(await font(page.locator(".markdown-code-block pre")), "16.5px");
 
-  await openSettings();
+  await openSettings(page);
   assert.equal(await width.inputValue(), "2000");
   assert.equal(await fontSize.inputValue(), "18");
   await checkChatAppearanceReset(page);
@@ -93,7 +90,7 @@ export async function checkChatAppearance(page) {
     }), true, "Every language option must remain reachable in a short settings panel");
   }
   await fontSize.press("Home");
-  await closeSettings();
+  await closeSettings(page);
   assert.equal(await font(textarea), "16px", "Mobile inputs retain the focus-zoom minimum");
   await textarea.fill("A mobile draft wraps and resizes within the available space.");
   await fittedHeight();

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { closeSettings, openSettings } from "./settings.mjs";
 
 // Keep account credentials and upstream services outside this UI boundary.
 // The route tests separately exercise the real writer and SDK model resolution.
@@ -28,14 +29,9 @@ export async function checkModelContext(page) {
     }] }],
   } }));
   await page.route(routes[3], (route) => route.fulfill({ json: { providers: [] } }));
-  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  const settings = page.getByRole("region", { name: "Settings", exact: true });
   const open = async () => {
-    const sidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
-    if (await sidebar.isVisible()) await sidebar.click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    const section = settings.getByRole("combobox", { name: "Settings", exact: true });
-    if (await section.isVisible()) await section.selectOption("models");
-    else await settings.getByRole("button", { name: "Models", exact: true }).click();
+    await openSettings(page, "Models");
     await settings.locator(".config-sidebar-item").filter({ hasText: "OpenAI Codex" }).click();
   };
   const input = settings.getByRole("textbox", { name: "Context window for GPT-6 Astra", exact: true });
@@ -57,7 +53,7 @@ export async function checkModelContext(page) {
     await save();
     assert.equal(saved.providers["openai-codex"].modelOverrides["gpt-6-astra"].contextWindow, 500000);
     assert.deepEqual(saved.providers.relay, { models: [{ id: "keep-me" }] });
-    await settings.getByRole("button", { name: "Close", exact: true }).click();
+    await closeSettings(page);
     await open();
     assert.equal(await input.inputValue(), "500000");
     assert.equal(await settings.locator(".config-sidebar-item").filter({ hasText: /^openai-codex$/ }).count(), 0,
@@ -88,7 +84,7 @@ export async function checkModelContext(page) {
     assert.deepEqual(saved, { providers: { relay: { models: [{ id: "keep-me" }] } } });
     // The placeholder is what pi resolves, so it shows the default again once the cleared field is saved.
     await settings.locator('input[aria-label="Context window for GPT-6 Astra"][placeholder="272000"]').waitFor();
-    await settings.getByRole("button", { name: "Close", exact: true }).click();
+    await closeSettings(page);
     console.log("PASS: account context edit/save/reopen/validation/retry/clear preserve other model settings");
   } finally {
     for (const route of routes) await page.unroute(route);
