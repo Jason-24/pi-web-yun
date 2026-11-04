@@ -4,12 +4,13 @@ import { useEffect, useRef } from "react";
 import { getFileIcon } from "./FileIcons";
 import { useI18n } from "@/hooks/useI18n";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
+import { PanelToolIcon } from "./PanelTools";
 
 export interface Tab {
   id: string;
   label: string;
   filePath: string;
-  kind?: "terminal" | "agent" | "side";
+  kind?: "terminal" | "agent" | "side" | "files" | "changes" | "launcher";
   closing?: boolean;
   sourceSessionId?: string | null;
   initialDisplayMode?: FileViewerDisplayMode;
@@ -25,9 +26,10 @@ interface Props {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onOpenFiles?: () => void;
+  onOpenTools?: () => void;
 }
 
-export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles }: Props) {
+export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles, onOpenTools }: Props) {
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -107,7 +109,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
             }}
           >
             <span className="file-tab-icon">
-              {tab.kind === "terminal" ? (
+              {tab.kind === "files" || tab.kind === "changes" || tab.kind === "launcher" ? <PanelToolIcon tool={tab.kind} size={17} /> : tab.kind === "terminal" ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
                 </svg>
@@ -144,8 +146,8 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
         );
       })}
     </div>
-    {onOpenFiles && <button type="button" className="file-tab-add" onClick={onOpenFiles}
-      title={t("files.chooseFile")} aria-label={t("files.chooseFile")}>
+    {(onOpenTools || onOpenFiles) && <button type="button" className="file-tab-add" onClick={onOpenTools ?? onOpenFiles}
+      title={t(onOpenTools ? "panel.newTab" : "files.chooseFile")} aria-label={t(onOpenTools ? "panel.newTab" : "files.chooseFile")}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
     </button>}
     </div>

@@ -1,8 +1,9 @@
-// Settings shows these as swatches: System, the light row, the dark row, then a row of three:
+// Settings shows System and Breeze as full-width swatches, then the light row, dark row and a row of three:
 // the high-contrast pair and Zenburn.
 // The rows line up by hue: each light theme sits above its dark counterpart; Rose and Slate have none.
 export const THEME_OPTIONS = [
   { id: "auto", label: "settings.themeSystem", scheme: null },
+  { id: "breeze", label: "settings.themeBreeze", scheme: "light" },
   { id: "light", label: "settings.themeLight", scheme: "light" },
   { id: "mist", label: "settings.themeMist", scheme: "light" },
   { id: "lilac", label: "settings.themeLilac", scheme: "light" },

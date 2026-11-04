@@ -1048,11 +1048,11 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           // so it shows its scrollbar instead of hiding it behind the minimap (#788).
           // A stable gutter keeps the centred column from shifting when a short
           // session grows past one screen.
-          className="scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
+          className="chat-transcript-scroll scrollbar-subtle min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-gutter:stable]"
           style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+          <div className="chat-transcript-gutter" style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
+            <div className="chat-transcript-column" ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
             {(() => {
               let lastUserIdx = -1;
               for (let i = messages.length - 1; i >= 0; i--) {
@@ -1294,9 +1294,18 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               <StreamingReply store={streamingStore} onCommit={updatePromptAnchor} toolResults={toolResultsMap} modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} />
             )}
 
-            {(agentRunning || isCompacting) && !hasStreamingContent && (agentPhase || isCompacting) && (
+            {isCompacting ? (
+              <div className="chat-compaction-status" role="status" aria-live="polite" aria-atomic="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M7 3H5a2 2 0 0 0-2 2v4m14 12h2a2 2 0 0 0 2-2v-4M3 13v6a2 2 0 0 0 2 2h4M21 11V5a2 2 0 0 0-2-2h-4M8 8h8M8 12h8M8 16h5" />
+                </svg>
+                <span>{t("chat.compactingContext")}<span className="chat-compaction-hint"> · {t("chat.compactingHint")}</span>
+                  {((queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)) > 0 && <span className="chat-compaction-hint"> · {t("chat.queued", { count: (queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0) })}</span>}
+                </span>
+              </div>
+            ) : agentRunning && !hasStreamingContent && agentPhase && (
               <div className="break-words py-2 text-[13px] text-text-muted">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t, isCompacting, (queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0))}</span>
+                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
               </div>
             )}
 
@@ -1323,7 +1332,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             </div>
           </div>
         </div>
-        {isMobile || pendingScrollRestore ? null : (
+        {!isMobile && <div className="chat-minimap-gutter" style={{ order: -1, width: CHAT_MINIMAP_WIDTH, flexShrink: 0, display: "flex" }}>
+        {!pendingScrollRestore && (
           <ChatMinimap
             messages={messages}
             getStreamingMessage={getStreamingMessage}
@@ -1333,6 +1343,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             turnsBefore={earlierTurnCount}
           />
         )}
+        </div>}
         </>}
       </div>
 

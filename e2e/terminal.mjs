@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { showSidebarFiles, showSidebarSessions } from "./sidebar.mjs";
+import { showRightPanel, showSidebarFiles, showSidebarSessions } from "./sidebar.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 assert.ok(!existsSync(join(root, ".next/dev/lock")), "Run in a checkout without an active dev server");
@@ -93,7 +93,7 @@ try {
     // session rows in its sessions: one above the other on a desktop, tabs on a phone.
     const showTab = (name) => (name === "Files" ? showSidebarFiles(page) : showSidebarSessions(page));
     const filesPanel = page.locator("#session-sidebar-panel-files");
-    const showPanel = () => page.getByRole("button", { name: "Show file panel", exact: true }).click();
+    const showPanel = () => showRightPanel(page);
     const hidePanel = async () => {
       const button = page.locator("#file-panel").getByRole("button", { name: "Hide file panel", exact: true, includeHidden: true });
       if (await button.getAttribute("aria-expanded") === "true") await button.click();

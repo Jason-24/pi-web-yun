@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { ComposeIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarPeek } from "@/hooks/useSidebarPeek";
 import { ChatWindow } from "./ChatWindow";
 import { ContextUsageIndicator } from "./ContextUsageIndicator";
@@ -26,6 +26,9 @@ import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { DebugPanel, DebugPanelBoundary } from "./DebugPanel";
+import { SessionOverview } from "./SessionOverview";
+import { PanelChanges, PanelTabSwitcher, PanelToolLauncher } from "./PanelTools";
+import { PANEL_CHANGES_ID, PANEL_FILES_ID, PANEL_LAUNCHER_ID, isFileWorkspaceTab, panelToolShortcut, type PanelTool } from "@/lib/panel-tools";
 import { SessionChatPanel } from "./SessionChatPanel";
 import { SubagentViewer } from "./SubagentViewer";
 import { TerminalPanel } from "./TerminalPanel";
@@ -278,7 +281,7 @@ export function AppShell() {
   const sidebarHomeRef = useRef<HTMLButtonElement>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
-  const filePickerActive = isWorkbenchDesktop && activeFileTabId === null;
+  const filePickerActive = activeFileTabId === PANEL_FILES_ID;
   const fileWorkspaceOpen = rightPanelOpen;
   const [rightPanelExpanded, setRightPanelExpanded] = useState(false);
   const [expandedPane, setExpandedPane] = useState<"conversation" | "file">("file");
@@ -594,15 +597,6 @@ export function AppShell() {
     setMobileToolbarMoreOpen((open) => !open);
   }, []);
 
-  const handleRightPanelToggle = useCallback(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-      setActiveTopPanel(null);
-      setMobileToolbarMoreOpen(false);
-    }
-    setRightPanelOpen(!fileWorkspaceOpen);
-  }, [isMobile, fileWorkspaceOpen]);
-
   const handleRightPanelClose = useCallback(() => {
     setRightPanelOpen(false);
     topBarRef.current?.querySelector<HTMLButtonElement>(".workspace-files-toggle:not([aria-hidden='true'])")
@@ -656,7 +650,8 @@ export function AppShell() {
   // they are dropped when the project changes (they belong to its sessions).
   const [agentTabs, setAgentTabs] = useState<{ sessionId: string; label: string; side?: boolean }[]>([]);
   const panelTabs: Tab[] = [
-    ...fileTabs,
+    ...fileTabs.map(tab => tab.kind === "files" ? { ...tab, label: translate("workbench.openFile") }
+      : tab.kind === "changes" ? { ...tab, label: translate("panel.changes") } : tab),
     ...terminalTabs.map((tab) => ({
       id: tab.id,
       label: getFileName(tab.cwd) || tab.cwd,
@@ -714,7 +709,7 @@ export function AppShell() {
 
   const changeFileWorkspace = useCallback((currentKey: string | null, nextKey: string) => {
     if (currentKey === nextKey) return;
-    const activeFileId = activeFileTabId?.startsWith("file:") ? activeFileTabId : null;
+    const activeFileId = isFileWorkspaceTab(activeFileTabId) ? activeFileTabId : null;
     const next = switchFileWorkspace(fileWorkspaceStatesRef.current, currentKey, nextKey, {
       tabs: fileTabs,
       activeTabId: activeFileId,
@@ -726,7 +721,7 @@ export function AppShell() {
     // Subagent tabs belong to the previous project's sessions: dropped, not parked.
     setAgentTabs([]);
     // Terminal tabs span workspaces and keep control of the panel while active.
-    if (!activeFileTabId || activeFileId || activeFileTabId.startsWith("agent:")) {
+    if (!activeFileTabId || activeFileId || activeFileTabId === PANEL_LAUNCHER_ID || activeFileTabId.startsWith("agent:")) {
       setActiveFileTabId(next.activeTabId);
       setRightPanelOpen(next.open);
     }
@@ -1411,12 +1406,26 @@ export function AppShell() {
   }, [handleOpenSubagentTab, translate]);
 
   // The switcher's New side chat, on the main agent's row, whichever family member the main chat shows.
-  const handleNewSideChat = useCallback(async (rootSessionId: string) => {
-    const result = await createSideChat(rootSessionId, translate);
-    if ("error" in result) return result.error;
-    if (isMobile) setActiveTopPanel(null);
-    handleSideSession(result.session, null);
-    return null;
+  const sideChatCreationRef = useRef(new Map<string, Promise<string | null>>());
+  const handleNewSideChat = useCallback((rootSessionId: string, workspaceGeneration?: number): Promise<string | null> => {
+    const existing = sideChatCreationRef.current.get(rootSessionId);
+    if (existing) return existing;
+    const request = (async () => {
+      const result = await createSideChat(rootSessionId, translate);
+      if ("error" in result) return result.error;
+      if (workspaceGeneration !== undefined && workspaceGeneration !== fileWorkspaceGenerationRef.current) {
+        setRefreshKey(key => key + 1);
+        return translate("panel.workspaceChanged");
+      }
+      if (isMobile) setActiveTopPanel(null);
+      handleSideSession(result.session, null);
+      return null;
+    })();
+    sideChatCreationRef.current.set(rootSessionId, request);
+    void request.finally(() => {
+      if (sideChatCreationRef.current.get(rootSessionId) === request) sideChatCreationRef.current.delete(rootSessionId);
+    }).catch(() => {});
+    return request;
   }, [handleSideSession, isMobile, translate]);
 
   // A side chat's first prompt names it: read the name when a run in an open tab starts or ends.
@@ -1430,7 +1439,7 @@ export function AppShell() {
     const remaining = terminalTabs.filter((item) => item.id !== tab.id);
     setTerminalTabs((tabs) => tabs.flatMap((item) => item.id !== tab.id ? [item] : replacement ? [replacement] : []));
     setActiveFileTabId((current) => current !== tab.id ? current : replacement?.id ?? remaining.at(-1)?.id ?? fileTabs.at(-1)?.id ?? lastAgentTabId(agentTabs));
-    if (!isWorkbenchDesktop && !replacement && !remaining.length && !fileTabs.length && !agentTabs.length) setRightPanelOpen(false);
+    if (activeFileTabId !== PANEL_LAUNCHER_ID && !replacement && !remaining.length && !fileTabs.length && !agentTabs.length) setRightPanelOpen(false);
   };
 
   const handleCloseFileTab = useCallback((tabId: string) => {
@@ -1445,12 +1454,12 @@ export function AppShell() {
         if (cur !== tabId) return cur;
         return fileTabs.at(-1)?.id ?? terminalTabs.at(-1)?.id ?? lastAgentTabId(remainingAgents);
       });
-      if (!isWorkbenchDesktop && fileTabs.length === 0 && terminalTabs.length === 0 && remainingAgents.length === 0) setRightPanelOpen(false);
+      if (activeFileTabId !== PANEL_LAUNCHER_ID && fileTabs.length === 0 && terminalTabs.length === 0 && remainingAgents.length === 0) setRightPanelOpen(false);
       return;
     }
     setFileTabs((prev) => {
       const next = prev.filter((t) => t.id !== tabId);
-      if (!isWorkbenchDesktop && next.length === 0 && terminalTabs.length === 0 && agentTabs.length === 0) setRightPanelOpen(false);
+      if (activeFileTabId !== PANEL_LAUNCHER_ID && next.length === 0 && terminalTabs.length === 0 && agentTabs.length === 0) setRightPanelOpen(false);
       return next;
     });
     setActiveFileTabId((cur) => {
@@ -1458,7 +1467,7 @@ export function AppShell() {
       const remaining = fileTabs.filter((t) => t.id !== tabId);
       return remaining.at(-1)?.id ?? terminalTabs.at(-1)?.id ?? lastAgentTabId(agentTabs);
     });
-  }, [fileTabs, terminalTabs, agentTabs, isWorkbenchDesktop]);
+  }, [fileTabs, terminalTabs, agentTabs, activeFileTabId]);
 
   // The Agents switcher's Delete on a side chat: its tab goes with it, and the
   // main chat showing it goes back to the parent, as the Main agent row does
@@ -1626,10 +1635,63 @@ export function AppShell() {
   }, [projectTrustCwd]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
+  const panelLauncherActive = !activeFileTabId || activeFileTabId === PANEL_LAUNCHER_ID;
+  const fileTreeApplicable = filePickerActive || activeFileTab?.kind === "changes" || Boolean(activeFileTab?.filePath);
+  const effectiveFileTreeHidden = fileTreeHidden || !fileTreeApplicable;
   // Subagent work tabs: like files, only the active one is mounted.
   const activeAgentTab = agentTabs.find((tab) => `agent:${tab.sessionId}` === activeFileTabId) ?? null;
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
   const windowTitle = activeCwdName ? `${activeCwdName} - PI-YUN` : "PI-YUN";
+
+  const openPanelLauncher = useCallback(() => {
+    setExpandedPane("file"); setActiveFileTabId(PANEL_LAUNCHER_ID); setRightPanelOpen(true);
+    if (isMobile) { setSidebarOpen(false); setMobileToolbarMoreOpen(false); }
+  }, [isMobile]);
+  const selectPanelTab = useCallback((id: string) => {
+    setExpandedPane("file"); setActiveFileTabId(id); setRightPanelOpen(true);
+    if (isMobile) { setSidebarOpen(false); setMobileToolbarMoreOpen(false); }
+  }, [isMobile]);
+  const sideToolDisabled = !selectedSession || selectedSession.transient ? translate("panel.sideNeedsSession")
+    : homeOpen || isHiddenRelation(selectedSession.relation) ? translate("panel.sideNeedsMain") : null;
+  const openPanelTool = useCallback((tool: PanelTool): void | Promise<string | null> => {
+    const cwd = selectedSession?.cwd ?? effectiveNewSessionCwd ?? activeCwd;
+    if (!cwd) return;
+    if (tool === "side") {
+      if (!selectedSession || selectedSession.transient || homeOpen || isHiddenRelation(selectedSession.relation)) return;
+      const input = chatInputRef.current;
+      if (!input) return Promise.resolve(translate("panel.openFailed"));
+      // Use the main composer's actual /side handler, including its refusal,
+      // naming and onSideSession behavior. Leave the user's draft untouched.
+      setSettingsSection(null);
+      setActiveTopPanel(null);
+      setMobileToolbarMoreOpen(false);
+      if (isMobile) setSidebarOpen(false);
+      return input.openSideChat().then(result => result.handled ? result.error ?? null : translate("panel.openFailed"));
+    }
+    if (tool === "terminal") { handleOpenTerminal(cwd); return; }
+    const id = tool === "files" ? PANEL_FILES_ID : PANEL_CHANGES_ID;
+    setFileTabs(tabs => tabs.some(tab => tab.id === id) ? tabs : [...tabs, {
+      id, label: translate(tool === "files" ? "workbench.openFile" : "panel.changes"), filePath: "", kind: tool,
+    }]);
+    if (tool === "files") setFileTreeCollapsed(false);
+    selectPanelTab(id);
+  }, [selectedSession, effectiveNewSessionCwd, activeCwd, homeOpen, isMobile, handleOpenTerminal, selectPanelTab, translate]);
+
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || Array.from(document.querySelectorAll('dialog[open], [role="dialog"], [role="menu"]')).some(node => node.getClientRects().length > 0)) return;
+      const tool = panelToolShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey,
+        altKey: event.altKey, shiftKey: event.shiftKey, isComposing: event.isComposing, keyCode: event.keyCode,
+        altGraph: event.getModifierState("AltGraph") });
+      if (!tool || !(selectedSession?.cwd ?? effectiveNewSessionCwd ?? activeCwd) || (tool === "side" && sideToolDisabled)) return;
+      event.preventDefault();
+      void openPanelTool(tool);
+    };
+    // Run before xterm's input handler so its Ctrl+P / Ctrl+` do not consume
+    // workspace shortcuts. Open menus and dialogs keep their own keys.
+    window.addEventListener("keydown", keyDown, true);
+    return () => window.removeEventListener("keydown", keyDown, true);
+  }, [openPanelTool, selectedSession?.cwd, effectiveNewSessionCwd, activeCwd, sideToolDisabled]);
 
   useEffect(() => {
     const syncWindowTitle = () => {
@@ -1710,7 +1772,7 @@ export function AppShell() {
         onOpenArchive={openArchiveWorkspace}
         archiveActive={currentView === "archive"}
         onArchiveStateChange={setArchiveSnapshot}
-        fileExplorerTarget={isWorkbenchDesktop ? fileExplorerDock : null}
+        fileExplorerTarget={isWorkbenchDesktop || (filePickerActive && fileWorkspaceOpen) ? fileExplorerDock : null}
         selectedSessionId={homeOpen ? null : selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
@@ -2260,40 +2322,19 @@ export function AppShell() {
     );
   };
 
+  const renderSessionOverview = (mobile: boolean) => <SessionOverview
+    key={`${selectedSession?.id ?? "new"}:${selectedSession?.cwd ?? effectiveNewSessionCwd ?? ""}`}
+    cwd={selectedSession?.cwd ?? effectiveNewSessionCwd}
+    sessionId={selectedSession?.id ?? null} leafId={branchActiveLeafId}
+    mobile={mobile} covered={mobile && isNarrowMobile && mobileToolbarMoreOpen} refreshKey={`${refreshKey}:${explorerRefreshKey}`} terminals={terminalTabs}
+    onOpenFile={(path, diff) => handleOpenFile(path, getFileName(path), { sourceSessionId: selectedSession?.id ?? null, modeHint: diff ? "diff" : undefined })}
+    onOpenTerminal={id => { setExpandedPane("file"); setActiveFileTabId(id); setRightPanelOpen(true); if (isMobile) setSidebarOpen(false); }}
+  />;
+
   const renderMainFileToggle = (mobile: boolean) => {
     const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
-    return (
-      <button
-        type="button"
-        onClick={handleRightPanelToggle}
-        className="workspace-files-toggle"
-        disabled={covered}
-        tabIndex={covered ? -1 : undefined}
-        aria-controls="file-panel"
-        aria-expanded={fileWorkspaceOpen}
-        aria-hidden={covered ? true : undefined}
-        title={fileWorkspaceOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-        aria-label={fileWorkspaceOpen ? translate("files.hidePanel") : translate("files.showPanel")}
-        data-mobile-toolbar-file={mobile ? "true" : undefined}
-        style={{
-          marginLeft: !mobile ? "auto" : 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-          height: TOP_BAR_ICON_BUTTON_SIZE, padding: mobile ? 0 : "0 10px", gap: 6,
-          visibility: covered ? "hidden" : "visible",
-          pointerEvents: covered ? "none" : "auto",
-          background: fileWorkspaceOpen ? "var(--bg-selected)" : "none",
-          border: "none", borderRadius: 8,
-          color: fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)",
-          cursor: "pointer", flexShrink: 0, transition: "color 0.12s, background 0.12s",
-        }}
-        onMouseEnter={(event) => { if (!covered) event.currentTarget.style.color = "var(--text)"; }}
-        onMouseLeave={(event) => { event.currentTarget.style.color = fileWorkspaceOpen ? "var(--text)" : "var(--text-muted)"; }}
-      >
-        <FolderIcon size={17} open={fileWorkspaceOpen} />
-        {!mobile && <span>{translate("sidebar.tabFiles")}</span>}
-      </button>
-    );
+    return <PanelTabSwitcher tabs={panelTabs} activeId={activeFileTabId} mobile={mobile} covered={covered}
+      onSelect={selectPanelTab} onNew={openPanelLauncher} />;
   };
 
   return (
@@ -2512,6 +2553,7 @@ export function AppShell() {
               {!isNarrowMobile && currentView === "chat" && renderChatToolbarActions(true)}
               {!isNarrowMobile && currentView === "chat" && renderDebugButton(true)}
               {currentView === "chat" && renderSessionStatsButton(true)}
+              {currentView === "chat" && renderSessionOverview(true)}
               {renderMainFileToggle(true)}
               {isNarrowMobile && currentView === "chat" && mobileToolbarMoreOpen && (
                 <div
@@ -2548,6 +2590,7 @@ export function AppShell() {
             <>
               {renderProjectTrustWarning(false)}
               {currentView === "chat" && renderDebugButton(false)}
+              {currentView === "chat" && renderSessionOverview(false)}
             </>
           )}
           {!isMobile && renderMainFileToggle(false)}
@@ -2959,7 +3002,7 @@ export function AppShell() {
       <div
         ref={attachFilePanel}
         id="file-panel"
-        className={`right-panel-container${fileWorkspaceOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelReadingExpanded ? " right-panel-reading-expanded" : ""}${fileTreeHidden ? " is-tree-collapsed" : ""}${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " right-panel-resizing" : ""}`}
+        className={`right-panel-container${fileWorkspaceOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelReadingExpanded ? " right-panel-reading-expanded" : ""}${effectiveFileTreeHidden ? " is-tree-collapsed" : ""}${filePickerActive ? " is-file-picker" : ""}${rightPanelResizer.isResizing || fileTreeResizer.isResizing ? " right-panel-resizing" : ""}`}
         style={{
           "--workbench-tree-width": `${fileTreeResizer.width}px`,
           display: "flex",
@@ -2980,19 +3023,19 @@ export function AppShell() {
         }}>
           <div style={{ flex: 1, overflow: "hidden" }}>
             <TabBar
-              tabs={isWorkbenchDesktop && panelTabs.length === 0
-                ? [{ id: "file-picker", label: translate("workbench.openFile"), filePath: "" }]
-                : panelTabs}
-              activeTabId={expandedConversationVisible ? "" : activeFileTabId ?? (isWorkbenchDesktop && panelTabs.length === 0 ? "file-picker" : "")}
-              onSelectTab={(tabId) => { setActiveFileTabId(tabId === "file-picker" ? null : tabId); setExpandedPane("file"); }}
-              onCloseTab={(tabId) => { if (tabId === "file-picker") handleRightPanelClose(); else handleCloseFileTab(tabId); }}
-              onOpenFiles={isWorkbenchDesktop ? () => {
-                setExpandedPane("file");
-                setFileTreeCollapsed(false);
-              } : undefined}
+              tabs={panelLauncherActive ? [...panelTabs, { id: PANEL_LAUNCHER_ID, label: translate("panel.newTab"), filePath: "", kind: "launcher" }] : panelTabs}
+              activeTabId={expandedConversationVisible ? "" : activeFileTabId ?? PANEL_LAUNCHER_ID}
+              onSelectTab={selectPanelTab}
+              onCloseTab={tabId => {
+                if (tabId === PANEL_LAUNCHER_ID) {
+                  if (panelTabs.length) selectPanelTab(panelTabs.at(-1)!.id);
+                  else handleRightPanelClose();
+                } else handleCloseFileTab(tabId);
+              }}
+              onOpenTools={openPanelLauncher}
             />
           </div>
-          {isWorkbenchDesktop && (!filePickerActive || fileTreeHidden) && <button
+          {isWorkbenchDesktop && fileTreeApplicable && (!filePickerActive || fileTreeHidden) && <button
             ref={fileTreeToggleRef}
             type="button"
             className="file-tree-toggle"
@@ -3021,6 +3064,8 @@ export function AppShell() {
               <path d="M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6" />
             </svg>
           </button>}
+          {isMobile && panelTabs.length > 0 && <PanelTabSwitcher tabs={panelTabs} activeId={activeFileTabId}
+            mobile covered={false} onSelect={selectPanelTab} onNew={openPanelLauncher} />}
           <button
             type="button"
             onClick={handleRightPanelClose}
@@ -3046,7 +3091,12 @@ export function AppShell() {
         <div className="workbench-files-body" inert={expandedConversationVisible} aria-hidden={expandedConversationVisible || undefined}>
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
         <div className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
-          {activeFileTab?.filePath ? (
+          {panelLauncherActive ? <PanelToolLauncher key={`${selectedSession?.id ?? "new"}:${activeCwd ?? ""}`}
+            cwd={selectedSession?.cwd ?? effectiveNewSessionCwd ?? activeCwd} sideDisabled={sideToolDisabled}
+            onOpen={openPanelTool} />
+          : activeFileTab?.kind === "changes" && activeCwd ? <PanelChanges cwd={activeCwd} refreshKey={explorerRefreshKey}
+            onOpenFile={path => handleOpenFile(path, getFileName(path), { modeHint: "diff", sourceSessionId: selectedSession?.id })} />
+          : activeFileTab?.filePath ? (
             <FileViewer
               key={`${fileWorkspaceGeneration}:${activeFileTab.id}:${activeFileTab.viewerRevision ?? 0}`}
               filePath={activeFileTab.filePath}
@@ -3120,7 +3170,7 @@ export function AppShell() {
             />
           )}
         </div>
-        <div className="workbench-tree-boundary" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined}>
+        <div className="workbench-tree-boundary" inert={effectiveFileTreeHidden} aria-hidden={effectiveFileTreeHidden || undefined}>
           <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
           {!filePickerActive && <button type="button" className="workbench-tree-collapse" onClick={toggleFileTree}
             aria-controls="workbench-file-tree" aria-expanded={!fileTreeHidden}
@@ -3128,8 +3178,8 @@ export function AppShell() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </button>}
         </div>
-        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={fileTreeHidden} aria-hidden={fileTreeHidden || undefined} />
-        {isWorkbenchDesktop && fileTreeHidden && <button ref={fileTreeRestoreRef}
+        <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={effectiveFileTreeHidden} aria-hidden={effectiveFileTreeHidden || undefined} />
+        {isWorkbenchDesktop && fileTreeApplicable && fileTreeHidden && <button ref={fileTreeRestoreRef}
           type="button" className="workbench-tree-restore" onClick={toggleFileTree}
           aria-label={translate("files.showDirectory")} title={translate("files.showDirectory")}
           aria-controls="workbench-file-tree" aria-expanded={false} />}

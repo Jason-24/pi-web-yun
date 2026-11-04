@@ -1,0 +1,36 @@
+.trigger { display: flex; align-items: center; justify-content: center; flex: 0 0 34px; width: 34px; height: 34px; margin: 0 3px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.trigger:hover, .trigger[aria-expanded="true"] { background: var(--bg-selected); color: var(--text); }
+.trigger:focus-visible, .panel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.trigger:disabled { opacity: .4; cursor: default; }
+.panel { position: fixed; inset: auto; margin: 0; padding: 0; box-sizing: border-box; overflow: auto; max-width: calc(100vw - 16px); border: 1px solid var(--border); border-radius: 18px; background: var(--bg); color: var(--text); box-shadow: 0 6px 28px rgb(0 0 0 / .12); }
+.panel::backdrop { background: transparent; }
+.card { padding: 18px; }
+.header { display: flex; align-items: center; gap: 4px; }
+.header > div { flex: 1; min-width: 0; }
+.header h2 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.header span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted); }
+.icon { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+.icon:hover { background: var(--bg-hover); color: var(--text); }
+.section { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 15px; }
+.heading { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 8px; }
+.heading h3 { margin: 0; color: var(--text); font-size: 13px; font-weight: 550; }
+.section p, .heading > small { margin: 6px 0; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.section .hint { font-size: 11px; margin: -2px 0 10px; }
+.counts { display: flex; gap: 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.counts > :first-child { color: color-mix(in srgb, #16a34a 78%, var(--text)); }
+.counts > :last-child { color: color-mix(in srgb, #dc2626 78%, var(--text)); }
+.panel .row { display: flex; width: 100%; align-items: center; gap: 10px; box-sizing: border-box; padding: 9px 7px; border: 0; border-radius: 8px; text-align: left; background: transparent; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.panel .row:hover { background: var(--bg-hover); }
+.row > :first-child { flex-shrink: 0; }
+.row > span:last-of-type { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row small { display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 10px; }
+.row > small { flex: none; margin: 0; }
+.row img { object-fit: cover; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel); }
+.more { margin-top: 7px; padding: 6px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.more:hover { background: var(--bg-hover); color: var(--text); }
+.panel[data-sheet] { max-width: none; border-radius: 20px 20px 0 0; box-shadow: 0 -8px 32px rgb(0 0 0 / .14); }
+.panel[data-sheet]::backdrop { background: rgb(0 0 0 / .22); }
+.panel[data-sheet] .card { padding: 20px 18px max(20px, env(safe-area-inset-bottom)); }
+.panel[data-sheet] .row { min-height: 44px; font-size: 13px; }
+.panel[data-sheet] .icon { width: 36px; height: 36px; }
+@media (max-width: 640px) { .trigger { height: 40px; flex-basis: 36px; width: 36px; margin: 0; } }

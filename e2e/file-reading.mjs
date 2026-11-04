@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { showRightPanel, showSidebarFiles } from "./sidebar.mjs";
 
 const base = process.env.E2E_BASE_URL || "http://127.0.0.1:30141";
 const artifacts = resolve("test-results/file-reading");
@@ -77,7 +78,7 @@ try {
   await page.goto(`${base}/?session=${session.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
   await page.locator(".workspace-chat-view textarea").first().waitFor({ timeout: 90000 });
   assert.equal(await page.locator(".file-panel-header").isVisible(), false, "closed resources leave no header controls above chat");
-  await page.locator(".workspace-files-toggle").filter({ visible: true }).first().click();
+  await showSidebarFiles(page);
   const panel = page.locator("#file-panel");
   const tree = panel.locator("#workbench-file-tree");
   const openFile = async name => {
@@ -98,7 +99,7 @@ try {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator(".workspace-chat-view textarea").first().waitFor({ timeout: 90000 });
-  await page.locator(".workspace-files-toggle").filter({ visible: true }).first().click();
+  await showSidebarFiles(page);
   await opener.waitFor();
   assert.equal(await opener.getAttribute("aria-selected"), "true");
   assert.equal(await panel.locator(".workbench-file-empty").isVisible(), true, "the empty picker keeps a visible preview placeholder");
@@ -143,7 +144,7 @@ try {
   await page.emulateMedia({ colorScheme: "light" });
   await opener.getByRole("button").click();
   await panel.locator(".file-panel-header").waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
+  await showSidebarFiles(page);
   await opener.waitFor();
   await tree.getByTitle(`${cwd}/reading.txt`, { exact: true }).click();
   const content = panel.locator(".file-viewer-content");
@@ -166,6 +167,11 @@ try {
   await panelSeparator.press("ArrowRight");
   await page.waitForFunction(left => Math.abs(document.querySelector(".file-panel-header").getBoundingClientRect().left - left) < 1, tabsBox.x);
   await content.evaluate(el => { el.dataset.instance = "same"; el.scrollTop = 200; });
+  const firstVisibleLine = () => content.evaluate(el => {
+    const top = el.getBoundingClientRect().top;
+    return [...el.querySelectorAll(".file-source-line")].find(line => line.getBoundingClientRect().bottom > top + 1)?.getAttribute("data-line-number");
+  });
+  const anchorLine = await firstVisibleLine();
   const originalWidth = (await panel.locator(".workbench-file-preview").boundingBox()).width;
   const treeWidth = (await tree.boundingBox()).width;
   await dragTreeClosed();
@@ -173,7 +179,9 @@ try {
   assert.ok((await panel.locator(".workbench-file-preview").boundingBox()).width > originalWidth + 150);
   assert.equal(await tree.evaluate(el => el.inert), true);
   assert.equal(await content.getAttribute("data-instance"), "same");
-  assert.equal(await content.evaluate(el => el.scrollTop), 200);
+  // Native scroll anchoring may choose the adjacent partly visible line when
+  // a source line changes from wrapped to unwrapped; a raw pixel offset is not stable.
+  assert.ok(Math.abs(Number(await firstVisibleLine()) - Number(anchorLine)) <= 1, "changing the wrap width keeps the reading anchor within one line");
   await content.focus();
   await page.keyboard.press("Control+f");
   const search = panel.getByRole("searchbox", { name: "查找文件内容…" });
@@ -192,10 +200,10 @@ try {
   await page.screenshot({ path: resolve(artifacts, "reading-collapsed-search.png") });
   await search.press("Escape");
   await panel.getByRole("search").waitFor({ state: "detached" });
-  const beforeRestore = await content.evaluate(el => el.scrollTop);
+  const beforeRestore = await firstVisibleLine();
   await panel.locator(".file-tree-toggle").click();
   await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, treeWidth);
-  assert.equal(await content.evaluate(el => el.scrollTop), beforeRestore);
+  assert.ok(Math.abs(Number(await firstVisibleLine()) - Number(beforeRestore)) <= 1);
   assert.equal(await content.getAttribute("data-instance"), "same");
   const chatInput = page.locator(".workspace-chat-view textarea").first();
   await chatInput.fill("放大文件时保留这条未发送草稿");
@@ -234,10 +242,10 @@ try {
   await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
   await assertFileFocused();
   await panel.locator(".file-tree-toggle").click();
-  await panel.getByRole("button", { name: "选择文件", exact: true }).click();
+  await panel.locator(".file-tree-toggle").click();
   await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
   await assertFileFocused();
-  assert.equal(await content.evaluate(el => el.scrollTop), beforeRestore, "directory controls preserve the reading position");
+  assert.ok(Math.abs(Number(await firstVisibleLine()) - Number(beforeRestore)) <= 1, "directory controls preserve the reading position");
   const contextTab = page.locator(".workspace-context-tab");
   const readingTab = panel.getByRole("tab", { name: "reading.txt", exact: true });
   const focusedScrollTop = await content.evaluate(el => el.scrollTop);
@@ -363,7 +371,8 @@ try {
   await longTab.press("ArrowLeft");
   assert.equal(await panel.getByRole("tab", { name: "many.txt", exact: true }).getAttribute("aria-selected"), "true");
   await panel.locator(".file-tree-toggle").click();
-  await panel.getByRole("button", { name: "选择文件", exact: true }).click();
+  await panel.locator(".file-tab-add").click();
+  await panel.locator('[data-panel-tool="files"]').click();
   await page.waitForFunction(() => !document.querySelector("#workbench-file-tree").inert);
   await tree.getByTitle(`${cwd}/components`, { exact: true }).click();
   await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).click();
@@ -392,7 +401,7 @@ try {
   const homeView = page.getByRole("region", { name: "主页", exact: true });
   await homeView.waitFor();
   await homeView.evaluate(el => { el.dataset.instance = "same-home"; });
-  await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
+  await showRightPanel(page);
   await panel.locator(".file-panel-expand-button").click();
   assert.equal(await contextTab.getAttribute("aria-label"), "显示主页");
   assert.equal(await homeView.isVisible(), false);
@@ -416,7 +425,7 @@ try {
   await panel.getByRole("tab", { name: "FileViewer.tsx", exact: true }).click();
   await panel.locator(".file-panel-close-button").click();
   await resourceHeader.waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
+  await showRightPanel(page);
   await resourceHeader.waitFor();
   assert.equal(await panel.locator(".file-breadcrumb-current").textContent(), "FileViewer.tsx", "reopening the unified shelf retains the active file");
   assert.equal(await panel.locator(".file-panel-expand-button").getAttribute("aria-pressed"), "false");

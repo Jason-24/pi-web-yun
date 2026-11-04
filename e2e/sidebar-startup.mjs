@@ -1,6 +1,7 @@
 // Check the actual server paint as well as hydrated reloads; no session writes.
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
+import { showSidebarFiles } from "./sidebar.mjs";
 
 const base = process.env.E2E_BASE_URL || "http://127.0.0.1:30141";
 const browser = await chromium.launch({ headless: true,
@@ -60,10 +61,11 @@ try {
       await page.locator("#workbench-file-tree #session-sidebar-panel-files").waitFor({ state: "attached" });
       assert.equal(await page.evaluate(() => window.inlineFileFlashes), 0, "No frame shows the inline fallback during reload");
     }
-    await page.locator(".workspace-files-toggle").filter({ visible: true }).first().click();
+    await showSidebarFiles(page);
     await page.locator("#workbench-file-tree #session-sidebar-panel-files").waitFor();
     assert.equal(await page.locator("#session-sidebar-panel-files").count(), 1, "The right dock retains the single explorer");
     await page.setViewportSize({ width: 1199, height: 1000 });
+    await page.locator("#file-panel .file-panel-close-button").click();
     await page.locator(".session-sidebar > #session-sidebar-panel-files").waitFor({ state: "attached" });
     if (placement === "below") await page.locator(".session-sidebar > #session-sidebar-panel-files").waitFor();
     else await page.getByRole("tab", { name: "文件", exact: true }).waitFor();

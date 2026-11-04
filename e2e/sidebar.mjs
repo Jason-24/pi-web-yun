@@ -7,12 +7,29 @@ import assert from "node:assert/strict";
  */
 
 /** Opens the desktop directory, the Files tab, or the inline files section. */
+export async function showRightPanel(page) {
+  const panel = page.locator("#file-panel");
+  if (await panel.getAttribute("class").then(value => value.includes("right-panel-open"))) return;
+  await page.locator(".panel-tab-switcher").first().click();
+  const menu = page.getByRole("menu").filter({ has: page.locator('[role="menuitemradio"]') });
+  if (await menu.isVisible()) {
+    const selected = menu.getByRole("menuitemradio", { checked: true });
+    if (await selected.count()) await selected.click();
+    else await menu.getByRole("menuitem").last().click();
+  }
+  await page.locator("#file-panel.right-panel-open").waitFor();
+  await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {}))));
+}
+
 export async function showSidebarFiles(page) {
   if (page.viewportSize().width >= 1200) {
-    const toggle = page.locator(".workspace-files-toggle").filter({ visible: true }).first();
-    await toggle.waitFor();
-    if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
-    await page.locator("#file-panel.right-panel-open").waitFor();
+    await showRightPanel(page);
+    const panel = page.locator("#file-panel");
+    if (!(await panel.getAttribute("class")).includes("is-file-picker") && !await panel.locator(".file-tree-toggle").isVisible()) {
+      if (!await panel.locator(".panel-tool-launcher").isVisible()) await panel.locator(".file-tab-add").click();
+      await panel.locator('[data-panel-tool="files"]').click();
+    }
+    await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {}))));
     const directory = page.locator("#file-panel .file-tree-toggle");
     if (await directory.isVisible() && await directory.getAttribute("aria-expanded") !== "true") await directory.click();
     await page.waitForFunction(() => document.querySelector("#workbench-file-tree")?.getBoundingClientRect().width > 100);

@@ -66,6 +66,29 @@ html.dark,
   --bg-subtle: rgba(255,255,255,0.04);
 }
 
+[data-theme="breeze"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-panel: #f0f7f4;
+  --bg-hover: #eaf3ef;
+  --bg-selected: #e3eee9;
+  --border: #dce7e2;
+  --text: #252e2b;
+  --text-muted: #53645d;
+  --text-dim: #5b6d64;
+  --accent: #2b5145;
+  --accent-hover: #193e32;
+  --accent-contrast: #ffffff;
+  --user-bg: #e9f3ff;
+  --assistant-bg: #ffffff;
+  --tool-bg: #f7faf8;
+  --bg-subtle: rgba(36,77,59,0.035);
+  --workspace-backdrop: linear-gradient(145deg, #eaf5fa 0%, #e5f7f1 52%, #e9f5ec 100%);
+  --workspace-sidebar: #f6fbf8;
+  --workspace-radius: 18px;
+  --workspace-shadow: 0 2px 8px rgb(30 68 51 / 0.025), 0 12px 40px -24px rgb(30 68 51 / 0.14);
+}
+
 [data-theme="mist"] {
   color-scheme: light;
   --bg: #f4f8f7;
@@ -2757,6 +2780,19 @@ span.token.table {
     font-size: max(16px, var(--chat-content-font-size, 14px)) !important;
   }
 }
+
+.chat-compaction-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.chat-compaction-status > svg { flex: none; margin-top: 1px; }
+.chat-compaction-hint { color: var(--text-dim); }
 
 /* A composer too narrow for the run's button labels, with a panel open beside
    it: icons only, so the draft keeps the width. A stacked composer has its own

@@ -297,7 +297,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
     assert.ok(Math.abs(await scroller.evaluate(element => element.scrollTop) - settingsScrollPosition) < 2, "returning from Settings preserves the reading position");
     // Content stays to the left of the directory; both separators grow leftward.
-    await page.getByRole("button", { name: "显示文件面板", exact: true }).click();
+    await showSidebarFiles(page);
     const filePanel = page.locator("#file-panel");
     const directory = page.locator("#workbench-file-tree");
     const preview = page.locator(".workbench-file-preview");

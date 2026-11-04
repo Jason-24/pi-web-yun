@@ -1,6 +1,44 @@
 /* The file workspace shows content on the left and its directory on the right. */
 .workbench-files-body { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .workbench-file-preview { position: relative; }
+.panel-tool-launcher { height: 100%; overflow: auto; padding: clamp(24px, 5vw, 48px); background: var(--bg-panel); color: var(--text); }
+.panel-tool-launcher header { margin-bottom: 24px; }
+.panel-tool-launcher h2, .panel-changes h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.panel-tool-launcher p, .panel-changes > p { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.panel-tool-launcher header p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+.panel-tool-grid button { display: flex; align-items: center; gap: 12px; min-height: 58px; width: 100%; padding: 14px; border: 1px solid transparent; border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.panel-tool-grid button > svg { flex-shrink: 0; color: var(--text-muted); }
+.panel-tool-grid button > span { flex: 1; }
+.panel-tool-grid button:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border); }
+.panel-tool-grid button:focus-visible, .panel-changes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel-tool-grid button:disabled { opacity: .5; cursor: default; }
+.panel-tool-grid kbd { padding: 2px 6px; border-radius: 5px; background: var(--bg-panel); color: var(--text-muted); font-family: inherit; font-size: 10px; white-space: nowrap; }
+.panel-tool-launcher .panel-tool-unavailable { margin: 7px 4px 0; font-size: 11px; }
+.panel-tool-launcher .panel-tool-error { color: var(--text); }
+.workspace-shell .panel-tab-switcher { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; margin: 0 5px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.workspace-shell .panel-tab-switcher:hover, .workspace-shell .panel-tab-switcher[aria-expanded="true"] { background: var(--bg-selected); color: var(--text); }
+.panel-tab-switcher[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
+.panel-tab-switcher:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.panel-tab-count { display: grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid currentColor; border-radius: 4px; font-size: 11px; line-height: 1; }
+.panel-changes { height: 100%; overflow: auto; padding: 24px; }
+.panel-changes header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-changes button { padding: 7px 9px; border: 0; border-radius: 7px; background: var(--bg-panel); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.panel-change-summary { display: flex; justify-content: space-between; margin: 20px 0 8px; color: var(--text-muted); font-size: 12px; }
+.panel-changes .panel-change-row { display: flex; width: 100%; align-items: center; gap: 10px; margin-bottom: 4px; padding: 12px 9px; background: transparent; text-align: left; }
+.panel-change-row:hover { background: var(--bg-hover); }
+.panel-change-row > span:last-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-change-row > :first-child { flex-shrink: 0; }
+.panel-change-row small { color: var(--text-muted); }
+@media (max-width: 1199px) {
+  .right-panel-container.is-file-picker .workbench-file-preview { display: none; }
+  .right-panel-container.is-file-picker .workbench-file-tree { display: flex; flex-direction: column; width: 100%; min-width: 0; flex: 1; background: var(--bg); }
+  .right-panel-container.is-file-picker .workbench-file-tree > * { width: 100%; min-width: 0; }
+}
+@media (max-width: 640px) {
+  .panel-tool-launcher { padding: 24px 16px; }
+  .workspace-shell .panel-tab-switcher { width: 36px; height: 40px; margin: 0; }
+}
 .workbench-file-tree, .workbench-tree-boundary { display: none; }
 /* The viewport is known to CSS before React restores its media-query snapshot
    and attaches the file-tree portal. Do not paint the inline fallback in the

@@ -1679,7 +1679,7 @@
   margin: 6px 0 0;
 }
 
-/* Fifteen columns: System spans the first row; then five light themes and five dark ones
+/* Fifteen columns: System and Breeze each span a row; then five light themes and five dark ones
    (three columns each), and a row of three wide tiles (five columns each). */
 .settings-theme-options {
   display: grid;
@@ -1698,7 +1698,8 @@
   cursor: pointer;
 }
 
-.settings-theme-option[data-system] {
+.settings-theme-option[data-system],
+.settings-theme-option:has(input[value="breeze"]) {
   grid-column: 1 / -1;
 }
 
@@ -1721,6 +1722,10 @@
   min-width: 0;
   overflow: hidden;
   background: var(--bg);
+}
+
+.settings-theme-fill[data-theme="breeze"] {
+  background: var(--workspace-backdrop);
 }
 
 .settings-theme-name {

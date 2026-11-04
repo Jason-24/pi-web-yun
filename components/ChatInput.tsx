@@ -25,6 +25,7 @@ import {
 import { getMarkdownListContinuation } from "@/lib/markdown-list-continuation";
 import { quoteSeparator } from "@/lib/quoted-selection";
 import { isBareMcpCommand, isBuiltinMcpCommand } from "@/lib/mcp-command";
+import { completeComposerSlash, extractComposerSlashQuery } from "@/lib/composer-slash";
 import { FolderIcon, getFileIcon } from "./FileIcons";
 import { ImagePreview } from "./ImagePreview";
 import { DismissButton } from "./DismissButton";
@@ -115,6 +116,8 @@ interface Props {
 
 export interface ChatInputHandle {
   focus: () => void;
+  /** Invoke the existing /side handler without submitting or clearing the draft. */
+  openSideChat: () => Promise<BuiltinSlashCommandResult>;
   insertText: (text: string) => void;
   /** Insert at the caret as a paragraph of its own: a blockquote must start a line. */
   insertQuote: (text: string) => void;
@@ -724,6 +727,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const bashMode = attachedImages.length === 0 && trimmedValue.startsWith("!");
   const bashExcluded = bashMode && trimmedValue.startsWith("!!");
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [inputSelection, setInputSelection] = useState<{ text: string; start: number; end: number } | null>(null);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const [slashMenuMaxHeight, setSlashMenuMaxHeight] = useState<number | null>(null);
   const [atQuery, setAtQuery] = useState<AtQueryMatch | null>(null);
@@ -769,6 +773,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   attachedImagesRef.current = attachedImages;
 
   useImperativeHandle(ref, () => ({
+    async openSideChat() {
+      if (!onBuiltinCommand) return { handled: false };
+      if (builtinCommandPendingRef.current) return { handled: true };
+      builtinCommandPendingRef.current = true;
+      setBuiltinCommandPending(true);
+      try {
+        return await onBuiltinCommand("/side");
+      } finally {
+        builtinCommandPendingRef.current = false;
+        setBuiltinCommandPending(false);
+      }
+    },
     insertIfEmpty(text: string) {
       const ta = textareaRef.current;
       const current = ta ? ta.value : value;
@@ -1131,16 +1147,23 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onSend(msg, attachedImages.length ? attachedImages : undefined);
   }, [value, attachedImages, isStreaming, runBuiltinCommand, onSend, clearInput, onAudioUnlock]);
 
-  const slashQuery = !compact && value.startsWith("/") && !/\s/.test(value.slice(1))
-    ? value.slice(1).toLowerCase()
-    : null;
+  const slashToken = compact ? null : extractComposerSlashQuery(
+    value,
+    inputSelection?.text === value ? inputSelection.start : value.length,
+    inputSelection?.text === value ? inputSelection.end : value.length,
+  );
+  const slashQuery = slashToken?.query ?? null;
+  const inlineSlash = slashToken?.inline === true;
+  const slashTokenKey = slashToken ? `${slashToken.start}:${slashQuery}` : null;
 
   const filteredSlashCommands = (() => {
     if (slashQuery === null) return [];
     const builtinCommands = isStreaming
       ? BUILTIN_SLASH_COMMANDS.filter((command) => command.availableWhileStreaming)
       : BUILTIN_SLASH_COMMANDS;
-    const commands = [...builtinCommands, ...(slashCommands ?? [])];
+    const commands = inlineSlash
+      ? (slashCommands ?? []).filter((command) => command.source === "skill")
+      : [...builtinCommands, ...(slashCommands ?? [])];
     return filterSlashCommands(commands, slashQuery, t);
   })();
 
@@ -1166,10 +1189,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (attachedImages.length === 0) setImageWarningDismissed(false);
   }, [attachedImages.length]);
 
-  // ── @ file autocomplete ──────────────────────────────────────────────────
-  // Recomputed from the text before the caret on every change/caret move.
-  // Disabled entirely when there is no cwd (new session without a directory).
-  const updateAtQuery = useCallback((text: string, cursor: number | null) => {
+  // Track the caret for slash completion and @ file mentions. Only file
+  // mentions need a cwd; skills can be chosen in a fresh composer as well.
+  const updateCompletionQueries = useCallback((text: string, cursor: number | null, selectionEnd = cursor) => {
+    setInputSelection({ text, start: cursor ?? text.length, end: selectionEnd ?? text.length });
     if (!cwd) {
       setAtQuery(null);
       return;
@@ -1319,18 +1342,25 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   }, []);
 
   const applySlashCommand = useCallback((command: SlashCommandPaletteItem) => {
-    const nextValue = `/${command.name} `;
-    setValue(nextValue);
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const token = extractComposerSlashQuery(ta.value, ta.selectionStart, ta.selectionEnd);
+    if (!token) return;
+    const completion = completeComposerSlash(ta.value, token, command);
+    if (!completion) return;
+    ta.setSelectionRange(0, ta.value.length);
+    replaceTextareaRange(ta, 0, ta.value.length, completion.text, completion.cursor);
+    valueRef.current = ta.value;
+    setValue(ta.value);
+    updateCompletionQueries(ta.value, completion.cursor);
     setSlashMenuOpen(false);
     setSlashActiveIndex(0);
     requestAnimationFrame(() => {
-      const ta = textareaRef.current;
-      if (!ta) return;
       ta.focus();
-      ta.setSelectionRange(nextValue.length, nextValue.length);
+      ta.setSelectionRange(completion.cursor, completion.cursor);
       autoGrowTextarea(ta);
     });
-  }, []);
+  }, [updateCompletionQueries]);
 
   const sendToSideChat = useCallback(() => {
     const msg = value.trim();
@@ -1461,7 +1491,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         }
       }
 
-      if (slashMenuOpen && slashQuery !== null) {
+      if (slashMenuOpen && slashQuery !== null && !isComposing) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           setSlashActiveIndex(getNextSlashIndex("down"));
@@ -1599,12 +1629,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     valueRef.current = nextValue;
     setValue(nextValue);
     setHistoryMenuOpen(false);
-    updateAtQuery(nextValue, start + markdown.length);
+    updateCompletionQueries(nextValue, start + markdown.length);
     requestAnimationFrame(() => {
       ta.focus();
       ta.setSelectionRange(start + markdown.length, start + markdown.length);
     });
-  }, [compact, processImageFiles, updateAtQuery]);
+  }, [compact, processImageFiles, updateCompletionQueries]);
 
   useEffect(() => {
     if (slashQuery === null) {
@@ -1621,7 +1651,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         slashCommandsRequestedRef.current = false;
       });
     }
-  }, [slashQuery, onLoadSlashCommands]);
+  }, [slashQuery, slashTokenKey, onLoadSlashCommands]);
 
   // Lazy-load skill dormancy (disable-model-invocation) each time the slash
   // palette opens, so toggles made in the skills panel are reflected on the
@@ -2397,11 +2427,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               valueRef.current = e.target.value;
               setValue(e.target.value);
               setHistoryMenuOpen(false);
-              updateAtQuery(e.target.value, e.target.selectionStart);
+              updateCompletionQueries(e.target.value, e.target.selectionStart, e.target.selectionEnd);
             }}
             onSelect={(e) => {
               const el = e.currentTarget;
-              updateAtQuery(el.value, el.selectionStart);
+              updateCompletionQueries(el.value, el.selectionStart, el.selectionEnd);
             }}
             onKeyDown={handleKeyDown}
             onCompositionStart={() => {
@@ -2411,7 +2441,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               isComposingRef.current = false;
               lastCompositionEndAtRef.current = Date.now();
               const el = e.currentTarget;
-              updateAtQuery(el.value, el.selectionStart);
+              updateCompletionQueries(el.value, el.selectionStart, el.selectionEnd);
             }}
             onInput={handleInput}
             onPaste={handlePaste}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { showSidebarFiles } from "./sidebar.mjs";
+import { showRightPanel, showSidebarFiles } from "./sidebar.mjs";
 
 export const filePanelFixture = `<!doctype html><html><head><script>
 localStorage.setItem("number", 42);
@@ -110,7 +110,7 @@ export async function checkFilePanel(page, filePath) {
     }
     await toggle.click();
     await panel.getByRole("button", { name: "Hide file panel", exact: true }).click();
-    await page.getByRole("button", { name: "Show file panel", exact: true }).click();
+    await showRightPanel(page);
     assert.equal(await toggle.getAttribute("aria-pressed"), "false", "Reopening returns to the split layout");
     assert.equal(await width(), originalWidth);
     assert.equal(await frame.evaluate(() => window.previewInstance), instance);

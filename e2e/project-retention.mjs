@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { showSidebarFiles } from "./sidebar.mjs";
 import { createJiti } from "jiti";
 
 const { applySessionUiStateRequest, emptySessionUiState } = await createJiti(import.meta.url).import("../lib/session-ui-state-shared.ts");
@@ -131,7 +132,7 @@ try {
     await waitUntil(() => !!state.projects[b] && !state.removedProjects?.[b]);
     assert.equal(state.removedProjects[a] > 0, true, "reopening only restores the chosen project");
     if (width >= 1200) {
-      await page.locator(".workspace-files-toggle").filter({ visible: true }).first().click();
+      await showSidebarFiles(page);
       await page.locator("#session-sidebar-panel-files").getByText("readme.md", { exact: true }).click();
       await page.getByRole("heading", { name: "Empty project", exact: true }).waitFor();
     }
