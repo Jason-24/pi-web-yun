@@ -101,7 +101,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 5%, transparent), 0 4px 16px rgb(0 0 0 / 0.04);
 }
 .workspace-shell .chat-composer-card[data-bash] { border-color: var(--tool-bg); }
-.workspace-shell .chat-composer-card[data-queuing] { border-color: rgba(234,179,8,0.4); }
+.workspace-shell .chat-composer-card[data-queuing] { border-color: color-mix(in srgb, var(--text-muted) 36%, var(--border)); }
 .workspace-shell .chat-composer-card .chat-input-textarea {
   caret-color: var(--accent);
   font-size: var(--chat-content-font-size, 14px);
@@ -169,6 +169,41 @@
 }
 .workspace-shell .chat-composer-send > svg { width: 16px; height: 16px; }
 .workspace-shell .chat-composer-send:hover:not(:disabled) { background: var(--accent-hover) !important; }
+
+/* Running controls share one quiet surface and a consistent icon grid. */
+.chat-composer-run-actions {
+  display: flex; align-items: center; align-self: flex-end; flex-shrink: 0; gap: 6px;
+}
+.chat-composer-run-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex-shrink: 0; height: 32px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; color: var(--text-muted);
+  font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1;
+  white-space: nowrap; cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.chat-composer-run-button > svg { flex: none; width: 16px; height: 16px; }
+.chat-composer-run-button:hover:not(:disabled) {
+  background: var(--bg-hover); border-color: color-mix(in srgb, var(--text-muted) 32%, var(--border)); color: var(--text);
+}
+.chat-composer-run-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chat-composer-run-button:disabled { color: var(--text-dim); opacity: .5; cursor: not-allowed; }
+.chat-composer-side-chat { width: 32px; padding: 0; }
+.chat-composer-stop {
+  border-color: transparent; background: rgba(239, 68, 68, .08); color: #ef4444;
+}
+.chat-composer-stop:hover:not(:disabled) {
+  border-color: transparent; background: rgba(239, 68, 68, .14); color: #ef4444;
+}
+.workspace-shell .chat-composer-sound > svg { width: 16px; height: 16px; stroke-width: 1.5; }
+@media (pointer: coarse) {
+  .chat-composer-run-button { min-height: 36px; }
+  .chat-composer-side-chat { width: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-composer-run-button { transition: none; }
+}
 
 /* Reading rhythm and surfaces; the conversation column and row geometry stay intact. */
 .workspace-shell .markdown-body { line-height: 1.8; }
