@@ -180,7 +180,8 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
           {offAvailable && <button type="button" aria-pressed={!automatic && explicit === "off"} disabled={!canChangeReasoning} onClick={() => chooseLevel("off")}>{t("chat.reasoningShort.off")}</button>}
         </div>
         {steps.length > 1 ? <div className="model-reasoning-sliderGroup" data-inactive={explicit === "off"}>
-          <div className="model-reasoning-track" style={{ "--reasoning-progress": `${selectedIndex < 0 ? 0 : selectedIndex / (steps.length - 1) * 100}%` } as CSSProperties}>
+          <div className="model-reasoning-track" style={{ "--reasoning-ratio": selectedIndex < 0 ? 0 : selectedIndex / (steps.length - 1) } as CSSProperties}>
+            <div className="model-reasoning-fill" aria-hidden="true" />
             <div className="model-reasoning-dots" aria-hidden="true">{steps.map(level => <span key={level} />)}</div>
             <input ref={sliderRef} type="range" min={0} max={steps.length - 1} step={1} value={sliderIndex}
               disabled={!canChangeReasoning} aria-label={t("chat.reasoningMenuTitle")}

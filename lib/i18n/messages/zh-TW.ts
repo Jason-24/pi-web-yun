@@ -268,6 +268,7 @@ export const zhTWLocale: LocalePlugin = {
     "agentSwitcher.title": "Agents",
     "agentSwitcher.titleRunning": "Agents：{count} 個執行中",
     "agentSwitcher.main": "主 Agent",
+    "sideChat.backToMain": "返回主對話",
     "agentSwitcher.subagent": "子 Agent",
     "agentSwitcher.current": "目前",
     "agentSwitcher.countOne": "{count} 個 Agent",

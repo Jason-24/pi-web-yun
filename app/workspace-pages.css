@@ -10,6 +10,8 @@
 .workspace-return-session { display: inline-flex; align-items: center; flex-shrink: 0; gap: 6px; height: 30px; margin-left: 4px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
 .workspace-return-session:hover { color: var(--text); }
 .workspace-return-session:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workspace-return-main { flex-shrink: 0; }
+@media (max-width: 640px) { .workspace-return-main span { display: none; } }
 .workspace-mobile-location { display: flex; align-items: center; flex: 1; min-width: 0; padding: 0 10px; color: var(--text-muted); font-size: 12px; }
 .workspace-title-action { padding: 0 10px; color: var(--text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
 .workspace-title-action:disabled { opacity: .4; cursor: default; }

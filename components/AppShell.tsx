@@ -2498,6 +2498,12 @@ export function AppShell() {
             {selectedSession && currentView !== "home" && <strong title={sessionDisplayTitle(selectedSession)}>{sessionDisplayTitle(selectedSession)}</strong>}
             {!selectedSession && currentView === "chat" && <strong>{translate("navigation.chat")}</strong>}
           </button>}
+          {currentView === "chat" && selectedSession?.relation?.kind === "side" && activeSessionFamily && <button type="button"
+            className="workspace-return-session workspace-return-main" onClick={() => handleSelectSession(activeSessionFamily.root)}
+            title={translate("sideChat.backToMain")} aria-label={translate("sideChat.backToMain")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m10 6-6 6 6 6M4 12h16" /></svg>
+            <span>{translate("sideChat.backToMain")}</span>
+          </button>}
           {!isMobile && currentView === "chat" && selectedSession && <button type="button" className="workspace-title-action"
             onClick={() => void handleAutoName()} disabled={selectedSession.transient || autoNameStatus.kind === "naming" || !((sessionStats?.userMessages ?? 0) > 0 || selectedSession.messageCount > 0)}
             title={autoNameStatus.kind === "error" ? autoNameStatus.message : translate("title.generateSession")}>

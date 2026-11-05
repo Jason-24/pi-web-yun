@@ -268,6 +268,7 @@ export const enLocale: LocalePlugin = {
     "agentSwitcher.title": "Agents",
     "agentSwitcher.titleRunning": "Agents: {count} running",
     "agentSwitcher.main": "Main agent",
+    "sideChat.backToMain": "Back to main chat",
     "agentSwitcher.subagent": "Sub-agent",
     "agentSwitcher.current": "Current",
     "agentSwitcher.countOne": "{count} agent",

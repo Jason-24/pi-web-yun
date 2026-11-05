@@ -151,6 +151,12 @@ try {
       assert.equal(commands.some(c => c.type === "abort"), false);
       await panel.locator(".file-panel-close-button").click();
       assert.equal(await mainInput.inputValue(), "Main draft stays here");
+      await page.goto(`${base}/?session=${childId}`, { waitUntil: "domcontentloaded", timeout: 120000 });
+      const backToMain = page.getByRole("button", { name: "Back to main chat" });
+      await backToMain.click();
+      await page.waitForURL(url => url.searchParams.get("session") === id);
+      await page.getByText("Parent context", { exact: true }).first().waitFor();
+      assert.equal(await backToMain.count(), 0, "the return action is only shown in a side chat");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       assert.deepEqual(errors, []);
       assert.equal(writes.filter(w => w.path.endsWith("/fork")).length, 2);
