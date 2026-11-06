@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CARE_KINDS, PET_CARE_KEY, careDay, configureCareHabit, controlCareFocus, createPetCareState,
   parsePetCareState, respondToCareNotice, startCareFocus, tickPetCare, type CareKind, type PetCareState } from "@/lib/pet-care";
+import { showBrowserNotification } from "@/lib/browser-notifications";
+import { useI18n } from "@/hooks/useI18n";
 
 function viewKey(state: PetCareState) {
   return JSON.stringify([CARE_KINDS.map((kind) => {
     const habit = state.habits[kind];
-    return [habit.enabled, habit.minutes, habit.pausedOn, Math.ceil((habit.targetMs - habit.elapsedMs) / 60_000)];
+    return [habit.enabled, habit.minutes, habit.pausedOn, Math.ceil(Math.max(0, habit.targetMs - habit.elapsedMs) / 1000)];
   }), state.focus.phase, state.focus.minutes, Math.ceil(state.focus.remainingMs / 1000), state.notice?.id, state.notice?.expiresAt, state.day]);
 }
 const editable = (target: EventTarget | null) => target instanceof Element && !!target.closest('input, textarea, [contenteditable="true"]');
 
 export function usePetCare(visible: boolean, blocked: boolean) {
+  const { t } = useI18n();
   const [state, setState] = useState(createPetCareState);
   const [noticeAllowed, setNoticeAllowed] = useState(false);
   const stateRef = useRef(state);
@@ -103,6 +106,31 @@ export function usePetCare(visible: boolean, blocked: boolean) {
       document.removeEventListener("visibilitychange", visibility); window.removeEventListener("blur", release); window.removeEventListener("focus", visibility);
     };
   }, [visible, publish, read]);
+
+  // A hidden tab still observes the deadline. The persisted claim and Web Lock
+  // keep multiple tabs from sending the same notification when available.
+  useEffect(() => {
+    let disposed = false;
+    const check = () => {
+      if (!document.hidden && document.hasFocus()) return;
+      const claim = () => {
+        if (disposed) return;
+        const current = read(), now = Date.now();
+        if (current.focus.phase !== "running" || !current.focus.endsAt || current.focus.endsAt > now) return;
+        const next = tickPetCare(current, { now, day: careDay(), activeMs: 0, canDeliver: false, owner: ownerRef.current });
+        const notify = !current.focus.notified && typeof Notification !== "undefined" && Notification.permission === "granted";
+        if (notify) next.focus.notified = true;
+        publish(next, true);
+        if (notify) void showBrowserNotification({ title: t("pet.care.focusDone"), body: t("pet.care.focusRest"), sessionUrl: window.location.href, onClick: () => window.focus(), tag: `pet-focus-${current.focus.endsAt}` });
+      };
+      if (navigator.locks) void navigator.locks.request("pi-yun-pet-focus-notification", { ifAvailable: true }, (lock) => { if (lock) claim(); });
+      else claim();
+    };
+    const timer = window.setInterval(check, 1000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("blur", check);
+    return () => { disposed = true; clearInterval(timer); document.removeEventListener("visibilitychange", check); window.removeEventListener("blur", check); };
+  }, [publish, read, t]);
 
   const configure = useCallback((kind: CareKind, patch: { enabled?: boolean; minutes?: number; restoreToday?: boolean }) => change((current) => configureCareHabit(current, kind, patch)), [change]);
   const startFocus = useCallback((minutes: number) => change((current) => startCareFocus(current, minutes)), [change]);

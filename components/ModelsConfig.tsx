@@ -1906,6 +1906,83 @@ function AddProviderPicker({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+function DefaultModelSetting({ cwd, revision, scope }: { cwd: string | null; revision: number; scope: EnabledModelsController["view"] }) {
+  const { t } = useI18n();
+  const [models, setModels] = useState<{ provider: string; id: string; name: string }[]>([]);
+  const [selected, setSelected] = useState("");
+  const [thinking, setThinking] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+    fetch(`/api/models${query}`, { signal: controller.signal }).then(async (res) => {
+      const data = await res.json() as { modelList?: { provider: string; id: string; name: string }[]; defaultModel?: { provider: string; modelId: string } | null; savedDefaultThinkingLevel?: string | null; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const value = data.defaultModel ? JSON.stringify([data.defaultModel.provider, data.defaultModel.modelId]) : "";
+      const available = data.modelList ?? [];
+      setModels(available);
+      setSelected((previous) => available.some((item) => JSON.stringify([item.provider, item.id]) === previous) ? previous : value);
+      setThinking((previous) => previous || data.savedDefaultThinkingLevel || "");
+      setError("");
+    }).catch((err: unknown) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err)); });
+    return () => controller.abort();
+  }, [cwd, revision, scope]);
+
+  async function saveDefault() {
+    const model = models.find((item) => JSON.stringify([item.provider, item.id]) === selected);
+    if (!model) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const res = await fetch("/api/models/default", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(cwd ? { cwd } : {}), provider: model.provider, modelId: model.id }) });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setMessage(t("models.defaultSaved"));
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  }
+  async function saveThinking() {
+    if (!thinking) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const res = await fetch("/api/models/default", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(cwd ? { cwd } : {}), thinkingLevel: thinking }) });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setMessage(t("models.thinkingDefaultSaved"));
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  }
+  return <div className="model-defaults">
+    <div className="model-defaults-fields">
+    <div className="model-defaults-field">
+    <label htmlFor="settings-default-model">{t("models.defaultForNewChats")}</label>
+    <div className="model-defaults-control">
+      <select id="settings-default-model" value={selected} disabled={busy || models.length === 0} onChange={(event) => { setSelected(event.target.value); setMessage(""); }}>
+        {!selected && <option value="">{t("models.defaultSelect")}</option>}
+        {models.map((model) => <option key={JSON.stringify([model.provider, model.id])} value={JSON.stringify([model.provider, model.id])}>{model.provider} / {model.name || model.id}</option>)}
+      </select>
+      <ConfigButton onClick={saveDefault} disabled={busy || !selected}>{t("models.setDefault")}</ConfigButton>
+    </div>
+    </div>
+    <div className="model-defaults-field">
+    <label htmlFor="settings-default-thinking">{t("models.thinkingDefault")}</label>
+    <div className="model-defaults-control">
+      <select id="settings-default-thinking" value={thinking} disabled={busy} onChange={(event) => { setThinking(event.target.value); setMessage(""); }}>
+        <option value="">{t("models.thinkingDefaultSelect")}</option>
+        {(["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const).map((level) => <option key={level} value={level}>{t(`chat.reasoningShort.${level}`)}</option>)}
+      </select>
+      <ConfigButton aria-label={t("models.thinkingSetDefault")} onClick={saveThinking} disabled={busy || !thinking}>{t("models.setDefault")}</ConfigButton>
+    </div>
+    </div>
+    </div>
+    <div className="model-defaults-meta">
+      <details className="model-defaults-help"><summary>{t("models.defaultNotes")}</summary><p>{t("models.defaultHelp")} {t("models.thinkingDefaultHelp")}</p></details>
+      <span role="status" className={error ? "model-defaults-status is-error" : "model-defaults-status"}>{error || message}</span>
+    </div>
+  </div>;
+}
+
 export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   onClose: () => void; embedded?: boolean; cwd?: string | null;
 }) {
@@ -1922,6 +1999,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   // would not contain the file's providers, and a save replaces the whole file.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savedOk, setSavedOk] = useState(false);
+  const [defaultModelRevision, setDefaultModelRevision] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(readRememberedSelection);
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
   const [apiKeyProviders, setApiKeyProviders] = useState<ApiKeyProvider[]>([]);
@@ -2157,6 +2235,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
         savedModelIdsRef.current = savedModelIds(draft);
         renamesRef.current.clear();
         enabledModels.resync(renames, modelRenames);
+        setDefaultModelRevision((value) => value + 1);
       }
     } catch (e) {
       if (e instanceof ProviderEntryError) {
@@ -2235,6 +2314,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
     <ConfigPanelShell embedded={embedded} title={t("common.models")} subtitle="~/.pi/agent/models.json" closeLabel={t("i18n.close")} onClose={onClose}>
 
         <EnabledModelsBanner controller={enabledModels} />
+        <DefaultModelSetting key={cwd ?? ""} cwd={cwd} revision={defaultModelRevision} scope={enabledModels.view} />
 
         {/* Body */}
         <ConfigSplitView>

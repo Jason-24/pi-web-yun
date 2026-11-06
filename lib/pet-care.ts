@@ -5,7 +5,7 @@ export type CareNotice = { id: string; owner: string; kinds: CareKind[]; focusDo
 type Habit = { enabled: boolean; minutes: number; elapsedMs: number; targetMs: number; pausedOn: string };
 export type PetCareState = {
   habits: Record<CareKind, Habit>;
-  focus: { minutes: number; remainingMs: number; phase: "idle" | "running" | "paused" | "done"; pending: boolean; snoozeMs: number };
+  focus: { minutes: number; remainingMs: number; phase: "idle" | "running" | "paused" | "done"; pending: boolean; snoozeMs: number; endsAt?: number; notified?: boolean };
   notice: CareNotice | null;
   cooldownMs: number;
   day: string;
@@ -45,6 +45,7 @@ export function parsePetCareState(raw: string | null): PetCareState {
       minutes: careMinutes(focus.minutes, 25, 120), remainingMs: bounded(focus.remainingMs, 0, 0, 120 * MINUTE),
       phase: ["idle", "running", "paused", "done"].includes(focus.phase) ? focus.phase : "idle",
       pending: focus.pending === true, snoozeMs: bounded(focus.snoozeMs, 0, 0, 5 * MINUTE),
+      endsAt: bounded(focus.endsAt, 0, 0, Number.MAX_SAFE_INTEGER), notified: focus.notified === true,
     };
     state.day = typeof value?.day === "string" ? value.day.slice(0, 10) : "";
     state.cooldownMs = bounded(value?.cooldownMs, 0, 0, 2 * MINUTE);
@@ -75,20 +76,25 @@ export function configureCareHabit(state: PetCareState, kind: CareKind, patch: {
   }
   return next;
 }
-export function startCareFocus(state: PetCareState, minutes = state.focus.minutes): PetCareState {
+export function startCareFocus(state: PetCareState, minutes = state.focus.minutes, now = Date.now()): PetCareState {
   const next = copyCareState(state), duration = careMinutes(minutes, state.focus.minutes, 120);
-  next.focus = { minutes: duration, remainingMs: duration * MINUTE, phase: "running", pending: false, snoozeMs: 0 };
+  next.focus = { minutes: duration, remainingMs: duration * MINUTE, phase: "running", pending: false, snoozeMs: 0, endsAt: now + duration * MINUTE, notified: false };
   next.notice = null;
   return next;
 }
-export function controlCareFocus(state: PetCareState, action: "pause" | "resume" | "stop"): PetCareState {
+export function controlCareFocus(state: PetCareState, action: "pause" | "resume" | "stop", now = Date.now()): PetCareState {
   const next = copyCareState(state);
-  if (action === "pause" && next.focus.phase === "running") next.focus.phase = "paused";
-  if (action === "resume" && next.focus.phase === "paused") next.focus.phase = "running";
-  if (action === "stop") { next.focus = { ...next.focus, remainingMs: 0, phase: "idle", pending: false, snoozeMs: 0 }; next.notice = null; }
+  if (action === "pause" && next.focus.phase === "running") {
+    next.focus.remainingMs = next.focus.endsAt ? Math.max(0, next.focus.endsAt - now) : next.focus.remainingMs;
+    if (next.focus.remainingMs === 0) { next.focus.phase = "done"; next.focus.pending = true; }
+    else next.focus.phase = "paused";
+    next.focus.endsAt = 0;
+  }
+  if (action === "resume" && next.focus.phase === "paused") { next.focus.phase = "running"; next.focus.endsAt = now + next.focus.remainingMs; }
+  if (action === "stop") { next.focus = { ...next.focus, remainingMs: 0, phase: "idle", pending: false, snoozeMs: 0, endsAt: 0 }; next.notice = null; }
   return next;
 }
-/** Active foreground time only. The hook caps gaps and handles input/dialog safety. */
+/** Habits use active time; focus uses its wall-clock deadline. */
 export function tickPetCare(state: PetCareState, options: { now: number; day: string; activeMs: number; canDeliver: boolean; owner: string }, random = Math.random): PetCareState {
   const next = copyCareState(state), delta = Math.max(0, options.activeMs);
   if (next.day !== options.day) {
@@ -106,7 +112,8 @@ export function tickPetCare(state: PetCareState, options: { now: number; day: st
     if (habit.enabled && habit.pausedOn !== options.day) habit.elapsedMs = Math.min(habit.targetMs, habit.elapsedMs + delta);
   }
   if (next.focus.phase === "running") {
-    next.focus.remainingMs = Math.max(0, next.focus.remainingMs - delta);
+    if (!next.focus.endsAt) next.focus.endsAt = options.now + next.focus.remainingMs;
+    next.focus.remainingMs = Math.max(0, next.focus.endsAt - options.now);
     if (!next.focus.remainingMs) { next.focus.phase = "done"; next.focus.pending = true; }
   }
   next.focus.snoozeMs = Math.max(0, next.focus.snoozeMs - delta);

@@ -11,6 +11,7 @@ function HabitControl({ kind, state, onChange }: { kind: CareKind; state: PetCar
   const [minutes, setMinutes] = useState(String(habit.minutes));
   useEffect(() => setMinutes(String(habit.minutes)), [habit.minutes]);
   const paused = habit.pausedOn === careDay();
+  const seconds = Math.max(0, Math.ceil((habit.targetMs - habit.elapsedMs) / 1000));
   return <div className={styles.careHabit}>
     <label className={styles.careHabitName} htmlFor={`pet-care-${kind}`}>{t(`pet.care.${kind}`)}</label>
     <label className={styles.careInterval}><input type="number" inputMode="numeric" min="1" max="180" value={minutes} aria-label={t("pet.care.intervalLabel", { habit: t(`pet.care.${kind}`) })}
@@ -23,6 +24,9 @@ function HabitControl({ kind, state, onChange }: { kind: CareKind; state: PetCar
       <input id={`pet-care-${kind}`} type="checkbox" aria-label={t(`pet.care.${kind}`)} checked={habit.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} />
       <span aria-hidden="true" />
     </label>
+    {habit.enabled && !paused && <span className={styles.careCountdown} role="timer" aria-live="off" aria-label={t("pet.care.habitRemaining", { habit: t(`pet.care.${kind}`) })}>
+      {seconds === 0 ? t("pet.care.waitingNotice") : t("pet.care.countdown", { time: `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}` })}
+    </span>}
     {paused && <button type="button" className={styles.careRestore} onClick={() => onChange({ restoreToday: true })}>{t("pet.care.restoreToday")}</button>}
   </div>;
 }
@@ -34,15 +38,23 @@ export function PetCareControls({ state, configure, startFocus, controlFocus }: 
 }) {
   const { t } = useI18n();
   const [minutes, setMinutes] = useState(String(state.focus.minutes));
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  useEffect(() => setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission), []);
   useEffect(() => setMinutes(String(state.focus.minutes)), [state.focus.minutes]);
   const seconds = Math.max(0, Math.ceil(state.focus.remainingMs / 1000));
   const timing = state.focus.phase === "running" || state.focus.phase === "paused";
   return <div className={styles.careControls}>
     <div className={styles.careHabits}>{CARE_KINDS.map((kind) => <HabitControl key={kind} kind={kind} state={state} onChange={(patch) => configure(kind, patch)} />)}</div>
+    <p className={styles.careTimingSummary}>{t("pet.care.activeTimeHint")}</p>
     <section className={styles.careFocus} aria-label={t("pet.care.focus")}>
       <div className={styles.careFocusHeader}><strong>{t("pet.care.focus")}</strong>
         {timing && <div className={styles.careClock} role="timer" aria-live="off" aria-label={t("pet.care.remaining")}>{String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}</div>}
       </div>
+      <p className={styles.careTimingSummary}>{t("pet.care.focusTimingHint")}</p>
+      {permission === "default" && <button type="button" onClick={() => { void Notification.requestPermission().then(setPermission).catch(() => setPermission("denied")); }}>{t("pet.care.enableNotifications")}</button>}
+      {permission === "granted" && <p className={styles.careTimingSummary}>{t("pet.care.notificationsEnabled")}</p>}
+      {permission === "denied" && <p className={styles.careTimingSummary}>{t("pet.care.notificationsDenied")}</p>}
+      {permission === "unsupported" && <p className={styles.careTimingSummary}>{t("pet.care.notificationsUnsupported")}</p>}
       {timing ? <>
         <div className={styles.careButtons}>
           <button type="button" onClick={() => controlFocus(state.focus.phase === "paused" ? "resume" : "pause")}>{t(state.focus.phase === "paused" ? "pet.care.resume" : "pet.care.pause")}</button>

@@ -39,8 +39,10 @@ const setMinutes = async (label, minutes) => {
 try {
   await page.goto(`${process.env.E2E_URL || "http://127.0.0.1:30141"}/?cwd=${encodeURIComponent("D:\\yun-pi\\pi-web-yun")}`, { waitUntil: "domcontentloaded", timeout: 120000 });
   await pet.waitFor();
+  await page.bringToFront();
   // This guard is shared by all editors, including file/forms outside chat.
   await page.evaluate(() => {
+    document.hasFocus = () => true;
     const editor = document.createElement("textarea"); editor.id = "care-typing-fixture";
     Object.assign(editor.style, { position: "fixed", left: "200px", top: "80px", width: "300px", height: "60px" });
     document.body.append(editor);
@@ -52,8 +54,12 @@ try {
     await setMinutes(`${label}间隔（分钟）`, 1);
     await menu.getByLabel(label, { exact: true }).check();
   }
+  const movementTimer = menu.getByRole("timer", { name: "久坐提醒剩余时间" });
+  assert.match(await movementTimer.innerText(), /01:00/);
+  await page.clock.runFor(3000);
+  assert.match(await movementTimer.innerText(), /00:5[6789]/, JSON.stringify(await state()));
   await page.keyboard.press("Escape");
-  await page.clock.runFor(55_000);
+  await page.clock.runFor(52_000);
   // A stream of input defers the notice even when its time is due.
   const input = page.locator("#care-typing-fixture");
   await input.fill("还在输入，稍后再提醒");
@@ -87,10 +93,19 @@ try {
   assert.equal((await state()).focus.remainingMs, beforePause);
   await menu.getByRole("button", { name: "继续", exact: true }).click();
   await page.keyboard.press("Escape");
-  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange")); });
-  const awayRemaining = (await state()).focus.remainingMs;
+  await page.evaluate(() => {
+    window.__careNotifications = [];
+    window.Notification = class {
+      static permission = "granted";
+      constructor(title) { window.__careNotifications.push(title); }
+      close() {}
+    };
+    Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange"));
+  });
   await page.clock.runFor(65_000);
-  assert.equal((await state()).focus.remainingMs, awayRemaining);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("pi-yun-pet-care-v1")).focus.phase === "done");
+  assert.equal((await state()).focus.phase, "done");
+  assert.deepEqual(await page.evaluate(() => window.__careNotifications), ["这段专注结束啦"]);
   assert.equal(await notice.count(), 0);
   await page.evaluate(() => {
     delete document.hidden; document.dispatchEvent(new Event("visibilitychange"));

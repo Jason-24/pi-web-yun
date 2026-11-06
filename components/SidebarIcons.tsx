@@ -15,13 +15,11 @@ export interface SidebarIconProps {
   label?: string;
 }
 
-/** An agent branching into two workers, shared by the workspace rail and Agents settings. */
+/** Two collaborators, shared by the workspace rail and Agents settings. */
 export function AgentsIcon({ strokeWidth = 1.7, ...props }: SidebarIconProps & { strokeWidth?: number }) {
   return <SidebarIcon {...props} strokeWidth={strokeWidth}>
-    <rect x="7" y="3" width="10" height="8" rx="3" />
-    <path d="M10 7h.01M14 7h.01M12 11v3.5M5 17v-.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v.5" />
-    <circle cx="5" cy="19" r="2" />
-    <circle cx="19" cy="19" r="2" />
+    <circle cx="9" cy="8" r="3" />
+    <path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 5.2a3 3 0 0 1 0 5.6M18 14.2a4 4 0 0 1 3 3.8v2" />
   </SidebarIcon>;
 }
 

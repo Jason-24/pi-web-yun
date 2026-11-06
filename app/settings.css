@@ -1,4 +1,46 @@
 /* Shared settings and configuration surfaces. */
+.model-defaults {
+  flex-shrink: 0;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  container-type: inline-size;
+}
+.model-defaults-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 24px;
+  max-width: 880px;
+}
+.model-defaults-field { min-width: 0; }
+.model-defaults-field > label { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: 11px; }
+.model-defaults-control { display: flex; align-items: center; gap: 8px; }
+.model-defaults-control select {
+  width: 0;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.model-defaults-control select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.model-defaults-control .config-button { flex-shrink: 0; min-height: 32px; padding: 5px 10px; font-size: 11px; }
+.model-defaults-meta { display: flex; align-items: baseline; gap: 16px; max-width: 880px; margin-top: 9px; font-size: 11px; line-height: 1.5; }
+.model-defaults-help { min-width: 0; color: var(--text-dim); }
+.model-defaults-help summary { width: fit-content; cursor: pointer; }
+.model-defaults-help p { max-width: 620px; margin: 6px 0 0; }
+.model-defaults-status { color: var(--text-muted); }
+.model-defaults-status.is-error { color: #f87171; }
+@container (max-width: 620px) {
+  .model-defaults-fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .model-defaults-meta { flex-wrap: wrap; gap: 6px; }
+}
+
 .config-panel-root {
   min-width: 0;
   min-height: 0;
