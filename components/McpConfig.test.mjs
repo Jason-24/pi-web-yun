@@ -1049,7 +1049,7 @@ test("an untested server offers Test in its header, beside Remove", () => {
   const { text: shown, button } = statusRow(html);
   assert.equal(button.label, "Test connection");
   assert.doesNotMatch(button.attributes, /disabled|aria-describedby/);
-  assert.match(decode(html), /<div class="config-detail-actions"><button type="button" class="config-button config-button-secondary config-button-small">Test connection<\/button><button[^>]*class="config-button config-button-danger/);
+  assert.match(decode(html), /<div class="config-detail-actions"><button[^>]*>Edit<\/button><button type="button" class="config-button config-button-secondary config-button-small">Test connection<\/button><button[^>]*class="config-button config-button-danger/);
   assert.equal(shown, "Not tested yet.");
   assert.equal(statusRow(html).label, "On");
   // A server that runs a shell command on every connection is labelled: its tests run one at a time.

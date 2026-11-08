@@ -1226,6 +1226,7 @@ export const enLocale: LocalePlugin = {
     "mcp.reason.unparsable": "The file is not valid JSON, so Pi Web left it unchanged.",
     "mcp.reason.invalid-shape": "The file is not an object with an \"mcpServers\" object, so Pi Web left it unchanged.",
     "mcp.reason.server-missing": "The file no longer defines this server.",
+    "mcp.reason.config-changed": "The configuration changed elsewhere. Cancel and reopen the editor to load the latest version.",
     "mcp.reason.entry-not-object": "This entry is not an object, so it cannot be turned on or off. Remove it, or fix it in the file.",
     "mcp.reason.web-password": "It references PI_WEB_PASSWORD, so Pi Web does not turn it on.",
     "mcp.reason.undo-unavailable": "The removal can no longer be undone.",

@@ -328,7 +328,7 @@ test("Settings › MCP opens the add pane from the sidebar, keeps the draft, and
   assert.match(decode(html), /<button type="button" aria-current="page" class="config-list-action-button">[\s\S]*?Add MCP<\/button>/);
   // The name first, under the paste box, with the note on where it came from; then the preview, which
   // leaves out what is not set: no working directory and no env names, rather than "None".
-  assert.match(text(html), /Server to add npx -y @acme\/lint-mcp Name Named lint after its address or command\. Preview Read as a command line Transport stdio Command npx -y @acme\/lint-mcp Add /);
+  assert.match(text(html), /Server to add npx -y @acme\/lint-mcp You can also ask the model in chat to help add or edit MCP configurations\. Name Named lint after its address or command\. Preview Read as a command line Transport stdio Command npx -y @acme\/lint-mcp Add /);
   assert.match(decode(html), /aria-label="Name"[^>]*value="lint"\/>/);
   // The added notice: the server and its file, the folder trusted with it, the test, and Sign in.
   const addedView = (props = {}) => renderToStaticMarkup(h(I18nProvider, null, h(McpConfigView, {

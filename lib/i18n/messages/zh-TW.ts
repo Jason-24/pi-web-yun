@@ -1226,6 +1226,7 @@ export const zhTWLocale: LocalePlugin = {
     "mcp.reason.unparsable": "該檔案不是有效的 JSON，Pi Web 沒有更動它。",
     "mcp.reason.invalid-shape": "該檔案不是包含 \"mcpServers\" 物件的物件，Pi Web 沒有更動它。",
     "mcp.reason.server-missing": "該檔案已不再定義此伺服器。",
+    "mcp.reason.config-changed": "設定已在其他地方修改。請取消並重新開啟編輯器以載入最新設定。",
     "mcp.reason.entry-not-object": "此項目不是物件，因此無法開啟或關閉。請將其移除，或在檔案中修正。",
     "mcp.reason.web-password": "它引用了 PI_WEB_PASSWORD，因此 Pi Web 不會開啟它。",
     "mcp.reason.undo-unavailable": "這次移除已無法復原。",

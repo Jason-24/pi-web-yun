@@ -9,6 +9,7 @@ const extensionStatusBarSource = await readFile(new URL("./ExtensionStatusBar.ts
 const mcpConfigSource = await readFile(new URL("./McpConfig.tsx", import.meta.url), "utf8");
 const mcpSignInSource = await readFile(new URL("./McpSignIn.tsx", import.meta.url), "utf8");
 const mcpAddSource = await readFile(new URL("./McpAddServer.tsx", import.meta.url), "utf8");
+const mcpEditSource = await readFile(new URL("./McpServerEditor.tsx", import.meta.url), "utf8");
 const newSessionBarSource = await readFile(new URL("./NewSessionContextBar.tsx", import.meta.url), "utf8");
 
 test("every class the keyboard-open rules target exists on its component", () => {
@@ -25,7 +26,7 @@ test("every .mcp-* rule in settings.css matches a class the MCP panel renders, a
   // Every .mcp-* rule targets a class the panel (its Sign-in row, its add pane) renders, and every
   // class it renders has a rule, so a rename cannot leave a phone rule silently dead.
   const styled = new Set([...settingsCssSource.matchAll(/\.(mcp-[a-z-]+)/g)].map((match) => match[1]));
-  const rendered = new Set([...`${mcpConfigSource}\n${mcpSignInSource}\n${mcpAddSource}`.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)]
+  const rendered = new Set([...`${mcpConfigSource}\n${mcpSignInSource}\n${mcpAddSource}\n${mcpEditSource}`.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)]
     .flatMap((match) => (match[1] ?? match[2]).split(/\s+/))
     .filter((name) => name.startsWith("mcp-")));
   assert.deepEqual([...styled].sort(), [...rendered].sort());

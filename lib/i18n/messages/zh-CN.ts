@@ -1226,6 +1226,7 @@ export const zhCNLocale: LocalePlugin = {
     "mcp.reason.unparsable": "该文件不是有效的 JSON，Pi Web 没有改动它。",
     "mcp.reason.invalid-shape": "该文件不是包含 \"mcpServers\" 对象的对象，Pi Web 没有改动它。",
     "mcp.reason.server-missing": "该文件已不再定义此服务器。",
+    "mcp.reason.config-changed": "配置已在其他地方修改。请取消并重新打开编辑器以加载最新配置。",
     "mcp.reason.entry-not-object": "此条目不是对象，因此无法开启或关闭。请将其移除，或在文件中修正。",
     "mcp.reason.web-password": "它引用了 PI_WEB_PASSWORD，因此 Pi Web 不会开启它。",
     "mcp.reason.undo-unavailable": "这次移除已无法撤销。",
