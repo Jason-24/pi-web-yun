@@ -241,6 +241,7 @@ export function McpAddServer({
       examples={draft.text.trim() === "" ? MCP_ADD_EXAMPLES.map(({ source, text }) => ({ label: t(MCP_IMPORT_SOURCE_KEYS[source]), value: text })) : []}
       multiline
     >
+      <p className="mcp-config-line is-dim">{t("mcp.add.modelHint")}</p>
       {offersRawPi && (
         <label className="mcp-add-toggle">
           <input type="checkbox" checked={draft.rawPi} onChange={(event) => onDraftChange(mcpAddDraftWithPaste(draft, { rawPi: event.target.checked }))} />

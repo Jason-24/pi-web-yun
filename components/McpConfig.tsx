@@ -17,6 +17,7 @@ import type {
   McpSessionStatus,
   ProjectTrustStatus,
 } from "@/lib/api-types";
+import { McpServerEditor } from "./McpServerEditor";
 import { useI18n } from "@/hooks/useI18n";
 import { displayPathWithin, shortenPath } from "@/lib/display-path";
 import {
@@ -1134,6 +1135,8 @@ export function McpConfigView({
               <McpServerDetail
                 key={mcpServerKey(selectedServer)}
                 server={selectedServer}
+                editCwd={data.project?.cwd ?? null}
+                onEdited={onRefresh}
                 context={context}
                 codemode={data.codemode}
                 toolSearchDisabled={data.toolSearchDisabled}
@@ -1410,6 +1413,8 @@ function McpNameList({ names }: { names: readonly string[] }) {
 
 function McpServerDetail({
   server,
+  editCwd,
+  onEdited,
   context,
   codemode,
   toolSearchDisabled,
@@ -1438,6 +1443,8 @@ function McpServerDetail({
   onSignInCancel,
 }: {
   server: McpServerInfo;
+  editCwd: string | null;
+  onEdited: () => void;
   context: McpRowContext;
   codemode: McpCodemodeInfo;
   toolSearchDisabled: McpResponse["toolSearchDisabled"];
@@ -1475,6 +1482,8 @@ function McpServerDetail({
   onSignInCancel: (server: McpServerInfo, flowId: string) => void;
 }) {
   const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
   const noteId = useId();
   const testBlockId = useId();
   const state = mcpServerRowState(server, context);
@@ -1507,6 +1516,8 @@ function McpServerDetail({
           ? t("mcp.write.savedWhileOff")
           : undefined;
 
+  if (editing) return <McpServerEditor server={server} cwd={editCwd} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); setEditSaved(true); onEdited(); }} />;
+
   return (
     <ConfigDetailStack>
       <div className="config-detail-heading">
@@ -1516,6 +1527,7 @@ function McpServerDetail({
             <ConfigDetailTitle>{name}</ConfigDetailTitle>
           </ConfigDetailHeaderInfo>
           <ConfigDetailActions>
+            {!server.override && !server.notAnObject && <ConfigButton size="small" disabled={controlsBusy || block !== undefined} aria-describedby={block ? noteId : undefined} onClick={() => setEditing(true)}>{t("mcp.edit.action")}</ConfigButton>}
             <McpTestButton server={server} test={test} testBlock={testBlock} describedBy={testBlockId} onTest={onTest} />
             <ConfigButton
               variant="danger"
@@ -1538,6 +1550,7 @@ function McpServerDetail({
         </ConfigDetailHeader>
         {note && <div id={noteId} className="config-detail-heading-note">{note}</div>}
       </div>
+      {editSaved && <p role="status" className="mcp-config-line">{t("mcp.edit.saved")}</p>}
       {actionError && (
         <p role="alert" className="mcp-config-line is-error">
           {t("mcp.actionFailed")} {actionFailureText(actionError, t)}

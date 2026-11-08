@@ -12,7 +12,7 @@ import type {
   SkillUpdateResult,
   ProjectTrustStatus,
 } from "@/lib/api-types";
-import { displayPathWithin, shortenPath } from "@/lib/display-path";
+import { shortenPath } from "@/lib/display-path";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import {
   getLastSettingsSelection,
@@ -22,7 +22,6 @@ import {
   ConfigAddSourceHeading,
   ConfigButton,
   ConfigDetail,
-  ConfigDetailActions,
   ConfigDetailHeader,
   ConfigDetailHeaderInfo,
   ConfigDetailStack,
@@ -47,11 +46,13 @@ import {
 } from "./SettingsUi";
 import { itemsToSwitch, projectTrustReloadKey } from "./settings-ui-helpers";
 import { MarkdownBody } from "./MarkdownBody";
+import { SkillScopeTransfer, type SkillTransferResult } from "./SkillScopeTransfer";
 
 type SkillScope = "global" | "project" | "path";
 type Translate = ReturnType<typeof useI18n>["t"];
 
 function sourceLabel(skill: Skill): SkillScope {
+  if (skill.install) return skill.install.scope;
   const src = skill.sourceInfo?.source;
   const scope = skill.sourceInfo?.scope;
   if (scope === "user" || src === "user") return "global";
@@ -139,6 +140,13 @@ function SkillDetail({
   updateError,
   onCheckUpdate,
   onUpdate,
+  onRemove,
+  removing,
+  collisions,
+  projectResourcesLoaded,
+  transferBusy,
+  onTransferBusy,
+  onTransferApplied,
 }: {
   skill: Skill;
   cwd: string;
@@ -151,6 +159,13 @@ function SkillDetail({
   updateError: string | null;
   onCheckUpdate: () => void;
   onUpdate: () => void;
+  onRemove: () => void;
+  removing: boolean;
+  collisions: { winnerPath: string; loserPath: string }[];
+  projectResourcesLoaded: boolean;
+  transferBusy: boolean;
+  onTransferBusy: (busy: boolean) => void;
+  onTransferApplied: (result: SkillTransferResult) => Promise<void>;
 }) {
   const { t } = useI18n();
   const label = sourceLabel(skill);
@@ -189,7 +204,7 @@ function SkillDetail({
 
     const load = async () => {
       try {
-        const params = new URLSearchParams({ cwd, filePath: skill.filePath });
+        const params = new URLSearchParams({ cwd, filePath: skill.filePath, management: "1" });
         if (documentPath !== rootDocument) params.set("document", documentPath);
         const response = await fetch(`/api/skills/content?${params}`, { signal: controller.signal });
         const data = (await response.json()) as Partial<SkillContentResponse> & { error?: string };
@@ -208,55 +223,43 @@ function SkillDetail({
   }, [cwd, skill.filePath, documentPath, rootDocument]);
 
   return (
-    <ConfigDetailStack>
-      {/* Path + tag + toggle, with a stable status row below. */}
-      <div className="skill-detail-heading">
-        <ConfigDetailHeader>
-          <ConfigDetailHeaderInfo>
-            <ConfigScopeTag scope={label}>{scopeLabel(label, t)}</ConfigScopeTag>
-            <span className="config-detail-path">
-              {label === "project" ? displayPathWithin(skill.filePath, cwd) : shortenPath(skill.filePath)}
-            </span>
-          </ConfigDetailHeaderInfo>
-          <ConfigDetailActions>
-            <ConfigSwitch
-              checked={enabled}
-              loading={toggling}
-              label={enabled ? t("i18n.visibleInPrompt") : t("i18n.hiddenFromPrompt")}
-              onChange={() => onToggle(skill)}
-            />
-          </ConfigDetailActions>
-        </ConfigDetailHeader>
-        <div className="skill-detail-status-row">
-          {!enabled && (
-            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              {t("i18n.hiddenButInvocable")}
-            </span>
-          )}
-          {saveError && (
-            <span style={{ fontSize: 12, color: "#f87171", overflowWrap: "anywhere" }}>
-              {saveError}
-            </span>
-          )}
+    <ConfigDetailStack className="skills-detail">
+      <header className="skills-hero">
+        <div className="skills-heroTitle">
+          <span className="skills-skillIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg></span>
+          <div className="skills-heroIdentity">
+            <div className="skills-eyebrow">{t("common.skills")} <ConfigScopeTag scope={label}>{scopeLabel(label, t)}</ConfigScopeTag>{skill.loaded === false && <span className="skills-shadowBadge">{t("skills.transfer.shadowed")}</span>}</div>
+            <h2>{skill.name}</h2>
+          </div>
         </div>
-      </div>
+        {skill.description && <p className="skills-description">{skill.description}</p>}
+      </header>
 
-      {skill.install?.skillsShUrl && (
-        <ConfigField label={t("config.source")}>
-          <a
-            href={skill.install.skillsShUrl}
-            target="_blank"
-            rel="noreferrer"
-            title={skill.install.skillsShUrl}
-            className="skill-source-link"
-          >
-            <span className="skill-source-link-text">
-              {skill.install.skillsShUrl.replace(/^https?:\/\//, "")} ↗
-            </span>
-          </a>
+      <section className="skills-visibility" aria-label={t("skills.visibilityTitle")}>
+        <div>
+          <div className="skills-visibilityTitle">{t("skills.visibilityTitle")} <span className={enabled ? "skills-enabled" : "skills-hidden"}>{t(enabled ? "skills.visible" : "skills.hidden")}</span></div>
+          <p>{t("skills.visibilityHelp")}</p>
+        </div>
+        <ConfigSwitch checked={enabled} loading={toggling} disabled={removing || transferBusy} label={enabled ? t("i18n.visibleInPrompt") : t("i18n.hiddenFromPrompt")} onChange={() => onToggle(skill)} />
+      </section>
+      {saveError && <p role="alert" className="skills-error">{saveError}</p>}
+
+      {collisions.length > 0 && <div className="skills-collision">
+        <ConfigField label={t("skills.collisionTitle")}>
+          <p>{t("skills.collisionHelp")}</p>
+          {collisions.map((collision) => <div key={collision.loserPath}>
+            <div>{t("skills.collisionWinner")}: <code>{collision.winnerPath}</code></div>
+            <div>{t("skills.collisionLoser")}: <code>{collision.loserPath}</code></div>
+          </div>)}
         </ConfigField>
-      )}
+      </div>}
 
+      <div className="skills-metadata">
+        <ConfigField label={t("config.source")}>
+          {skill.install?.skillsShUrl ? <a href={skill.install.skillsShUrl} target="_blank" rel="noreferrer" className="skill-source-link">
+            <span className="skill-source-link-text">{skill.install.source} ↗</span>
+          </a> : <span>{skill.install?.source ?? skill.sourceInfo?.source ?? scopeLabel(label, t)}</span>}
+        </ConfigField>
       {skill.install && (
         <ConfigField label={t("i18n.version")}>
           <div className="skill-version-row">
@@ -267,7 +270,7 @@ function SkillDetail({
               <ConfigButton
                 size="small"
                 onClick={onCheckUpdate}
-                disabled={checkingUpdate || updating}
+                disabled={checkingUpdate || updating || transferBusy}
               >
                  {t("i18n.check")}
               </ConfigButton>
@@ -302,7 +305,7 @@ function SkillDetail({
                 variant="primary"
                 size="small"
                 onClick={onUpdate}
-                disabled={updating || checkingUpdate}
+                disabled={updating || checkingUpdate || transferBusy}
               >
                  {updating ? t("i18n.updating") : t("i18n.update")}
               </ConfigButton>
@@ -314,18 +317,13 @@ function SkillDetail({
         </ConfigField>
       )}
 
-      <ConfigField label={t("config.name")}>
-        <span className="skill-name-value">
-          {skill.name}
-        </span>
-      </ConfigField>
+        <div className="skills-pathField">
+          <ConfigField label={t("skills.location")}><code>{skill.filePath}</code></ConfigField>
+          <SkillScopeTransfer skill={skill} cwd={cwd} projectResourcesLoaded={projectResourcesLoaded} busy={transferBusy || removing || updating || toggling} onBusy={onTransferBusy} onApplied={onTransferApplied} />
+        </div>
+      </div>
 
-      <ConfigField label={t("i18n.description")}>
-        <span className="skill-description">
-          {skill.description}
-        </span>
-      </ConfigField>
-
+      <section className="skills-instructionsCard">
       <ConfigField label={t("skills.instructions")} ref={instructionsRef}>
         {documents.length > 0 && (
           <ConfigDetailHeader>
@@ -349,6 +347,12 @@ function SkillDetail({
           <span className="skill-instructions-status">{t("skills.noInstructions")}</span>
         )}
       </ConfigField>
+      </section>
+
+      {skill.install && <section className="skills-uninstall" aria-label={t("skills.removeTitle")}>
+        <div><h3>{t("skills.removeTitle")}</h3><p>{t("skills.removeHelp")}</p></div>
+        <ConfigButton variant="danger" size="small" onClick={onRemove} disabled={removing || toggling || updating || transferBusy}>{removing ? t("skills.removing") : t("skills.remove")}</ConfigButton>
+      </section>}
     </ConfigDetailStack>
   );
 }
@@ -368,6 +372,7 @@ function AddSkillPanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkillSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
@@ -384,6 +389,7 @@ function AddSkillPanel({
   const search = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setSearching(true);
+    setSearched(true);
     setSearchError(null);
     setResults([]);
     try {
@@ -401,13 +407,13 @@ function AddSkillPanel({
         return;
       }
       setResults(d.results ?? []);
-      if ((d.results ?? []).length === 0) setSearchError(t("i18n.noSkills"));
+
     } catch (e) {
       setSearchError(String(e));
     } finally {
       setSearching(false);
     }
-  }, [t]);
+  }, []);
 
   const install = useCallback(
     async (pkg: string) => {
@@ -439,11 +445,11 @@ function AddSkillPanel({
 
   const installPath =
     scope === "global"
-      ? "~/.pi/agent/skills/"
-      : `${shortenPath(cwd)}/.pi/skills/`;
+      ? "~/.agents/skills/"
+      : `${shortenPath(cwd)}/.agents/skills/`;
 
   return (
-    <ConfigDetailStack className="is-full-height">
+    <ConfigDetailStack className="is-full-height skills-addPanel">
       {/* ── Header area ── */}
       <div
         style={{
@@ -471,6 +477,7 @@ function AddSkillPanel({
           }
         />
 
+        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>{t("skills.onlineSearchHelp")}</p>
         {/* Search row */}
         <div style={{ display: "flex", gap: 8 }}>
           <input
@@ -480,7 +487,8 @@ function AddSkillPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") search(query);
             }}
-             placeholder={t("i18n.skillSearchPlaceholder")}
+             aria-label={t("skills.onlineSearch")}
+             placeholder={t("skills.onlineSearchPlaceholder")}
             style={{
               flex: 1,
               padding: "7px 10px",
@@ -497,13 +505,15 @@ function AddSkillPanel({
             onClick={() => search(query)}
             disabled={searching || !query.trim()}
           >
-             {searching ? t("i18n.searching") : t("i18n.search")}
+             {searching ? t("i18n.searching") : t("skills.onlineSearch")}
           </ConfigButton>
         </div>
 
+        <p className="skills-installHint">{t("skills.customInstallHint")}</p>
+
         {/* Errors */}
         {searchError && (
-          <div style={{ fontSize: 12, color: "#f87171" }}>{searchError}</div>
+          <div role="alert" style={{ fontSize: 12, color: "#f87171" }}>{t("skills.searchFailed")}<details><summary>{t("skills.errorDetails")}</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{searchError}</pre></details></div>
         )}
         {installError && (
           <div
@@ -514,6 +524,7 @@ function AddSkillPanel({
         )}
       </div>
 
+      {searched && !searching && !searchError && results.length === 0 && <ConfigEmptyState>{t("i18n.noSkills")}</ConfigEmptyState>}
       {/* ── Results list ── */}
       {results.length > 0 && (
         <div style={{ flex: 1, overflowY: "auto" }}>
@@ -521,6 +532,8 @@ function AddSkillPanel({
             const isInstalled =
               installedPackages[scope].has(r.package) ||
               newlyInstalledPkgs.has(`${scope}:${r.package}`);
+            const otherScope = scope === "global" ? "project" : "global";
+            const installedElsewhere = installedPackages[otherScope].has(r.package) || newlyInstalledPkgs.has(`${otherScope}:${r.package}`);
             const isInstalling = installing === r.package;
             // split "owner/repo@skill" for cleaner display
             const atIdx = r.package.indexOf("@");
@@ -549,6 +562,7 @@ function AddSkillPanel({
                   >
                     {skillpart ?? repopart}
                   </div>
+                  {installedElsewhere && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("skills.installedElsewhere", { scope: scopeLabel(otherScope, t) })}</div>}
                   {/* repo + installs + link row */}
                   <div
                     style={{
@@ -637,6 +651,7 @@ export function SkillsConfig({
 }) {
   const { t } = useI18n();
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(() => getLastSettingsSelection("skills", cwd));
@@ -652,16 +667,30 @@ export function SkillsConfig({
   const [updatingSkill, setUpdatingSkill] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [projectResourcesLoaded, setProjectResourcesLoaded] = useState(true);
+  const [diagnostics, setDiagnostics] = useState<NonNullable<SkillsResponse["diagnostics"]>>([]);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeDetails, setRemoveDetails] = useState<string | null>(null);
+  const [removeSuccessful, setRemoveSuccessful] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [undoTransfer, setUndoTransfer] = useState<{ token: string; cwd: string } | null>(null);
+  useEffect(() => {
+    if (!undoTransfer) return;
+    const timeout = setTimeout(() => setUndoTransfer(null), 5 * 60_000);
+    return () => clearTimeout(timeout);
+  }, [undoTransfer]);
+  useEffect(() => { setUndoTransfer(null); setRemoveError(null); setRemoveDetails(null); }, [cwd]);
 
   const loadSkills = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/skills?cwd=${encodeURIComponent(cwd)}`);
+      const res = await fetch(`/api/skills?cwd=${encodeURIComponent(cwd)}&management=1`);
       const d = (await res.json()) as Partial<SkillsResponse> & { error?: string };
       if (!res.ok || d.error) throw new Error(d.error ?? `HTTP ${res.status}`);
       const list = d.skills ?? [];
       setSkills(list);
+      setDiagnostics(d.diagnostics ?? []);
       setProjectResourcesLoaded(d.projectResourcesLoaded ?? true);
       setSelected((current) => {
         if (current && list.some((skill) => skill.filePath === current)) return current;
@@ -870,17 +899,88 @@ export function SkillsConfig({
   }, [t]);
 
   const selectedSkill = skills.find((s) => s.filePath === selected) ?? null;
-  const bulkBusy = loading || toggling.size > 0 || updatingSkill !== null;
+  const removeSkill = async (skill: Skill) => {
+    if (!skill.install || !window.confirm(t("skills.removeConfirm", { name: skill.name, scope: scopeLabel(skill.install.scope, t), path: skill.filePath }))) return;
+    setRemoving(true);
+    setUndoTransfer(null);
+    setRemoveError(null);
+    setRemoveDetails(null);
+    setRemoveSuccessful(false);
+    try {
+      const res = await fetch("/api/skills/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cwd, filePath: skill.filePath, package: skill.install.package, scope: skill.install.scope, sharedAcknowledged: true }) });
+      const data = await res.json() as { error?: string; remains?: boolean | null; failed?: boolean; details?: string; backupPath?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      await loadSkills();
+      if (data.remains === true) setRemoveError(t(data.failed ? "skills.removeFailedStillLoaded" : "skills.removeShared"));
+      else if (data.remains === null) setRemoveError(t("skills.removeUnknown"));
+      else if (data.failed) setRemoveError(t("skills.removeFailedGone"));
+      else { setRemoveError(t("skills.removeDone", { name: skill.name })); setRemoveSuccessful(true); }
+      if (data.backupPath) setRemoveDetails(t("skills.removeBackup", { path: data.backupPath }));
+      else if (data.details) setRemoveDetails(data.details);
+    } catch (error) {
+      setRemoveError(error instanceof Error ? error.message : String(error));
+    } finally { setRemoving(false); }
+  };
+
+  const transferApplied = async (result: SkillTransferResult, skill: Skill) => {
+    await loadSkills();
+    setSelected(result.targetPath);
+    setUpdateStatuses({});
+    setRemoveSuccessful(true);
+    setRemoveDetails(null);
+    setRemoveError(t(result.mode === "move" ? "skills.transfer.moved" : "skills.transfer.copied", { name: skill.name, scope: scopeLabel(skill.install!.scope === "global" ? "project" : "global", t) }));
+    setUndoTransfer({ token: result.undoToken, cwd });
+  };
+  const undoScopeTransfer = async () => {
+    if (!undoTransfer) return;
+    setTransferBusy(true);
+    try {
+      const response = await fetch("/api/skills/transfer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "undo", cwd, undoToken: undoTransfer.token }) });
+      const data = await response.json() as { code?: string; targetPath?: string };
+      if (!response.ok) {
+        const known = ["conflict", "undo-expired", "undo-changed", "project-untrusted"];
+        throw new Error(t(`skills.transfer.error.${known.includes(data.code ?? "") ? data.code : "failed"}`));
+      }
+      await loadSkills();
+      setSelected(data.targetPath ?? null);
+      setUndoTransfer(null);
+      setRemoveSuccessful(true);
+      setRemoveError(t("skills.transfer.undone"));
+      setRemoveDetails(null);
+    } catch (error) { setRemoveSuccessful(false); setRemoveError(error instanceof Error ? error.message : String(error)); }
+    finally { setTransferBusy(false); }
+  };
+
+  const bulkBusy = loading || toggling.size > 0 || updatingSkill !== null || removing || transferBusy;
 
   return (
+    <div className="skills-panel">
     <ConfigPanelShell embedded={embedded} title={t("common.skills")} subtitle={shortenPath(cwd)} closeLabel={t("i18n.close")} onClose={onClose}>
 
         {!projectResourcesLoaded && <ConfigTrustNotice message={t("trust.skillsNotLoaded")} />}
+        {removeError && <div className={`skills-notice ${removeSuccessful ? "skills-noticeSuccess" : "skills-noticeWarning"}`} role={removeSuccessful ? "status" : "alert"}>
+          <span className="skills-noticeIcon" aria-hidden="true">{removeSuccessful ? "✓" : "!"}</span>
+          <div className="skills-noticeBody">
+            <div>{removeError}</div>
+            {undoTransfer && <small className="skills-undoHint">{t("skills.transfer.undoWindow")}</small>}
+            {removeDetails && <details><summary>{t("skills.removeDetails")}</summary><pre>{removeDetails}</pre></details>}
+          </div>
+          {undoTransfer && undoTransfer.cwd === cwd && <ConfigButton size="small" disabled={transferBusy} onClick={() => void undoScopeTransfer()}>{t("skills.transfer.undo")}</ConfigButton>}
+          <button className="skills-dismiss" aria-label={t("skills.dismissNotice")} onClick={() => { setRemoveError(null); setRemoveDetails(null); setUndoTransfer(null); }}>×</button>
+        </div>}
 
         {/* Body */}
         <ConfigSplitView>
           {/* Left: skill list */}
           <ConfigSidebar>
+            <div className="skills-sidebarContext">
+              <span>{t("skills.currentProject")}</span>
+              <code>{shortenPath(cwd)}</code>
+            </div>
+            <div className="skills-filter">
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
+              <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder={t("skills.filterInstalled")} aria-label={t("skills.filterInstalled")} />
+            </div>
             <ConfigSidebarList>
               {loading ? (
                 <div className="config-sidebar-message">
@@ -890,9 +990,9 @@ export function SkillsConfig({
                 <div className="config-sidebar-message is-error">
                   {error}
                 </div>
-              ) : skills.length === 0 ? (
+              ) : skills.length === 0 || !skills.some((skill) => skill.name.toLowerCase().includes(filter.trim().toLowerCase())) ? (
                 <div className="config-sidebar-message is-empty">
-                   {t("i18n.noSkills")}
+                   {t(filter.trim() ? "skills.noMatch" : "i18n.noSkills")}
                 </div>
               ) : (
                 (() => {
@@ -903,38 +1003,13 @@ export function SkillsConfig({
                     path: t("skills.scope.path"),
                   };
                   const groupDefinitions = [
-                    {
-                      label: `${scopeLabels.project} / skills.sh`,
-                      matches: (skill: Skill) =>
-                        sourceLabel(skill) === "project" &&
-                        Boolean(skill.install?.skillsShUrl),
-                    },
-                    {
-                      label: scopeLabels.project,
-                      matches: (skill: Skill) =>
-                        sourceLabel(skill) === "project" &&
-                        !skill.install?.skillsShUrl,
-                    },
-                    {
-                      label: `${scopeLabels.global} / skills.sh`,
-                      matches: (skill: Skill) =>
-                        sourceLabel(skill) === "global" &&
-                        Boolean(skill.install?.skillsShUrl),
-                    },
-                    {
-                      label: scopeLabels.global,
-                      matches: (skill: Skill) =>
-                        sourceLabel(skill) === "global" &&
-                        !skill.install?.skillsShUrl,
-                    },
-                    {
-                      label: scopeLabels.path,
-                      matches: (skill: Skill) => sourceLabel(skill) === "path",
-                    },
+                    { label: scopeLabels.project, matches: (skill: Skill) => sourceLabel(skill) === "project" },
+                    { label: scopeLabels.global, matches: (skill: Skill) => sourceLabel(skill) === "global" },
+                    { label: scopeLabels.path, matches: (skill: Skill) => sourceLabel(skill) === "path" },
                   ];
                   for (const { label, matches } of groupDefinitions) {
                     const grpSkills = skills.filter(matches);
-                    if (grpSkills.length > 0)
+                    if (grpSkills.some((skill) => skill.name.toLowerCase().includes(filter.trim().toLowerCase())))
                       groups.push({ label, skills: grpSkills });
                   }
                   const renderSkillRow = (skill: Skill) => {
@@ -950,10 +1025,11 @@ export function SkillsConfig({
                           setAddMode(false);
                         }}
                       >
-                        <ConfigStatusDot active={!disabled} />
+                        <ConfigStatusDot active={!disabled && skill.loaded !== false} />
                         <ConfigSidebarText className={`is-grow${disabled ? " is-muted" : ""}`}>
                           {skill.name}
                         </ConfigSidebarText>
+                        {skill.loaded === false && <span className="skills-shadowBadge">{t("skills.transfer.shadowed")}</span>}
                         {(() => {
                           const key = updateKey(skill);
                           const status = key ? updateStatuses[key] : undefined;
@@ -978,7 +1054,7 @@ export function SkillsConfig({
                               <ConfigSidebarGroupSwitch
                                 enabled={visible}
                                 total={grpSkills.length}
-                                disabled={bulkBusy}
+                                disabled={bulkBusy || Boolean(filter.trim())}
                                 loading={bulkGroup === grpLabel}
                                 label={t(allVisible ? "skills.groupSwitchOn" : "skills.groupSwitchOff", { group: grpLabel })}
                                 onChange={(enabled) => void setGroupSkills(grpLabel, grpSkills, enabled)}
@@ -988,7 +1064,7 @@ export function SkillsConfig({
                             {grpLabel}
                           </ConfigSidebarGroupLabel>
                           {groupStatus?.group === grpLabel && <ConfigSidebarGroupStatus error={groupStatus.error} />}
-                          {orderSkillsByDormancy(grpSkills).map(renderSkillRow)}
+                          {orderSkillsByDormancy(grpSkills).filter((skill) => skill.name.toLowerCase().includes(filter.trim().toLowerCase())).map(renderSkillRow)}
                         </div>
                       );
                     },
@@ -1050,6 +1126,13 @@ export function SkillsConfig({
                 updateError={updateError}
                 onCheckUpdate={() => void checkForUpdates(selectedSkill)}
                 onUpdate={() => void updateInstalledSkill(selectedSkill)}
+                onRemove={() => void removeSkill(selectedSkill)}
+                removing={removing}
+                collisions={diagnostics.flatMap((item) => item.collision?.resourceType === "skill" && (item.collision.winnerPath === selectedSkill.filePath || item.collision.loserPath === selectedSkill.filePath) ? [item.collision] : [])}
+                projectResourcesLoaded={projectResourcesLoaded}
+                transferBusy={transferBusy}
+                onTransferBusy={setTransferBusy}
+                onTransferApplied={(result) => transferApplied(result, selectedSkill)}
               />
               ) : (
                 <ConfigEmptyState>{t("i18n.selectSkill")}</ConfigEmptyState>
@@ -1079,11 +1162,12 @@ export function SkillsConfig({
         >
           {!embedded && <ConfigButton onClick={onClose}>{t("i18n.close")}</ConfigButton>}
           {skills.some((skill) => Boolean(skill.install)) && (
-            <ConfigButton variant="secondary" onClick={() => void checkForUpdates()} disabled={checkingAll || updatingSkill !== null}>
+            <ConfigButton variant="secondary" onClick={() => void checkForUpdates()} disabled={checkingAll || updatingSkill !== null || transferBusy || removing}>
               {checkingAll ? t("i18n.checking") : t("i18n.checkUpdates")}
             </ConfigButton>
           )}
         </ConfigFooter>
     </ConfigPanelShell>
+    </div>
   );
 }

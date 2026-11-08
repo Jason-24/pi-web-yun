@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const { skills } = await loadSkillsWithInstallInfo(cwd);
+    const { skills } = await loadSkillsWithInstallInfo(cwd, { includeShadowed: searchParams.get("management") === "1" });
     const skill = skills.find((item) => item.filePath === filePath);
     if (!skill) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });

@@ -95,6 +95,8 @@ export interface SkillInfo {
     scope?: string;
   };
   install?: SkillInstallInfo;
+  /** False only in the management view for an installation shadowed by a same-name skill. */
+  loaded?: boolean;
 }
 
 export interface SkillsResponse {
@@ -578,6 +580,7 @@ export interface McpResponse {
  * status a route answers with is noted where routes differ.
  */
 export type McpRefusalReason =
+  | "config-changed"
   /** `cwd` is empty or not an absolute path. */
   | "cwd-invalid"
   /** `cwd` is outside the folders Pi Web may read, has a `..` segment, or does not exist. */

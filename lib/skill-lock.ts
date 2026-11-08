@@ -10,6 +10,7 @@ interface SkillLockEntry {
   ref?: unknown;
   skillFolderHash?: unknown;
   computedHash?: unknown;
+  piWebVersionHash?: unknown;
 }
 
 interface SkillLockFile {
@@ -96,7 +97,7 @@ function getInstallInfo(
   if (!source) return undefined;
   const skillPath = typeof entry.skillPath === "string" ? entry.skillPath : undefined;
   const ref = typeof entry.ref === "string" ? entry.ref : undefined;
-  const rawVersionHash = scope === "global" ? entry.skillFolderHash : entry.computedHash;
+  const rawVersionHash = (scope === "global" ? entry.skillFolderHash : entry.computedHash) ?? entry.piWebVersionHash;
   const versionHash = typeof rawVersionHash === "string" && rawVersionHash
     ? rawVersionHash
     : undefined;
@@ -114,7 +115,7 @@ function getInstallInfo(
     ...(ref && { ref }),
     ...(versionHash && { versionHash }),
     canCheckForUpdates: Boolean(
-      isGitHubSource && skillPath && versionHash && hasComparableVersion,
+      isGitHubSource && skillPath && versionHash && hasComparableVersion && !entry.piWebVersionHash,
     ),
   };
 }

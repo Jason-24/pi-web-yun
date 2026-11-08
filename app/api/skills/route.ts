@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
-    return NextResponse.json(await loadSkillsWithInstallInfo(cwd));
+    return NextResponse.json(await loadSkillsWithInstallInfo(cwd, { includeShadowed: searchParams.get("management") === "1" }));
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

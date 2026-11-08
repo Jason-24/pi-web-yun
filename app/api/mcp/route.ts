@@ -46,6 +46,7 @@ import type { PiSdkInternals } from "@/lib/pi-sdk-internals";
 import { invalidateModelsCache } from "@/lib/models-cache";
 import { freshFolderTrustBreadth, getProjectTrustStatus, trustFreshFolderAndWrite } from "@/lib/project-trust";
 import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+import { McpEditError, mcpEditData, updateMcpEntry } from "@/lib/mcp-edit";
 
 export const dynamic = "force-dynamic";
 
@@ -613,6 +614,27 @@ export async function POST(req: Request) {
 
   try {
     switch (body.action) {
+      case "read-edit":
+      case "update": {
+        const scope = readScope(body.scope);
+        const name = readName(body.name);
+        if (!scope || name === undefined) return refusal(400, "invalid-request", "Expected a scope and server name");
+        const target = writeTarget(scope, project, agentDir);
+        if (target instanceof Refusal) return target.response();
+        try {
+          if (body.action === "read-edit") {
+            const found = readMcpServerEntry({ agentDir, project, scope, name });
+            if (!found.ok) return refusal(found.reason === "unreadable" ? 500 : 409, found.reason === "unreadable" ? "internal" : found.reason, "The server configuration cannot be read");
+            return NextResponse.json(mcpEditData(found.value), { headers: { "Cache-Control": "no-store" } });
+          }
+          if (typeof body.version !== "string" || body.version.length > 100 || JSON.stringify(body.patch ?? {}).length > MCP_ADD_MAX_TEXT) return refusal(400, "invalid-request", "Invalid edit request");
+          await updateMcpEntry(target, name, body.version, body.patch, internals);
+          return NextResponse.json({ success: true });
+        } catch (error) {
+          if (error instanceof McpEditError) return refusal(error.reason === "invalid-request" ? 400 : 409, error.reason, error.message);
+          return writeRefusal(error).response();
+        }
+      }
       case "enable":
       case "disable":
       case "remove":

@@ -410,3 +410,94 @@ test("a global server is turned off and on in the project alone, through an over
   assert.equal((await post({ action: "set-in-project", name: "lint", cwd })).status, 400);
   assert.equal((await post({ action: "set-in-project", name: "lint", enabled: false })).status, 400);
 });
+
+
+test("edit read hides all header values and credential-bearing URLs; update keeps untouched secrets and unknown fields", async () => {
+  const config = { url: "https://example.com/mcp?api_key=super-secret-token", headers: { Authorization: "Bearer private-token", "X-Label": "also-private" }, oauth: { clientId: "client" }, unknown: { keep: true }, enabled: false };
+  await writeFile(globalPath, JSON.stringify({ mcpServers: { edit: config }, rootKey: "keep" }));
+  const read = await post({ action: "read-edit", scope: "global", name: "edit" });
+  assert.equal(read.status, 200);
+  assert.equal(read.body.fields.url.hidden, true);
+  assert.equal(read.body.fields.url.value, "");
+  assert.deepEqual(read.body.names, ["Authorization", "X-Label"]);
+  assert.ok(!JSON.stringify(read.body).includes("private"));
+  assert.ok(!JSON.stringify(read.body).includes("super-secret"));
+  const saved = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { values: [{ name: "X-New", action: "literal", value: "!do-not-run $SECRET" }] } });
+  assert.equal(saved.status, 200);
+  const result = await readJson(globalPath);
+  assert.equal(result.rootKey, "keep");
+  assert.deepEqual(result.mcpServers.edit, { ...config, headers: { ...config.headers, "X-New": "$!do-not-run $$SECRET" } });
+});
+
+test("edit preserves argument boundaries, removes a value, and rejects stale versions without writing", async () => {
+  await writeFile(globalPath, JSON.stringify({ mcpServers: { edit: { command: "npx", args: ["old"], env: { TOKEN: "original-secret", KEEP: "unchanged" } } } }));
+  const read = await post({ action: "read-edit", scope: "global", name: "edit" });
+  const args = ["-y", "a b", "C:\\some path", "$literal", ""];
+  const save = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: { args: JSON.stringify(args) }, values: [{ name: "TOKEN", action: "remove" }] } });
+  assert.equal(save.status, 200);
+  assert.deepEqual((await readJson(globalPath)).mcpServers.edit, { command: "npx", args, env: { KEEP: "unchanged" } });
+  const bytes = await readFile(globalPath, "utf8");
+  const stale = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: { command: "changed" } } });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.reason, "config-changed");
+  assert.equal(await readFile(globalPath, "utf8"), bytes);
+});
+
+test("edit rejects invalid patches and cannot rename or change transport or inject arbitrary fields", async () => {
+  const read = await post({ action: "read-edit", scope: "global", name: "lint" });
+  const bytes = await readFile(globalPath, "utf8");
+  for (const patch of [{ fields: { args: "not json" } }, { fields: { url: "https://other/mcp" } }, { fields: { enabled: false } }, { name: "renamed" }, { values: [{ name: "X", action: "reference", value: "INVALID-NAME" }] }]) {
+    const saved = await post({ action: "update", scope: "global", name: "lint", version: read.body.version, patch });
+    assert.equal(saved.status, 400);
+    assert.equal(await readFile(globalPath, "utf8"), bytes);
+  }
+});
+
+test("edit rechecks project trust, secrets and web-password references", async () => {
+  await writeFile(projectPath, JSON.stringify({ mcpServers: { edit: { command: "npx" } } }));
+  store.set(cwd, false);
+  assert.equal((await post({ action: "read-edit", scope: "project", name: "edit", cwd })).status, 403);
+  store.set(cwd, true);
+  const read = await post({ action: "read-edit", scope: "project", name: "edit", cwd });
+  assert.equal(read.status, 200);
+  for (const [value, action, reason] of [["private-token", "literal", "secret-global-only"], ["PI_WEB_PASSWORD", "reference", "web-password"]]) {
+    const saved = await post({ action: "update", scope: "project", name: "edit", cwd, version: read.body.version, patch: { values: [{ name: "API_TOKEN", action, value }] } });
+    assert.equal(saved.status, 409);
+    assert.equal(saved.body.reason, reason);
+  }
+  const reference = await post({ action: "update", scope: "project", name: "edit", cwd, version: read.body.version, patch: { values: [{ name: "API_TOKEN", action: "reference", value: "MY_TOKEN" }] } });
+  assert.equal(reference.status, 200);
+  assert.equal((await readJson(projectPath)).mcpServers.edit.env.API_TOKEN, "${MY_TOKEN}");
+});
+
+
+test("edit keeps a no-op file byte-identical and never sends masked command arguments", async () => {
+  const raw = { command: "npx", args: ["server", "--api-key", "topsecret-argument"], env: { TOKEN: "hidden-environment" } };
+  const bytes = JSON.stringify({ mcpServers: { edit: raw } }, null, 4);
+  await writeFile(globalPath, bytes);
+  const read = await post({ action: "read-edit", scope: "global", name: "edit" });
+  assert.equal(read.status, 200);
+  assert.equal(read.body.fields.args.hidden, true);
+  assert.equal(read.body.fields.args.value, "");
+  assert.ok(!JSON.stringify(read.body).includes("topsecret-argument"));
+  assert.ok(!JSON.stringify(read.body).includes("hidden-environment"));
+  const save = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: {}, values: [] } });
+  assert.equal(save.status, 200);
+  assert.equal(await readFile(globalPath, "utf8"), bytes);
+});
+
+
+test("description can be read, edited and cleared for HTTP and stdio servers", async () => {
+  for (const connection of [{ command: "npx" }, { url: "https://example.com/mcp" }]) {
+    await writeFile(globalPath, JSON.stringify({ mcpServers: { edit: { ...connection, description: "Existing description", unknown: { keep: true } } } }));
+    let read = await post({ action: "read-edit", scope: "global", name: "edit" });
+    assert.deepEqual(read.body.fields.description, { value: "Existing description", hidden: false });
+    let saved = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: { description: "Database tools\nFor the development environment" } } });
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await readJson(globalPath)).mcpServers.edit, { ...connection, description: "Database tools\nFor the development environment", unknown: { keep: true } });
+    read = await post({ action: "read-edit", scope: "global", name: "edit" });
+    saved = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: { description: "" } } });
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await readJson(globalPath)).mcpServers.edit, { ...connection, unknown: { keep: true } });
+  }
+});
