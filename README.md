@@ -1,124 +1,100 @@
-# Pi Web
+# PI-YUN
 
-[中文文档](./docs/README.zh-CN.md) | [日本語](./docs/README.ja.md) | [Русский](./docs/README.ru.md)
+[日本語](./docs/README.ja.md) | [Русский](./docs/README.ru.md)
 
-Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). Pi Web uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
+PI-YUN 是基于 [Pi Web](https://github.com/agegr/pi-web) 的 [pi 编程智能体](https://github.com/earendil-works/pi)浏览器工作空间。它沿用 pi 的本地配置和会话文件，在浏览器中组织项目、与智能体协作，并加入工作台导航、桌面陪伴和专注计时等体验。
 
-**[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
+![PI-YUN 工作空间示例，展示项目导航与对话界面](./docs/screenshot2.png)
 
-![Pi Web displaying a pi session with structured Markdown, tool calls, and project navigation](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
+*使用示例数据展示的 PI-YUN 工作空间。*
 
-## Features
+## 功能
 
-- **Session workspace**: browse, resume, rename, export, and delete conversations grouped by project, with running state, context usage, cost, and compaction details.
-- **Project creation**: use **+** beside **Projects** to name a project and select one source folder, with directory validation and persistent sidebar entries. See [adding a project](docs/worktrees.md#adding-a-project).
-- **Two ways to branch**: **New session** creates an independent session file from an earlier message; **Edit from here** creates a branch inside the current session.
-- **Project file tools**: browse and upload files, inspect Git diffs, and preview source, Markdown, images, audio, PDFs, and DOCX files with automatic refresh.
-- **Git worktrees**: switch checkouts from the sidebar while keeping sessions from the same repository grouped together.
-- **Web-based configuration**: manage provider login and API keys, models, model tests, plugin packages, and skills without leaving Pi Web.
-- **English, Simplified Chinese, and Traditional Chinese UI**: Pi Web follows the browser language initially and provides a language switcher in the top bar.
+- **会话与项目**：按项目浏览、继续、搜索、置顶和归档会话；支持从历史消息创建新会话或在当前会话内分支。
+- **工作空间**：在首页、对话、历史、系统提示词、工具定义、智能体和分支视图之间切换；支持侧聊和子智能体。
+- **项目文件与终端**：浏览和上传文件、查看 Git 差异、预览常见文件格式，并在工作空间中使用终端。
+- **Git worktree**：从项目选择器切换或创建 worktree，将同一仓库的会话归在一起。详见 [worktree 指南](./docs/worktrees.zh-CN.md)。
+- **模型与扩展**：在设置中管理模型、默认模型和思考等级，以及登录凭据、MCP、插件和技能。
+- **陪伴与专注**：桌宠提供会话状态提示、生活习惯提醒和专注计时；提醒与计时设置保存在浏览器中，不调用模型。专注计时可在页面后台运行，并可按需启用浏览器通知。
+- **多语言界面**：支持简体中文、繁体中文和英文，首次使用时跟随浏览器语言。
 
-## Quick Start
+## 快速开始
 
-Pi Web requires Node.js 22.19.0 or newer. Check your version with `node --version`, then run:
+需要 Node.js **22.19.0 或更高版本**，可通过 `node --version` 检查。使用 npm 包启动：
 
 ```bash
-npx pi-web-yun@latest
+npx pi-yun@latest
 ```
 
-The CLI opens a browser after the server is ready. If it does not, open [http://127.0.0.1:30141](http://127.0.0.1:30141). Pi Web listens only on `127.0.0.1` by default.
+服务就绪后会尝试打开浏览器；也可以访问 [http://127.0.0.1:30141](http://127.0.0.1:30141)。默认只监听本机地址。首次使用时，在设置的「模型」中登录模型服务商或配置 API Key。
 
-If no model provider is configured yet, open the **Models** panel to sign in or add an API key.
-
-To install the `pi-yun` command globally:
+也可以全局安装：
 
 ```bash
 npm install -g pi-yun@latest
 pi-yun
 ```
 
-Commands:
+常用命令：
 
 ```bash
-pi-yun version          # print the installed version
-pi-yun status           # list running servers
-pi-yun stop [--port N]  # stop a running server
-pi-yun open [--port N]  # open a running server in the browser
-pi-yun update [--check] # update a global npm install
+pi-yun --help             # 查看启动选项
+pi-yun version            # 查看已安装版本
+pi-yun status             # 查看运行中的服务
+pi-yun stop [--port N]    # 停止服务
+pi-yun open [--port N]    # 在浏览器中打开服务
+pi-yun update [--check]   # 更新全局 npm 安装，或只检查更新
 ```
 
-To update, run `pi-yun stop`, then `pi-yun update` (or run the same install command again). To uninstall, run `npm uninstall -g pi-yun`.
+更新前可先运行 `pi-yun stop`，然后运行 `pi-yun update`；卸载使用 `npm uninstall -g pi-yun`。
 
-## Configuration
+## 配置与访问
 
-For port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `pi-web --help` (or `-h`) to print startup options and exit without starting the server. Unknown options exit with an error.
+命令行选项优先于对应的环境变量：
 
-| Option or environment variable | Purpose | Default |
+| 选项或环境变量 | 用途 | 默认值 |
 | --- | --- | --- |
-| `--help`, `-h` | Print startup options and exit | — |
-| `--port <port>`, `-p <port>`, or `PORT` | Server port | `30141` |
-| `--hostname <host>`, `-H <host>`, or `PI_WEB_HOSTNAME` | Bind hostname | `127.0.0.1` |
-| `--no-open` or `PI_WEB_NO_OPEN=1` | Do not open a browser automatically | Browser opens |
-| `PI_WEB_APP_NAME` | PWA manifest `name` and `short_name`; surrounding whitespace is trimmed, empty values use the default | `Pi Web` |
-| `PI_WEB_SKIP_VERSION_CHECK=1` | Disable Pi Web update checks | Unset |
-| `PI_WEB_ALLOWED_HOSTS` | Additional exact proxy or custom hostnames, comma-separated | Unset |
-| `PI_WEB_PASSWORD` | Enable browser password login; API clients may use Basic Auth with username `pi` | Authentication disabled |
-| `PI_WEB_IDLE_TIMEOUT_MS` | Session idle timeout in milliseconds, up to `2147483647`; `0` disables idle shutdown; invalid or out-of-range values use the default | `600000` (10 min) |
-| `PI_WEB_SHUTDOWN_DEADLINE_MS` | How long extensions get to handle `session_shutdown` before a closing session is disposed anyway, in milliseconds up to `2147483647`; `0`, invalid or out-of-range values use the default | `5000` (5 s) |
-| `PI_CODEMODE_MAX_WORKERS` | pi's limit on codemode scripts running at once, shared by every session and subagent in the server; pi's own default is `2`, and pi-web sets `8` when the variable is unset or empty. Each script may use up to 256 MB | `8` |
+| `--port <port>`、`-p <port>` 或 `PORT` | 服务端口 | `30141` |
+| `--hostname <host>`、`-H <host>` 或 `PI_WEB_HOSTNAME` | 监听地址 | `127.0.0.1` |
+| `--no-open` 或 `PI_WEB_NO_OPEN=1` | 禁止自动打开浏览器 | 自动打开 |
+| `PI_WEB_PASSWORD` | 启用浏览器密码登录；API 可使用用户名 `pi` 的 Basic Auth | 未启用 |
+| `PI_WEB_ALLOWED_HOSTS` | 允许的额外代理或自定义主机名，以逗号分隔 | 未设置 |
+| `PI_WEB_APP_NAME` | PWA 的显示名称；修改后需重启服务 | `Pi Web` |
+| `PI_WEB_SKIP_VERSION_CHECK=1` | 关闭更新检查 | 未设置 |
+| `PI_WEB_IDLE_TIMEOUT_MS` | 会话空闲关闭时间，`0` 为禁用 | `600000` 毫秒 |
+| `PI_WEB_SHUTDOWN_DEADLINE_MS` | 扩展处理会话关闭事件的最长等待时间 | `5000` 毫秒 |
+| `PI_CODEMODE_MAX_WORKERS` | 服务中 Code mode 脚本的并发上限 | `8` |
 
-Set `PI_WEB_APP_NAME` before starting the server (for example, `PI_WEB_APP_NAME='Work Pi' pi-web`). After changing it, restart the server to serve the new manifest; no rebuild is required. Updates to the name of an already installed PWA are managed by the browser and are not guaranteed to appear immediately. This does not change the page title or icons.
-
-For example:
+例如，自定义端口并关闭自动打开浏览器：
 
 ```bash
-pi-web --help
-pi-web -p 8080 -H 0.0.0.0 --no-open
+pi-yun --port 8080 --no-open
 ```
 
-### Remote Access
+### 局域网与远程访问
 
-Binding to a non-loopback address exposes an agent that can execute high-privilege actions. On a trusted LAN, require a long random password:
-
-```bash
-PI_WEB_PASSWORD='a-long-random-password' pi-web --hostname 0.0.0.0
-```
-
-Password authentication does not encrypt the connection. Do not expose Pi Web over plain HTTP to the internet; use HTTPS through a trusted reverse proxy or a trusted VPN. If a reverse proxy sends an external hostname, add that exact name to `PI_WEB_ALLOWED_HOSTS`. This allow-list does not change the address Pi Web binds to.
-
-### Docker
-
-Each release publishes an image to `ghcr.io/agegr/pi-web`. See [Running Pi Web in Docker](./docs/docker.md) for it, the Compose example and which volumes to keep.
-
-### HTTP Proxy
-
-Server-side model and API requests honor the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables.
-
-On macOS or Linux:
-
-```bash
-HTTP_PROXY=http://127.0.0.1:7890 \
-HTTPS_PROXY=http://127.0.0.1:7890 \
-NO_PROXY=localhost,127.0.0.1 \
-npx pi-web-yun@latest
-```
-
-On Windows PowerShell:
+监听非本机地址会让网络上的访问者接触到能够执行操作的智能体。在可信局域网内使用时，请设置强密码。PowerShell 示例：
 
 ```powershell
-$env:HTTP_PROXY = "http://127.0.0.1:7890"
-$env:HTTPS_PROXY = "http://127.0.0.1:7890"
-$env:NO_PROXY = "localhost,127.0.0.1"
-npx pi-web-yun@latest
+$env:PI_WEB_PASSWORD = '替换为足够长的随机密码'
+pi-yun --hostname 0.0.0.0
 ```
 
-## Notes
+密码本身不会加密 HTTP 流量；远程访问请使用可信 VPN 或配置 HTTPS 的反向代理。代理使用额外主机名时，可将准确的主机名加入 `PI_WEB_ALLOWED_HOSTS`。
 
-- **Agent data**: Pi Web reads pi data from `~/.pi/agent` by default, including session files under `sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`. Set `PI_CODING_AGENT_DIR` to use another pi agent directory.
-- **Filesystem access**: Pi Web must be able to read the agent data directory and the working directories recorded by its sessions. Run Pi Web in the same filesystem environment as pi when sharing existing sessions.
-- **Shared configuration**: the Models panel uses pi's model, settings, and credential storage, so changes are visible to both interfaces. An open session applies a saved edit of its model when you select the model again.
-- **File access boundary**: the file browser is limited to working directories selected in Pi Web and project or session roots it already knows about; it is not a general filesystem browser.
-- **Git worktrees**: see [Worktrees in Pi Web](./docs/worktrees.md) for switcher visibility, worktree creation, and removal behavior.
+服务端模型和 API 请求支持 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY` 环境变量。
+
+## 数据与使用说明
+
+- PI-YUN 默认读取 `~/.pi/agent` 中的 pi 配置和会话；可通过 `PI_CODING_AGENT_DIR` 指定其他目录。与 pi 共享会话时，请确保进程能访问相同的工作目录和数据目录。
+- 模型设置与 pi 共用配置和凭据；已打开会话中的模型配置修改后，需要重新选择该模型才能应用。
+- 文件浏览器的访问范围受已选择或已知的项目和会话目录限制。
+- 生活提醒按前台活跃使用时间计时，页面不活跃时会暂停。专注计时使用实际时间；浏览器可能限制后台页面，关闭所有页面后不会安排系统通知。
+- 使用 Docker 时，可按照本仓库的 [Docker 指南](./docs/docker.md)从源码构建镜像。
+
+## 集成接口
+
+以下接口供下游集成使用。
 
 ### Downstream Session Context Menu
 
@@ -172,42 +148,29 @@ file. Provider errors fail safe by preserving that session. This lease only
 affects automatic idle eviction; explicit shutdown and Stop fallback cleanup
 still take precedence.
 
-## Development
+## 本地开发
 
 ```bash
 npm install
 npm run dev
 ```
 
-The development server runs at [http://127.0.0.1:30141](http://127.0.0.1:30141). Run the common checks with:
+开发服务地址为 [http://127.0.0.1:30141](http://127.0.0.1:30141)。常用检查：
 
 ```bash
 npm test
-node_modules/.bin/tsc --noEmit
+npx tsc --noEmit
 npm run lint
 ```
 
-Do not run `next build` or `npm run build` during normal development. It writes to `.next/` and can interfere with the development server; leave builds for release work.
+开发期间不要运行 `next build` 或 `npm run build`：它们会修改 `.next/`，影响开发服务。发布构建请使用独立的干净工作目录。项目结构和开发约定见 [AGENTS.md](./AGENTS.md)，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
-Before starting on a feature, read [Contributing](./CONTRIBUTING.md) for what is in scope and the pull request checklist.
+## 发布说明
 
-Contributor guides: [Internationalization](./docs/i18n.md) and [Release process](./docs/release.md).
+本项目的 npm 包名为 `pi-yun`，版本在 `package.json` 和 `package-lock.json` 中维护。当前仓库保留了上游发布工作流，但该工作流仅在 `agegr/pi-web` 仓库执行；推送 PI-YUN 的标签不会通过它自动发布 npm 包或 Docker 镜像。仓库中的 `npm run release` 会安装依赖、递增补丁版本、构建并发布 npm 包，应在独立的干净发布目录中使用。具体步骤见[发布指南](./docs/release.md)。
 
-## Repository Layout
+## 致谢与许可证
 
-```text
-app/             Next.js UI and API routes
-components/      React UI components
-hooks/           Client state and interaction hooks
-lib/             Session, agent, model, file, Git, and security logic
-public/          Static assets and PWA files
-bin/             npm CLI entrypoint and launch option parsing
-docs/            Focused user and contributor guides
-demo/            Static browser demo published to GitHub Pages (see demo/README.md)
-```
+PI-YUN 基于 [agegr/pi-web](https://github.com/agegr/pi-web) 开发，并使用 [pi](https://github.com/earendil-works/pi) 生态。感谢上游项目及所有贡献者。
 
-See [AGENTS.md](./AGENTS.md) for the architecture notes and detailed file map.
-
-## License
-
-[MIT](./LICENSE)
+[MIT License](./LICENSE)

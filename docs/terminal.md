@@ -45,7 +45,7 @@ npm 11 blocks install scripts by default, so there is no postinstall repair
 anymore; `lib/terminal-manager.ts` instead repairs the bits at first terminal
 creation (macOS only, best effort), including published/npm-installed packages.
 
-Pi Web pins node-pty to `1.2.0-beta.15`, which includes Linux x64 and ARM64
+PI-YUN pins node-pty to `1.2.0-beta.15`, which includes Linux x64 and ARM64
 prebuilt binaries. Native module loading is deferred until terminal creation,
 so missing or incompatible binaries produce a JSON error with repair instructions.
 Empty or non-JSON API errors show the HTTP status and direct users to the server log.
@@ -55,7 +55,7 @@ If a native binary cannot load, run
 installation directory (for npx, the cache directory containing `node_modules`).
 On Debian/Ubuntu, install `python3` and `build-essential` first. This forces a
 source build instead of reusing a missing or incompatible prebuilt binary.
-Restart Pi Web after repair.
+Restart PI-YUN after repair.
 
 ## Verification
 

@@ -1,21 +1,21 @@
-# Contributing to Pi Web
+# Contributing to PI-YUN
 
 [中文](./docs/CONTRIBUTING.zh-CN.md)
 
-Pi Web is a light web front end for the [pi coding agent](https://github.com/earendil-works/pi). It reads and writes the same agent directory as the pi CLI and runs sessions through pi's SDK. Most declined pull requests are well built but fall outside that scope, so please read this page before starting on a feature.
+PI-YUN is a light web front end for the [pi coding agent](https://github.com/earendil-works/pi). It reads and writes the same agent directory as the pi CLI and runs sessions through pi's SDK. Most declined pull requests are well built but fall outside that scope, so please read this page before starting on a feature.
 
-## What Pi Web is for
+## What PI-YUN is for
 
 - **Doing in a browser what a terminal does less well.** Browse sessions by project. Read files, diffs and tool output. Configure models, skills, agents, plugins and MCP servers through forms instead of hand-edited JSON. Use pi from a phone or from another machine on your network.
-- **Behaving like pi.** A session behaves the same whether it runs in Pi Web or in the pi CLI. Extensions written for the CLI work in Pi Web unchanged, and pi's TUI (`@earendil-works/pi-tui`) shows what an extension's request means.
+- **Behaving like pi.** A session behaves the same whether it runs in PI-YUN or in the pi CLI. Extensions written for the CLI work in PI-YUN unchanged, and pi's TUI (`@earendil-works/pi-tui`) shows what an extension's request means.
 
 ## Out of scope
 
 These are declined however well they are implemented:
 
 - **Changes to what pi itself does.** This covers the system prompt, tool behavior, prompt template expansion, retries, compaction, and what gets written to session files. Propose these upstream in pi.
-- **Features that could be a pi extension.** Examples are scheduled messages, custom commands and new providers. An extension works in pi and in Pi Web; see [#666](https://github.com/agegr/pi-web/issues/666) for scheduled sending done as an extension.
-- **Pi Web-only configuration or extension API.** This means new config files only Pi Web reads, new `ctx.ui.*` options or `extension_ui_request` fields, and new meanings for existing fields. The web client decides how to display what pi's protocol already expresses.
+- **Features that could be a pi extension.** Examples are scheduled messages, custom commands and new providers. An extension works in pi and in PI-YUN; see [#666](https://github.com/agegr/pi-web/issues/666) for scheduled sending done as an extension.
+- **PI-YUN-only configuration or extension API.** This means new config files only PI-YUN reads, new `ctx.ui.*` options or `extension_ui_request` fields, and new meanings for existing fields. The web client decides how to display what pi's protocol already expresses.
 - **IDE or Git client features.** This covers editing files, file management (create, rename, delete), commit history and a second diff view. The file viewer is read-only. Editing is left to the agent or to your own editor.
 - **New subsystems or operating modes.** Examples are schedulers, long-running background agents, a plugin or UI-slot system, a second "lite" mode, and multi-pane layouts.
 - **Visual customization beyond the built-in themes.** That rules out custom themes, skins, chat backgrounds and extra accent colors. Appearance is one of the built-in themes (Light, Mist, Rose, Sand, Lilac, Dark, Pine, Slate, Dusk, Ember, high contrast light or dark, Zenburn, or following the system), plus a few typography settings.

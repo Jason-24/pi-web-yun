@@ -1,289 +1,51 @@
-# Release Checklist
+# PI-YUN 发布指南
 
-> Fork note: this checklist describes upstream `agegr/pi-web` releases. This
-> repository retains the `pi-yun` package name, its own version and `npm run
-> release` command. The imported publish workflow runs only in `agegr/pi-web`;
-> pushing a fork tag does not publish through upstream's npm identity.
+本指南针对 `Jason-24/pi-web-yun` 和 npm 包 `pi-yun`。仓库中的 `.github/workflows/publish.yml` 来自上游，发布任务限定在 `agegr/pi-web` 执行；向本仓库推送 `v*` 标签不会自动发布 npm 包、容器镜像或创建 GitHub Release。
 
-For a local `pi-yun` release, use a clean release checkout and run
-`npm run release`. It first runs `npm ci` so the build uses the exact dependency
-versions in package-lock.json, then bumps the version, builds and publishes.
-The `prebuild` check refuses an installed Next.js
-version different from package.json; `prepack` refuses stale framework/app
-versions or missing startup artifacts, including Next 16.4's
-`.next/server/preview-props.json`. Do not build over a running development
-checkout. An already published package with this mismatch needs a rebuilt,
-new version; reinstalling the same broken tarball cannot repair its output.
+## 发布前检查
 
-Upstream publishes three artifacts for each release:
+1. 在干净的检出目录确认目标提交、工作区状态、`main` 与 `origin/main` 的关系，以及目标提交的 CI 结果。使用 `git fetch origin` 更新远端信息。
+2. 确认 `package.json` 和 `package-lock.json` 中的版本一致，并检查目标 npm 版本和远端标签是否已存在：
 
-- npm package: `@agegr/pi-web`, published by GitHub Actions (`.github/workflows/publish.yml`) when a `v*` tag is pushed
-- Docker image: `ghcr.io/agegr/pi-web`, tagged `<version>`, `<major>.<minor>` and `latest`, published by the same workflow on the same tag (see [docker.md](./docker.md))
-- GitHub Release: `agegr/pi-web`
+   ```bash
+   npm view pi-yun@<version> version --registry https://registry.npmjs.org/
+   git ls-remote --tags origin refs/tags/v<version>
+   ```
 
-Use this checklist from a clean `main` checkout.
+   查询失败不等于版本或标签不存在；区分未找到与网络、认证等错误。
+3. 确认 npm 和 GitHub 的发布权限。运行 `npm test`、`npx tsc --noEmit` 和 `npm run lint`，并根据改动检查相关功能。
+4. 从上一个 PI-YUN 发布版本到目标提交整理变更，准备发布说明。不要把上游标签当作本项目的发布记录。
 
-## 0. One-time Setup: npm Trusted Publishing
+## 版本、构建与 npm 发布
 
-The publish workflow authenticates to npm with Trusted Publishing (OIDC). No npm token exists anywhere, so nothing expires or needs rotating.
+`package.json` 的 `npm run release` 当前依次执行 `npm ci`、`npm version patch --no-git-tag-version`、`npm run build` 和 `npm publish`。它会直接向 npm 发布，递增补丁版本并修改两个版本文件，但不会创建 Git 提交或标签。使用前应确认递增后的版本可用、npm 登录与权限正确，并在没有开发服务器的独立干净检出目录运行；构建会写入 `.next/`。
 
-On npmjs.com, open `@agegr/pi-web` → Settings → Trusted Publisher → GitHub Actions and enter:
-
-- Organization or user: `agegr`
-- Repository: `pi-web`
-- Workflow filename: `publish.yml`
-- Environment: leave empty
-- Permissions: `npm publish` only. The workflow publishes directly; `npm stage publish` (a staged version that waits for a maintainer's 2FA approval) is not used.
-
-Renaming the workflow file breaks publishing until this entry is updated. Settings → Publishing access is set to "Require two-factor authentication and disallow bypass 2fa tokens": Trusted Publishing is not a token and keeps working, and a manual `npm publish` still works with a 2FA prompt.
-
-## 1. Preflight
+如果需要其他版本号，或希望在发布前先审查构建和版本文件，可在独立发布目录中分步执行：
 
 ```bash
-git fetch origin
-git status --short --branch
-git log --oneline --decorate -5
-git rev-list --left-right --count main...origin/main
-gh auth status
-node -e "const p=require('./package.json'); console.log(p.version)"
-gh run list --branch main --workflow ci.yml --limit 1
+npm ci
+npm version <version> --no-git-tag-version
+npm run build
+npm publish
 ```
 
-Expected:
+`npm publish` 是实际发布动作；发布成功后不能假定该版本可以重新使用。`prebuild` 会检查安装的 Next.js 版本，`prepack` 会检查构建产物。发布后确认 `npm view pi-yun@<version> version` 返回预期版本，并检查 npm 的 dist-tags。
 
-- `git status` is clean: `npm version` refuses a dirty tree.
-- `main` and `origin/main` are aligned (`0	0`), and every commit meant for this release is on `origin/main`. A commit merged only locally has had no CI run: push `main` first and wait for CI.
-- GitHub is authenticated as an account that can push and create releases.
-- CI on the commit you are releasing passed. The publish workflow only builds; it does not lint or test.
+## 提交、标签和 GitHub Release
 
-Nothing is built locally, so a running dev server on 30141 is safe, and a local `.next/server/route-cache/` cannot leak into the package: CI builds from a fresh checkout.
-
-Before bumping, confirm the next version is free (replace `<version>`):
+将版本文件及准备发布的其他改动提交后，确认提交中的 `package.json` 版本与标签一致。创建附注标签并只推送本次标签：
 
 ```bash
-npm view @agegr/pi-web@<version> version --registry https://registry.npmjs.org/   # expect E404
-git ls-remote --tags origin v<version>                                            # expect empty
-```
-
-## 2. Bump, Commit and Tag
-
-Patch release:
-
-```bash
-npm run release
-```
-
-The release script runs:
-
-```bash
-npm version patch -m "Release v%s"
-```
-
-It bumps `package.json` and `package-lock.json`, commits them as `Release v<version>`, and creates the annotated tag `v<version>`. Nothing leaves your machine yet.
-
-For a minor (or major) release, name the bump yourself:
-
-```bash
-npm version minor -m "Release v%s"
-```
-
-Choosing the bump: look at `git log --oneline v<previous>..HEAD`. A batch of `feat:` commits (new UI, new commands, new settings) is a minor; only fixes and small adjustments is a patch. Decide before pushing, since a published version cannot be reused.
-
-Check the result before pushing:
-
-```bash
-git show --stat HEAD
-git tag --points-at HEAD
-```
-
-## 3. Push: CI Publishes to npm and GHCR
-
-```bash
-git push origin main v<version>
-```
-
-Push the release tag by name. Do not use `git push --tags`: the local checkout holds tags fetched from contributor forks that are not on origin, and `--tags` publishes them (it leaked a stray `v0.10.5`, on a commit that is on no branch, during the v0.11.0 release). If you ever need `--tags`, compare `git tag` with `git ls-remote --tags origin` first.
-
-The tag starts the Release workflow (`publish.yml`). Its `check-tag` job fails the run at once if the tag is not `v` + the `package.json` version; after it, two jobs run side by side:
-
-- `npm` runs `npm ci`, `npm run build` and `npm publish --access public`. It takes about three minutes.
-- `container` builds `linux/amd64` and `linux/arm64` images and pushes them to GHCR. The arm64 half runs under QEMU: the v0.14.1 build took 33 minutes of its 45-minute timeout.
-
-Follow it:
-
-```bash
-gh run list --workflow publish.yml --limit 1
-gh run watch <run-id> --exit-status
-```
-
-The same push to `main` also redeploys the demo (`demo-pages.yml`), since the release commit changes `package.json`.
-
-Notes:
-
-- `gh run watch` can return a non-zero exit while the run is still going (it did on the long container build). Check `gh run view <run-id>` before treating it as a failure.
-
-- A newly published version may take a few minutes to show up. `npm view @agegr/pi-web@<version> version` can return E404 and `npm view @agegr/pi-web version` can show the previous version even though the workflow log printed `+ @agegr/pi-web@<version>`. This is registry propagation, not a failed publish: do not re-run the workflow. Poll the registry until the version appears:
-
-```bash
-curl -s https://registry.npmjs.org/@agegr%2Fpi-web/<version> | head -c 80   # JSON once it exists, "version not found" before
-npm view @agegr/pi-web dist-tags --registry https://registry.npmjs.org/
-npm view @agegr/pi-web versions --json --registry https://registry.npmjs.org/
-```
-
-- The package carries a provenance statement linking it to the workflow run; the npm page shows it.
-
-If the workflow fails before `npm publish` succeeds, the version is still free:
-
-- A passing cause (npm or GitHub outage): `gh run rerun <run-id>`.
-- A code or config fix: land it on `main`, then move the tag to the fixed commit and push it again. This is safe only while npm does not have the version (check with the `curl` above):
-
-```bash
-git tag -d v<version>
-git push origin :refs/tags/v<version>
 git tag -a v<version> -m "Release v<version>"
 git push origin main v<version>
 ```
 
-- An `ENEEDAUTH` or 404 on `npm publish` means the Trusted Publisher entry (step 0) does not match this repository and `publish.yml`.
+不要使用 `git push --tags`：本地可能存在从上游或其他来源获取的标签。如果版本尚未改变，也可给已有目标提交打与其版本一致的标签；确保需要发布的全部修改都已提交并包含在标签内。
 
-If the `container` job fails after npm has the version, the tag can no longer move. A passing cause: `gh run rerun <run-id> --failed`, which reruns that job only; image tags are overwritten, so a partial push does no harm. A rerun builds the tagged commit again, so a fix to the Dockerfile or the workflow reaches GHCR only with the next release.
-
-### Pushed the tag too early
-
-If the tag went out before the release was ready (a commit still missing, say), cancel the Release run before `npm publish` runs:
+如需 GitHub Release，在标签推送后使用 GitHub 网页，或使用已登录且有权限的 GitHub CLI：
 
 ```bash
-gh run cancel <run-id>
-curl -s https://registry.npmjs.org/@agegr%2Fpi-web/<version> | head -c 80   # still "version not found"
+gh release create v<version> --repo Jason-24/pi-web-yun --verify-tag --title "v<version>" --notes-file <notes-file>
 ```
 
-Then either move the tag once the fix is on `main`, as above, or release the next patch instead. The second leaves an unpublished `v<version>` tag on origin, as `v0.14.0` was: base the next release notes on the last version that was published, and say there that the skipped tag was never released.
-
-## 4. Generate Release Notes from Commits
-
-Use the previous release tag as the base.
-
-```bash
-git log --oneline --decorate v<previous>..v<version>
-git log --format='%h%x09%s%n%b' v<previous>..v<version>
-git diff --stat v<previous>..v<version>
-```
-
-Write the release notes from those commits, not from memory. Include both Chinese and English sections. Keep commit hashes or PR numbers next to each item when useful.
-
-- Check commands, flags and setting names against `README.md` and the code before writing them down.
-- Thank outside contributors by name: `git log --format='%h %an | %s' v<previous>..v<version>` lists authors, and the previous release's notes show the style.
-- Open with the install/upgrade command (`npm install -g @agegr/pi-web@latest`), as earlier releases did.
-- Write the notes to a file outside the repo (for example `NOTES=$(mktemp)`), or pass them through stdin as shown below. A `release-notes.md` in the repo root is an untracked file in the next release's `git status`.
-
-Suggested structure:
-
-```markdown
-## 中文
-
-基于 `v<previous>..v<version>` 的提交整理。
-
-### 新增
-
-- ...
-
-### 修复
-
-- ...
-
-### 改进
-
-- ...
-
-### 内部调整
-
-- 发布 npm 包 `@agegr/pi-web@<version>`。
-
-## English
-
-Prepared from commits in `v<previous>..v<version>`.
-
-### Added
-
-- ...
-
-### Fixed
-
-- ...
-
-### Improved
-
-- ...
-
-### Internal
-
-- Published npm package `@agegr/pi-web@<version>`.
-```
-
-## 5. Create or Update the GitHub Release
-
-Create a new release:
-
-```bash
-gh release create v<version> \
-  --repo agegr/pi-web \
-  --verify-tag \
-  --title "v<version>" \
-  --notes-file "$NOTES"
-```
-
-If the release already exists and only the notes need updating:
-
-```bash
-gh release edit v<version> \
-  --repo agegr/pi-web \
-  --notes-file "$NOTES"
-```
-
-You can avoid a temporary file by passing notes through stdin:
-
-```bash
-gh release edit v<version> --repo agegr/pi-web --notes-file - <<'EOF'
-## 中文
-
-...
-
-## English
-
-...
-EOF
-```
-
-## 6. Final Verification
-
-```bash
-gh release view v<version> --repo agegr/pi-web
-gh run list --workflow publish.yml --limit 1
-npm view @agegr/pi-web@<version> version --registry https://registry.npmjs.org/
-npm view @agegr/pi-web dist-tags --registry https://registry.npmjs.org/
-git status --short --branch
-git log --oneline --decorate -3
-git ls-remote --tags origin
-```
-
-Check that the image can be pulled without signing in:
-
-```bash
-T=$(curl -s "https://ghcr.io/token?scope=repository:agegr/pi-web:pull" | node -p 'JSON.parse(require("fs").readFileSync(0)).token')
-for tag in <version> <major>.<minor> latest; do
-  printf '%s: ' "$tag"
-  curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" \
-    -H 'Accept: application/vnd.oci.image.index.v1+json' \
-    "https://ghcr.io/v2/agegr/pi-web/manifests/$tag"
-done
-```
-
-Expected:
-
-- GitHub Release exists and is not a draft unless intentionally published as one.
-- The Release run for `v<version>` succeeded, both its `npm` and `container` jobs.
-- npm exact version resolves and `latest` points at it (allow a few minutes, see step 3).
-- Every image tag answers `200`.
-- `git ls-remote --tags origin` shows no tag you did not mean to publish.
-- `main` is aligned with `origin/main`.
-- `HEAD` points at the release commit and `v<version>` tag.
+最后核对远端标签、GitHub Release 页面和 npm 版本。标签、GitHub Release 和 npm 发布是独立动作；未执行的步骤不会自动完成。Docker 使用本仓库的 [Docker 指南](./docker.md)自行构建，现有工作流不会为此 fork 自动发布镜像。

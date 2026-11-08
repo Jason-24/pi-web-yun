@@ -1,21 +1,21 @@
-# 参与贡献 Pi Web
+# 参与贡献 PI-YUN
 
 [English](../CONTRIBUTING.md)
 
-Pi Web 是 [pi coding agent](https://github.com/earendil-works/pi) 的轻量网页前端：它和 pi CLI 读写同一个 agent 目录，通过 pi 的 SDK 运行会话。被拒的 PR 大多不是做得不好，而是超出了这个范围，所以开始做新功能之前请先读一下这一页。
+PI-YUN 是 [pi coding agent](https://github.com/earendil-works/pi) 的轻量网页前端：它和 pi CLI 读写同一个 agent 目录，通过 pi 的 SDK 运行会话。被拒的 PR 大多不是做得不好，而是超出了这个范围，所以开始做新功能之前请先读一下这一页。
 
-## Pi Web 做什么
+## PI-YUN 做什么
 
 - **做浏览器比终端更擅长的事。** 按项目浏览会话；查看文件、diff 和工具输出；用表单配置模型、技能、agent、插件和 MCP 服务器，不必手改 JSON；在手机上或局域网里的另一台机器上使用 pi。
-- **行为与 pi 一致。** 同一个会话在 Pi Web 和 pi CLI 里表现相同；为 CLI 写的扩展在这里无需修改就能工作，扩展请求的含义以 pi 的 TUI（`@earendil-works/pi-tui`）为准。
+- **行为与 pi 一致。** 同一个会话在 PI-YUN 和 pi CLI 里表现相同；为 CLI 写的扩展在这里无需修改就能工作，扩展请求的含义以 pi 的 TUI（`@earendil-works/pi-tui`）为准。
 
 ## 不在范围内
 
 以下内容无论实现得多好，都不会合并：
 
 - **改变 pi 本身的行为**：系统提示词、工具行为、提示模板展开、重试、压缩，以及写进会话文件的内容。请到 pi 上游提出。
-- **可以做成 pi 扩展的功能**：比如定时消息、自定义命令、新的 provider。扩展在 pi 和 Pi Web 里都能用；定时发送就是用扩展解决的，见 [#666](https://github.com/agegr/pi-web/issues/666)。
-- **只有 Pi Web 认的配置或扩展 API**：只有 Pi Web 读取的新配置文件；新的 `ctx.ui.*` 选项或 `extension_ui_request` 字段；给现有字段赋予新含义。pi 协议已经表达的东西，怎么显示由网页端自己决定。
+- **可以做成 pi 扩展的功能**：比如定时消息、自定义命令、新的 provider。扩展在 pi 和 PI-YUN 里都能用；定时发送就是用扩展解决的，见 [#666](https://github.com/agegr/pi-web/issues/666)。
+- **只有 PI-YUN 认的配置或扩展 API**：只有 PI-YUN 读取的新配置文件；新的 `ctx.ui.*` 选项或 `extension_ui_request` 字段；给现有字段赋予新含义。pi 协议已经表达的东西，怎么显示由网页端自己决定。
 - **IDE 或 Git 客户端功能**：编辑文件、文件管理（新建、重命名、删除）、提交历史、第二套 diff 视图。文件查看器保持只读，编辑交给 agent 或你自己的编辑器。
 - **新的子系统或运行模式**：定时调度、长期运行的后台 agent、插件或 UI 插槽系统、第二种“精简”模式、多窗格布局。
 - **内置主题之外的视觉定制**：自定义主题、皮肤、聊天背景、额外的强调色。外观只能选内置主题（浅色、深色、雾青、蔷薇、松夜，或跟随系统），外加少量排版设置。
