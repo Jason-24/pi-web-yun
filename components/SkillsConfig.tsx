@@ -134,6 +134,7 @@ function SkillDetail({
   onToggle,
   toggling,
   saveError,
+  saved,
   updateStatus,
   checkingUpdate,
   updating,
@@ -153,6 +154,7 @@ function SkillDetail({
   onToggle: (skill: Skill) => void;
   toggling: boolean;
   saveError: string | null;
+  saved: boolean;
   updateStatus?: SkillUpdateResult;
   checkingUpdate: boolean;
   updating: boolean;
@@ -242,6 +244,7 @@ function SkillDetail({
         </div>
         <ConfigSwitch checked={enabled} loading={toggling} disabled={removing || transferBusy} label={enabled ? t("i18n.visibleInPrompt") : t("i18n.hiddenFromPrompt")} onChange={() => onToggle(skill)} />
       </section>
+      <p className="skills-save-status" role="status">{t(toggling ? "i18n.saving" : saved ? "i18n.saved" : "config.switchAutoSave")}</p>
       {saveError && <p role="alert" className="skills-error">{saveError}</p>}
 
       {collisions.length > 0 && <div className="skills-collision">
@@ -642,12 +645,14 @@ export function SkillsConfig({
   onClose,
   embedded = false,
   trust,
+  onTrustProject,
 }: {
   cwd: string;
   onClose: () => void;
   embedded?: boolean;
   /** The page's trust status for `cwd`; a new decision loads the list again. */
   trust?: ProjectTrustStatus | null;
+  onTrustProject?: () => void;
 }) {
   const { t } = useI18n();
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -657,6 +662,7 @@ export function SkillsConfig({
   const [selected, setSelected] = useState<string | null>(() => getLastSettingsSelection("skills", cwd));
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedSkillPath, setSavedSkillPath] = useState<string | null>(null);
   // The group switch that is running, and what the last one left undone.
   const [bulkGroup, setBulkGroup] = useState<string | null>(null);
   const [groupStatus, setGroupStatus] = useState<{ group: string; error: string } | null>(null);
@@ -820,6 +826,7 @@ export function SkillsConfig({
     const next = !skill.disableModelInvocation;
     setToggling((s) => new Set(s).add(skill.filePath));
     setSaveError(null);
+    setSavedSkillPath(null);
     setGroupStatus(null);
     try {
       const res = await fetch("/api/skills", {
@@ -842,6 +849,7 @@ export function SkillsConfig({
             : s,
         ),
       );
+      setSavedSkillPath(skill.filePath);
     } catch (e) {
       setSaveError(String(e));
     } finally {
@@ -863,6 +871,7 @@ export function SkillsConfig({
     const disableModelInvocation = !enabled;
     setToggling((current) => new Set([...current, ...filePaths]));
     setBulkGroup(group);
+    setSavedSkillPath(null);
     setSaveError(null);
     setGroupStatus(null);
     try {
@@ -957,7 +966,11 @@ export function SkillsConfig({
     <div className="skills-panel">
     <ConfigPanelShell embedded={embedded} title={t("common.skills")} subtitle={shortenPath(cwd)} closeLabel={t("i18n.close")} onClose={onClose}>
 
-        {!projectResourcesLoaded && <ConfigTrustNotice message={t("trust.skillsNotLoaded")} />}
+        {!projectResourcesLoaded && <ConfigTrustNotice
+          message={t("trust.skillsNotLoaded")}
+          trustLabel={t("mcp.trust.trustButton")}
+          onTrust={trust?.requiresTrust && !trust.trusted ? onTrustProject : undefined}
+        />}
         {removeError && <div className={`skills-notice ${removeSuccessful ? "skills-noticeSuccess" : "skills-noticeWarning"}`} role={removeSuccessful ? "status" : "alert"}>
           <span className="skills-noticeIcon" aria-hidden="true">{removeSuccessful ? "✓" : "!"}</span>
           <div className="skills-noticeBody">
@@ -1112,6 +1125,7 @@ export function SkillsConfig({
                 onToggle={toggle}
                 toggling={toggling.has(selectedSkill.filePath)}
                 saveError={saveError}
+                saved={savedSkillPath === selectedSkill.filePath}
                 updateStatus={
                   updateKey(selectedSkill)
                     ? updateStatuses[updateKey(selectedSkill)!]

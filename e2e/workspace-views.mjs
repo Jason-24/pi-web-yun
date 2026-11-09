@@ -1,7 +1,10 @@
 // Run against an existing dev server: E2E_BROWSER_CHANNEL=chrome node e2e/workspace-views.mjs
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { getPackageDir } from "@earendil-works/pi-coding-agent";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { showSidebarFiles } from "./sidebar.mjs";
@@ -18,6 +21,19 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     { role: "user", content: "检查工作区的导航与视图切换", timestamp: 1792972800000 },
     { role: "assistant", content: [{ type: "text", text: "会话已经加载。\n\n" + "保持当前对话与草稿，切换视图时继续接收会话事件。\n\n".repeat(40) }], timestamp: 1792972801000, stopReason: "stop", usage: { input: 25000, output: 19000, cacheRead: 0, cacheWrite: 0, totalTokens: 44000, cost: { input: 0.075, output: 0.285, cacheRead: 0, cacheWrite: 0, total: 0.36 } } },
   ];
+  const exportDir = await mkdtemp(join(tmpdir(), "pi-web-history-fixture-"));
+  let historyHtml;
+  try {
+    const fixture = join(exportDir, "session.jsonl");
+    const { exportFromFile } = await import(pathToFileURL(join(getPackageDir(), "dist/core/export-html/index.js")).href);
+    await writeFile(fixture, [
+      { type: "session", version: 3, id: session.id, timestamp: session.created, cwd },
+      { type: "message", id: "older", parentId: null, timestamp: session.created, message: { role: "user", content: "更早的一条历史消息", timestamp: 1792886400000 } },
+      ...messages.map((message, index) => ({ type: "message", id: index ? "answer" : "user", parentId: index ? "user" : "older", timestamp: session.modified, message })),
+    ].map(JSON.stringify).join("\n") + "\n");
+    const output = await exportFromFile(fixture, join(exportDir, "session.html"));
+    historyHtml = await readFile(output, "utf8");
+  } finally { await rm(exportDir, { recursive: true, force: true }); }
   const contextPage = { messages, entryIds: ["user", "answer"], oldestEntryId: "user", hasMore: true, turnsBefore: 0, thinkingLevel: "off", model: null };
   const tree = [1, 2].map(index => ({ entry: { type: "message", id: `branch-${index}`, parentId: null,
     timestamp: session.modified, message: { role: "user", content: `可选分支 ${index}` } }, children: [] }));
@@ -26,11 +42,14 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
   const branchReads = [];
   const branchTargets = [];
   let sessionReads = 0;
-  let olderReads = 0;
+  let historyReads = 0;
+  let historyFailure = false;
+  let downloads = 0;
+  page.on("download", () => { downloads++; });
   let popups = 0;
   page.on("pageerror", error => errors.push(error.message));
   page.on("popup", popup => { popups++; void popup.close(); });
-  await context.addInitScript(() => localStorage.setItem("pi-locale", "zh-CN"));
+  await context.addInitScript(() => { if (window === window.top) localStorage.setItem("pi-locale", "zh-CN"); });
   await page.route("**/api/**", async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -54,13 +73,18 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
     if (path === "/api/cache-miss-notices") return reply({ enabled: true });
     if (path === "/api/web-auth") return reply({ enabled: false });
+    if (path === `/api/sessions/${session.id}/export`) {
+      historyReads++;
+      if (historyFailure) return route.fulfill({ status: 500, json: { error: "Export fixture failure" } });
+      return route.fulfill({ contentType: "text/html; charset=utf-8", body: historyHtml });
+    }
     if (path === `/api/sessions/${session.id}/context`) {
       const leafId = url.searchParams.get("leafId");
       if (leafId) branchReads.push(leafId);
       if (leafId === "branch-2") return reply({ context: { ...contextPage,
         messages: [{ role: "user", content: "第二条分支的独立对话内容", timestamp: 1792972800000 }], entryIds: ["branch-2"], hasMore: false } });
       if (url.searchParams.has("before")) {
-        olderReads++;
+
         return reply({ context: { ...contextPage, messages: [{ role: "user", content: "更早的一条历史消息", timestamp: 1792886400000 }], entryIds: ["older"], oldestEntryId: "older", hasMore: false } });
       }
       return reply({ context: contextPage });
@@ -272,12 +296,35 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.deepEqual(branchTargets, ["branch-2", "branch-1"]);
     await checkEmbedded("agents");
     const history = await checkEmbedded("history");
-    await history.getByText("会话已经加载。", { exact: false }).waitFor();
-    await history.getByRole("button", { name: "加载更多", exact: false }).click();
-    await history.getByText("更早的一条历史消息", { exact: true }).waitFor();
-    assert.equal(olderReads, 1);
+    const historyFrame = history.frameLocator("iframe");
+    await historyFrame.locator("#messages").getByText("会话已经加载。", { exact: false }).waitFor();
+    await historyFrame.locator("#messages").getByText("更早的一条历史消息", { exact: true }).waitFor();
+    const initialHistoryReads = historyReads;
+    await historyFrame.getByRole("button", { name: "User", exact: true }).click();
+    await historyFrame.locator("#tree-search").fill("更早");
+    await historyFrame.locator("#tree-search").fill("");
+    assert.equal(await history.locator("iframe").getAttribute("sandbox"), "allow-scripts allow-downloads");
+    assert.equal(await historyFrame.locator("body").evaluate(() => { try { void parent.document; return true; } catch { return false; } }), false);
+    assert.equal(historyReads, initialHistoryReads, "Tree filters stay inside the exported viewer");
     assert.equal(popups, 0, "history opens in the workspace");
     await page.screenshot({ path: resolve(artifacts, "workspace-history.png") });
+    historyFailure = true;
+    await history.getByRole("button", { name: "导出 HTML", exact: true }).click();
+    await history.getByText("导出失败，请点击“导出 HTML”重试。", { exact: true }).waitFor();
+    assert.equal(downloads, 0, "An error response must not download JSON");
+    historyFailure = false;
+    const downloadReady = page.waitForEvent("download");
+    await history.getByRole("button", { name: "导出 HTML", exact: true }).click();
+    const download = await downloadReady;
+    assert.equal(await download.failure(), null);
+    assert.ok(download.suggestedFilename().endsWith(".html"));
+    historyFailure = true;
+    await history.locator(".workspace-page-header").getByRole("button", { name: "刷新", exact: true }).click();
+    await history.getByRole("alert").waitFor();
+    historyFailure = false;
+    await history.getByRole("alert").getByRole("button", { name: "刷新", exact: true }).click();
+    await historyFrame.locator("#tree-search").waitFor();
+    await history.getByRole("button", { name: "返回对话", exact: true }).focus();
     await page.keyboard.press("Escape");
     assert.equal(await view("chat").getAttribute("aria-current"), "page");
     assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
@@ -445,7 +492,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await page.screenshot({ path: resolve(artifacts, "workspace-mobile-system.png") });
     assert.equal(commands.some(type => type === "prompt" || type === "abort"), false);
     assert.deepEqual(errors, []);
-    console.log("PASS: fixed navigation, embedded system/tools/history/settings/branches/agents, floating companion, left content/right directory and resizing, history paging, no popups, mounted chat and draft preservation, session switching, mobile width, no prompt/abort or browser errors.");
+    console.log("PASS: fixed navigation, embedded system/tools/history/settings/branches/agents, floating companion, left content/right directory and resizing, native history tree, no popups, mounted chat and draft preservation, session switching, mobile width, no prompt/abort or browser errors.");
   } catch (error) {
     await page.screenshot({ path: resolve(artifacts, "workspace-failure.png") });
     console.error({ url: page.url(), branchReads, branchTargets, errors,

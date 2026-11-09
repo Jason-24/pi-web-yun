@@ -16,6 +16,13 @@
 .workspace-title-action { padding: 0 10px; color: var(--text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 12px; white-space: nowrap; }
 .workspace-title-action:disabled { opacity: .4; cursor: default; }
 .workspace-page { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); outline: none; }
+.workspace-page[data-workspace-page="history"] { color: var(--text); }
+.workspace-page[data-workspace-page="history"] > .workspace-page-content { overflow: hidden; }
+.session-history-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+.session-export-action { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 240px; }
+.session-export-action button:disabled { opacity: .6; cursor: wait; }
+.session-export-error { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+.session-history-status { height: 100%; overflow: auto; padding: 24px 28px; }
 .workspace-page-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 84px; padding: 18px 28px; border-bottom: 1px solid var(--border); }
 .workspace-page-header > div { flex: 1; min-width: 0; }
 .workspace-page-header h1 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -.02em; }

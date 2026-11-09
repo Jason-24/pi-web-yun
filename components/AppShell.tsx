@@ -30,7 +30,8 @@ import { SessionOverview } from "./SessionOverview";
 import { PanelChanges, PanelTabSwitcher, PanelToolLauncher } from "./PanelTools";
 import { PANEL_CHANGES_ID, PANEL_FILES_ID, PANEL_LAUNCHER_ID, isFileWorkspaceTab, panelToolShortcut, type PanelTool } from "@/lib/panel-tools";
 import { SessionChatPanel } from "./SessionChatPanel";
-import { SubagentViewer } from "./SubagentViewer";
+import { SessionHistoryViewer } from "./SessionHistoryViewer";
+import { SessionExportButton } from "./SessionExportButton";
 import { TerminalPanel } from "./TerminalPanel";
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -2627,6 +2628,7 @@ export function AppShell() {
           )}
           {activeTopPanel && !settingsSection && <section className="workspace-page" ref={workspacePanelRef} tabIndex={-1}
             id={activeTopPanel === "session" ? "workspace-usage-page" : undefined}
+            data-theme={activeTopPanel === "history" ? "dark" : undefined}
             data-workspace-page={activeTopPanel} aria-label={translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}>
             <header className="workspace-page-header">
               <div><h1>{translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}</h1>
@@ -2634,7 +2636,7 @@ export function AppShell() {
               </div>
               {activeTopPanel === "history" && selectedSession && <>
                 <button type="button" className="workspace-page-back" onClick={() => setHistoryRefreshKey((key) => key + 1)}>{translate("i18n.refresh")}</button>
-                <a className="workspace-page-export" href={"api/sessions/" + encodeURIComponent(selectedSession.id) + "/export"} download>{translate("navigation.exportHistory")}</a>
+                <SessionExportButton key={selectedSession.id} sessionId={selectedSession.id} />
               </>}
               <button type="button" className="workspace-page-back" onClick={() => setActiveTopPanel(null)}>
                 {translate(homeOpen ? "navigation.backHome" : "navigation.backChat")}
@@ -2647,9 +2649,8 @@ export function AppShell() {
                 onDelete={(sessionId) => sidebarControlRef.current?.deleteArchivedSession(sessionId) ?? Promise.resolve(false)}
                 onDeleteMany={(sessionIds) => sidebarControlRef.current?.deleteArchivedSessions(sessionIds) ?? Promise.resolve(false)}
                 onRefresh={() => { void sidebarControlRef.current?.refreshArchive(); }} />}
-              {activeTopPanel === "history" && selectedSession && <SubagentViewer key={`${selectedSession.id}:${historyRefreshKey}`} variant="history"
-                sessionId={selectedSession.id} fallbackLabel={sessionDisplayTitle(selectedSession)}
-                running={runningSessionIds.has(selectedSession.id)} onOpenFile={handleOpenLinkedFile} />}
+              {activeTopPanel === "history" && selectedSession && <SessionHistoryViewer key={`${selectedSession.id}:${historyRefreshKey}`}
+                sessionId={selectedSession.id} />}
               {activeTopPanel === "branches" && <BranchNavigator embedded tree={branchTree} activeLeafId={branchActiveLeafId}
                 onLeafChange={handleBranchLeafChange} locked={branchSwitchLocked} hasSession={Boolean(selectedSession)} />}
               {activeTopPanel === "agents" && activeSessionFamily && selectedSession && (

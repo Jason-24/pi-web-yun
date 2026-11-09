@@ -1196,7 +1196,7 @@ export function McpConfigView({
             })}
           />
         ) : (
-          <ConfigFooterStatus summary={counts.total > 0 ? t("mcp.serverCount", { enabled: counts.enabled, total: counts.total }) : ""} />
+          <ConfigFooterStatus summary={[counts.total > 0 ? t("mcp.serverCount", { enabled: counts.enabled, total: counts.total }) : "", t("config.switchAutoSave")].filter(Boolean).join(" · ")} />
         )}
       >
         {!embedded && <ConfigButton onClick={onClose}>{t("i18n.close")}</ConfigButton>}

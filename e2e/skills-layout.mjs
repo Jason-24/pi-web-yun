@@ -28,6 +28,8 @@ try {
       { name: "ui-review", description: "Review interface layout and accessibility.", filePath: `${cwd}/.agents/skills/ui-review/SKILL.md`, baseDir: `${cwd}/.agents/skills/ui-review`, sourceInfo: { source: "project", scope: "project" }, disableModelInvocation: false },
     ];
     let undoSkills = null, undoSourcePath = null;
+    let trusted = width !== 1440;
+    let toggleFailure = false;
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     const errors = [], writes = [];
@@ -51,13 +53,19 @@ try {
         skills.push(target);
         return reply({ targetPath, undoToken: "fixture-undo-token" });
       }
+      if (path === "/api/skills" && request.method() === "PATCH") {
+        if (toggleFailure) return route.fulfill({status:500,json:{error:"Skill write failure"}});
+        const body = request.postDataJSON();
+        for (const skill of skills) if (skill.filePath === body.filePath) skill.disableModelInvocation = body.disableModelInvocation;
+        return reply({success:true});
+      }
       if (path === "/api/skills/remove") {
         const body = request.postDataJSON();
         assert.equal(body.sharedAcknowledged, true);
         skills = skills.filter(skill => skill.filePath !== body.filePath);
         return reply({ success: true, failed: false, remains: false, backupPath: "C:/Users/test/.agents/.pi-web-skill-trash/find-skills-example" });
       }
-      if (path === "/api/skills") return reply({ skills, diagnostics: skills.some(skill => skill.loaded === false) ? [{ type: "collision", message: "same name", collision: { resourceType: "skill", name: "find-skills", winnerPath: undoSourcePath, loserPath: skills.find(skill => skill.loaded === false).filePath } }] : [], projectResourcesLoaded: true });
+      if (path === "/api/skills") return reply({ skills: trusted ? skills : skills.filter(skill => skill.install?.scope !== "project" && skill.sourceInfo?.scope !== "project"), diagnostics: skills.some(skill => skill.loaded === false) ? [{ type: "collision", message: "same name", collision: { resourceType: "skill", name: "find-skills", winnerPath: undoSourcePath, loserPath: skills.find(skill => skill.loaded === false).filePath } }] : [], projectResourcesLoaded: trusted });
       if (path === "/api/skills/content") return reply({ content: "---\nname: find-skills\n---\n## When to use this skill\n\nFind the right skill for your task and keep it available to your agent.\n\n- Search by the task you want to complete\n- Review the source and installation location\n- Install in your project or globally\n\n## Quick start\n\nDescribe the task you want help with. The agent can suggest matching skills and explain how to use them." });
       if (path === "/api/skills/search") return reply({ results: [] });
       if (path === "/api/models") return reply({ models: { "fixture/base": "Design assistant" }, modelList: [{ provider: "fixture", id: "base", name: "Design assistant" }], defaultModel: { provider: "fixture", modelId: "base" }, thinkingLevels: { "fixture:base": ["off", "high"] } });
@@ -74,7 +82,10 @@ try {
       if (path === "/api/web-auth") return reply({ enabled: false });
       if (path === "/api/app-update") return reply({ latestVersion: "0.2.7" });
       if (path === "/api/worktrees") return reply({ projectRoot: cwd, projectKey: cwd, isGit: false, worktrees: [] });
-      if (path === "/api/project-trust") return reply({ cwd, trusted: true, requiresTrust: false, mcpServers: [] });
+      if (path === "/api/project-trust") {
+        if (request.method() === "POST") trusted = true;
+        return reply({ cwd, trusted, requiresTrust: true, decision: trusted ? true : null, inherited: false, mcpServers: [] });
+      }
       if (path === "/api/cache-miss-notices") return reply({ showCacheMissNotices: true });
       if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
       return reply({});
@@ -92,9 +103,51 @@ try {
         settings = page.getByRole("region", { name: "设置", exact: true });
         await settings.getByRole("button", { name: "技能", exact: true }).filter({ visible: true }).click();
       } else settings = await openSettings(page, "Skills");
+      if (width === 1440) {
+        await settings.getByRole("button", { name: chinese ? "添加技能" : "Add skill", exact: true }).click();
+        const project = settings.getByRole("button", { name: chinese ? "项目" : "project", exact: true });
+        assert.equal(await project.isDisabled(), true);
+        const input = settings.getByRole("textbox", { name: chinese ? "搜索在线技能" : "Search online", exact: true });
+        const search = settings.getByRole("button", { name: chinese ? "搜索在线技能" : "Search online", exact: true });
+        assert.equal(await search.isDisabled(), true);
+        await input.fill("testing");
+        assert.equal(await search.isEnabled(), true);
+        await search.click();
+        await settings.getByText(chinese ? "未找到技能" : "No skills found", { exact: true }).last().waitFor();
+        const openTrust = settings.getByRole("button", { name: chinese ? "信任项目…" : "Trust project…", exact: true });
+        await openTrust.click();
+        const dialog = page.getByRole("dialog", { name: chinese ? "信任此项目？" : "Trust this project?" });
+        await dialog.waitFor();
+        await dialog.getByRole("button", { name: chinese ? "取消" : "Cancel", exact: true }).click();
+        assert.equal(trusted, false, "Cancel keeps the project untrusted");
+        await openTrust.click();
+        await dialog.getByRole("button", { name: chinese ? "信任项目" : "Trust project", exact: true }).click();
+        await dialog.waitFor({ state: "hidden" });
+        await page.waitForFunction(() => ![...document.querySelectorAll('.config-scope-switch-option')].find(el => el.textContent === 'project' || el.textContent === '项目')?.disabled);
+        assert.equal(await project.isEnabled(), true);
+        assert.equal(await input.inputValue(), "testing", "Trust reload preserves the search draft");
+        await project.click();
+        assert.equal(await project.getAttribute("aria-pressed"), "true");
+        assert.equal(await openTrust.count(), 0);
+        console.log("PASS skills trust: cancel, confirm, scope selection and editable search");
+      }
       await settings.getByRole("button", { name: "find-skills", exact: true }).click();
       await settings.getByRole("heading", { name: "find-skills", exact: true }).waitFor();
       await settings.getByText("When to use this skill", { exact: true }).waitFor();
+      if (width === 1440) {
+        const visibility = settings.locator(".skills-visibility").getByRole("switch");
+        const initial = await visibility.getAttribute("aria-checked");
+        toggleFailure = true;
+        await visibility.click();
+        await settings.getByRole("alert").filter({hasText:"Skill write failure"}).waitFor();
+        assert.equal(await visibility.getAttribute("aria-checked"),initial,"A failed toggle is not shown as saved");
+        toggleFailure = false;
+        await visibility.click();
+        await settings.locator(".skills-save-status").getByText(chinese ? "已保存" : "Saved",{exact:true}).waitFor();
+        assert.notEqual(await visibility.getAttribute("aria-checked"),initial);
+        await visibility.click();
+        await settings.locator(".skills-save-status").getByText(chinese ? "已保存" : "Saved",{exact:true}).waitFor();
+      }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       const detail = settings.locator(".config-detail").filter({ visible: true });
       assert.ok(await detail.evaluate(el => el.scrollWidth <= el.clientWidth), "detail fits its viewport");

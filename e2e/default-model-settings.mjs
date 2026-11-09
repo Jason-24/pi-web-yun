@@ -34,6 +34,14 @@ try {
   await page.getByRole("button", { name: "Open project" }).waitFor();
   await page.waitForTimeout(1000);
   const settings = await openSettings(page, "Models");
+  const defaults = settings.locator(".model-defaults");
+  const toggle = defaults.locator(".model-defaults-toggle");
+  assert.equal(await defaults.evaluate(el => el.open), false, "Defaults start collapsed");
+  assert.equal(await settings.locator(".config-sidebar > .model-defaults").count(), 1, "Defaults belong to the sidebar");
+  await mkdir("test-results/default-model-settings", { recursive: true });
+  await page.screenshot({ path: "test-results/default-model-settings/collapsed.png" });
+  await toggle.click();
+  assert.equal(writes.length, 0, "Opening defaults must not save settings");
   const picker = settings.getByLabel("Default model for new chats");
   await picker.waitFor();
   await mkdir("test-results/default-model-settings", { recursive: true });
@@ -68,6 +76,15 @@ try {
     const bounds = await settings.locator(`#${id}`).boundingBox();
     assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390);
   }
+  await page.setViewportSize({ width: 320, height: 480 });
+  for (const id of ["settings-default-model", "settings-default-thinking"]) {
+    await settings.locator(`#${id}`).scrollIntoViewIfNeeded();
+    const bounds = await settings.locator(`#${id}`).boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 320 && bounds.y >= 0 && bounds.y + bounds.height <= 480);
+  }
+  await toggle.click();
+  await settings.getByRole("button", { name: "Add provider", exact: true }).waitFor();
+  assert.equal(await defaults.evaluate(el => el.open), false);
   console.log("PASS: settings saves the new-chat default and shows project refusals");
 } catch (error) {
   console.error((await page.locator("body").innerText()).slice(0, 2500));

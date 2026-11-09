@@ -1819,7 +1819,7 @@ function AddProviderPicker({
         onClose();
       }}
     >
-      <div style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+      <div role="dialog" aria-modal="true" aria-label={t("i18n.addProvider")} style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", overflow: "hidden" }}>
         {/* Search */}
         <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
@@ -1906,16 +1906,19 @@ function AddProviderPicker({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-function DefaultModelSetting({ cwd, revision, scope }: { cwd: string | null; revision: number; scope: EnabledModelsController["view"] }) {
+function DefaultModelSetting({ cwd, revision, scope, onConfigure }: { cwd: string | null; revision: number; scope: EnabledModelsController["view"]; onConfigure: () => void }) {
   const { t } = useI18n();
   const [models, setModels] = useState<{ provider: string; id: string; name: string }[]>([]);
   const [selected, setSelected] = useState("");
   const [thinking, setThinking] = useState("");
   const [busy, setBusy] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
+    setModelsLoaded(false);
     const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
     fetch(`/api/models${query}`, { signal: controller.signal }).then(async (res) => {
       const data = await res.json() as { modelList?: { provider: string; id: string; name: string }[]; defaultModel?: { provider: string; modelId: string } | null; savedDefaultThinkingLevel?: string | null; error?: string };
@@ -1926,9 +1929,9 @@ function DefaultModelSetting({ cwd, revision, scope }: { cwd: string | null; rev
       setSelected((previous) => available.some((item) => JSON.stringify([item.provider, item.id]) === previous) ? previous : value);
       setThinking((previous) => previous || data.savedDefaultThinkingLevel || "");
       setError("");
-    }).catch((err: unknown) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err)); });
+    }).catch((err: unknown) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err)); }).finally(() => { if (!controller.signal.aborted) setModelsLoaded(true); });
     return () => controller.abort();
-  }, [cwd, revision, scope]);
+  }, [cwd, revision, scope, loadAttempt]);
 
   async function saveDefault() {
     const model = models.find((item) => JSON.stringify([item.provider, item.id]) === selected);
@@ -1953,7 +1956,15 @@ function DefaultModelSetting({ cwd, revision, scope }: { cwd: string | null; rev
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setBusy(false); }
   }
-  return <div className="model-defaults">
+  return <details className="model-defaults">
+    <summary className="model-defaults-toggle">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" fill="var(--bg-panel)" /><circle cx="15" cy="17" r="3" fill="var(--bg-panel)" />
+      </svg>
+      <span>{t("models.newChatDefaults")}</span>
+      <svg className="model-defaults-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+    </summary>
+    <div className="model-defaults-body">
     <div className="model-defaults-fields">
     <div className="model-defaults-field">
     <label htmlFor="settings-default-model">{t("models.defaultForNewChats")}</label>
@@ -1977,10 +1988,14 @@ function DefaultModelSetting({ cwd, revision, scope }: { cwd: string | null; rev
     </div>
     </div>
     <div className="model-defaults-meta">
+      <span>{t("models.defaultInstant")}</span>
+      {modelsLoaded && !error && models.length === 0 && <div className="model-defaults-empty"><p>{t("models.noDefaultModels")}</p><ConfigButton size="small" onClick={onConfigure}>{t("i18n.addProvider")}</ConfigButton></div>}
       <details className="model-defaults-help"><summary>{t("models.defaultNotes")}</summary><p>{t("models.defaultHelp")} {t("models.thinkingDefaultHelp")}</p></details>
+      {error && <ConfigButton size="small" onClick={() => setLoadAttempt(value => value + 1)}>{t("i18n.refresh")}</ConfigButton>}
       <span role="status" className={error ? "model-defaults-status is-error" : "model-defaults-status"}>{error || message}</span>
     </div>
-  </div>;
+    </div>
+  </details>;
 }
 
 export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
@@ -1999,12 +2014,16 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   // would not contain the file's providers, and a save replaces the whole file.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savedOk, setSavedOk] = useState(false);
+  const [savedConfigJson, setSavedConfigJson] = useState<string | null>(null);
   const [defaultModelRevision, setDefaultModelRevision] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(readRememberedSelection);
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
   const [apiKeyProviders, setApiKeyProviders] = useState<ApiKeyProvider[]>([]);
   /** Set once the provider lists have answered; until then an overrides-only entry may be a managed provider's. */
   const [authListed, setAuthListed] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authRefreshing, setAuthRefreshing] = useState(false);
+  const authRequest = useRef<AbortController | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Provider ids as models.json has them on disk, and where renames moved them. */
   const savedProvidersRef = useRef<Set<string>>(new Set());
@@ -2022,15 +2041,30 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
   const [providerNameDraft, setProviderNameDraft] = useState<{ provider: string; name: string } | null>(null);
 
   const refreshAuthProviders = useCallback(() => {
-    fetch("/api/auth/providers")
-      .then((r) => r.json())
-      .then((d: { oauthProviders?: OAuthProvider[]; apiKeyProviders?: ApiKeyProvider[] }) => {
-        if (Array.isArray(d.oauthProviders)) setOauthProviders(d.oauthProviders);
-        if (Array.isArray(d.apiKeyProviders)) setApiKeyProviders(d.apiKeyProviders);
+    authRequest.current?.abort();
+    const controller = new AbortController();
+    authRequest.current = controller;
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    setAuthRefreshing(true);
+    void fetch("/api/auth/providers", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json() as { oauthProviders?: OAuthProvider[]; apiKeyProviders?: ApiKeyProvider[]; error?: string };
+        if (!response.ok || data.error) throw new Error(`HTTP ${response.status}`);
+        if (!Array.isArray(data.oauthProviders) || !Array.isArray(data.apiKeyProviders)) throw new Error("Invalid provider listing");
+        if (authRequest.current !== controller) return;
+        setOauthProviders(data.oauthProviders);
+        setApiKeyProviders(data.apiKeyProviders);
+        setAuthError(null);
       })
-      .catch(() => {})
-      .finally(() => setAuthListed(true));
+      .catch((error: unknown) => {
+        if (authRequest.current === controller) setAuthError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (authRequest.current === controller) { setAuthListed(true); setAuthRefreshing(false); }
+      });
   }, []);
+  useEffect(() => () => { authRequest.current?.abort(); authRequest.current = null; }, []);
 
   useEffect(() => {
     fetch("/api/models-config")
@@ -2042,6 +2076,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
       .then((d) => {
         const normalized = d.providers ? d : { ...d, providers: {} };
         setConfig(normalized);
+        setSavedConfigJson(JSON.stringify(normalized));
         savedProvidersRef.current = new Set(Object.keys(normalized.providers ?? {}));
         savedModelIdsRef.current = savedModelIds(normalized);
         const keys = Object.keys(normalized.providers ?? {});
@@ -2212,6 +2247,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
       }
       draft = renamed;
     }
+    const draftSnapshot = JSON.stringify(draft);
     try {
       draft = normalizeContextWindowOverrides(draft);
       checkProviderEntries(draft);
@@ -2224,8 +2260,8 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
       const d = await res.json() as { success?: boolean; error?: string };
       if (!res.ok || d.error) setSaveError(d.error ?? `HTTP ${res.status}`);
       else {
+        setSavedConfigJson(draftSnapshot);
         setSavedOk(true);
-        setTimeout(() => setSavedOk(false), 2000);
         // models.json just changed under the switches: providers may have been
         // renamed, models added, deleted or renamed. Re-verify the stored
         // patterns against the new catalog and re-read.
@@ -2248,6 +2284,10 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
       setSaving(false);
     }
   }, [applyProviderRename, config, enabledModels, loadError, providerNameDraft, t]);
+
+  const dirty = savedConfigJson !== null && (JSON.stringify(config) !== savedConfigJson
+    || Boolean(providerNameDraft && providerNameDraft.name.trim() !== providerNameDraft.provider));
+  const showSaved = savedOk && !dirty;
 
   const providers = Object.entries(config.providers ?? {}).filter(([id, entry]) => {
     if (!isOverridesOnly(entry)) return true;
@@ -2313,8 +2353,11 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
     <>
     <ConfigPanelShell embedded={embedded} title={t("common.models")} subtitle="~/.pi/agent/models.json" closeLabel={t("i18n.close")} onClose={onClose}>
 
+        {authError && <div className="models-load-notice" role="alert">
+          <div><strong>{t("models.providersLoadFailed")}</strong><p>{t("models.providersLoadHelp")}</p></div>
+          <ConfigButton size="small" onClick={() => { refreshAuthProviders(); enabledModels.refresh(); setDefaultModelRevision(value => value + 1); }} disabled={authRefreshing}>{t(authRefreshing ? "i18n.loading" : "i18n.refresh")}</ConfigButton>
+        </div>}
         <EnabledModelsBanner controller={enabledModels} />
-        <DefaultModelSetting key={cwd ?? ""} cwd={cwd} revision={defaultModelRevision} scope={enabledModels.view} />
 
         {/* Body */}
         <ConfigSplitView>
@@ -2417,6 +2460,8 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
               })}
             </ConfigSidebarList>
 
+            <DefaultModelSetting key={cwd ?? ""} cwd={cwd} revision={defaultModelRevision} scope={enabledModels.view} onConfigure={() => setPickerOpen(true)} />
+
             {/* Add provider */}
             {/* The picker chooses first; its choice opens the detail on a phone. */}
             <ConfigListAction onClick={(event) => { event.preventDefault(); setPickerOpen(true); }}>{t("i18n.addProvider")}</ConfigListAction>
@@ -2437,21 +2482,21 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
           <span style={{ color: "#f87171" }}>
             {loadError ? t("models.configUnreadable", { error: loadError }) : saveError}
           </span>
-        ) : t("models.applyHelp")}>
+        ) : <span role="status">{t(saving ? "i18n.saving" : dirty ? "config.unsavedChanges" : showSaved ? "i18n.saved" : "config.noPendingChanges")} · {t("models.applyHelp")}</span>}>
           {!embedded && <ConfigButton onClick={onClose}>{t("i18n.cancel")}</ConfigButton>}
           <ConfigButton
             variant="primary"
             onClick={handleSave}
-            disabled={saving || savedOk || loadError !== null}
-            className={savedOk ? "is-success" : undefined}
+            disabled={saving || (showSaved && !dirty) || loadError !== null}
+            className={showSaved ? "is-success" : undefined}
           >
-            {savedOk && (
+            {showSaved && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
                 className="config-button-success-icon">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
-             <span>{savedOk ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}</span>
+             <span>{showSaved ? t("i18n.saved") : saving ? t("i18n.saving") : t("i18n.save")}</span>
           </ConfigButton>
         </ConfigFooter>
     </ConfigPanelShell>
