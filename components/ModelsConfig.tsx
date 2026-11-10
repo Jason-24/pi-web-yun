@@ -608,6 +608,9 @@ function ThinkingLevelMapEditor({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+        {t("models.thinkingLevelMapHelp")}
+      </p>
       {THINKING_LEVELS.map((level) => {
         const raw = map[level];
         const state: "omit" | "null" | "string" =
@@ -667,7 +670,7 @@ function ThinkingLevelMapEditor({
                 onClick={() => setLevel(level, "omit")}
                 style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
               >
-                {t("i18n.default")}
+                {t(level === "xhigh" || level === "max" ? "models.thinkingDefaultUnavailable" : "i18n.default")}
               </button>
               <button
                 onClick={() => setLevel(level, null)}

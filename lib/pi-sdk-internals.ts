@@ -47,7 +47,7 @@ const MEMBERS = {
   getMcpToolExposure: { module: "mcpServers", kind: "function" },
   signInMcpServer: { module: "mcpOAuth", kind: "function" },
   McpOAuthCredentialStore: { module: "mcpOAuth", kind: "class" },
-  McpSignInCancelledError: { module: "mcpOAuth", kind: "class" },
+  McpSignInCancelledError: { module: "mcpRuntime", kind: "class" },
   resolveConfigValueOrThrow: { module: "configValues", kind: "function" },
   resolveHeadersOrThrow: { module: "configValues", kind: "function" },
   getConfigValueEnvVarNames: { module: "configValues", kind: "function" },
@@ -63,8 +63,8 @@ export type McpOAuthCredentialStore = NonNullable<McpExtensionOptions["credentia
 /** One server's slice of the credential store. */
 export type McpOAuthServerStore = ReturnType<McpOAuthCredentialStore["forServer"]>;
 
-/** pi-mcp's `McpOAuthStateStore`, which sign-in reads and writes. */
-export type McpOAuthStateStore = Pick<McpOAuthServerStore, "load" | "save">;
+/** The sign-in store, including the refresh lock required since pi 1.5.1. */
+export type McpOAuthStateStore = Pick<McpOAuthServerStore, "load" | "save" | "withRefreshLock">;
 
 /** pi-mcp's `StdioTransportOptions`. */
 export interface StdioTransportOptions {

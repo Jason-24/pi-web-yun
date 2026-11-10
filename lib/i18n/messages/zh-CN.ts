@@ -1908,6 +1908,8 @@ export const zhCNLocale: LocalePlugin = {
     "models.developerRole": "使用 developer role 传递系统提示词",
     "models.adaptiveThinking": "Claude 自适应思考（effort 等级）",
     "models.thinkingLevelMap": "思考等级映射",
+    "models.thinkingDefaultUnavailable": "默认（未启用）",
+    "models.thinkingLevelMapHelp": "默认遵循 Pi 的等级支持规则。xhigh 和 max 默认未启用；要启用，请选择“自定义”并填写提供商接受的值，例如 max。",
     "models.clearAll": "全部清除",
     "models.enabledSection": "可用模型",
     "models.enabledCount": "已启用 {enabled}/{total}",

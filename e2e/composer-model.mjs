@@ -19,9 +19,10 @@ const models = [
   { provider: "fixture", id: "mapped", name: "自定义推理模型" },
   { provider: "fixture", id: "plain", name: "无推理模型" },
   { provider: "fixture", id: "single", name: "单档推理模型" },
+  { provider: "fixture", id: "three", name: "三档推理模型" },
   ...Array.from({ length: 6 }, (_, i) => ({ provider: "fixture", id: `extra-${i}`, name: `Extra ${i}` })),
 ];
-const capabilities = { "fixture:base": ["off", "low", "medium", "high"], "fixture:mapped": ["off", "low", "high", "max"], "fixture:plain": ["off"], "fixture:single": ["off", "high"] };
+const capabilities = { "fixture:base": ["off", "low", "medium", "high"], "fixture:mapped": ["off", "low", "high", "max"], "fixture:plain": ["off"], "fixture:single": ["off", "high"], "fixture:three": ["off", "low", "high", "max"] };
 let model = models[0];
 let level = "low";
 let defaultLevel = "medium";
@@ -91,6 +92,30 @@ try {
   await trigger.click();
   await card.waitFor();
   assert.equal(await slider.getAttribute("max"), "2");
+  assert.deepEqual(await card.locator(".model-reasoning-scale span").allTextContents(), ["低", "中", "高"], "every configured stop has a visible label");
+  const track = await slider.boundingBox();
+  const requestsBeforeDrag = commands.filter(command => command.type === "set_thinking_level").length;
+  await page.mouse.move(track.x + 16, track.y + track.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + 16 + (track.width - 32) * .35, track.y + track.height / 2, { steps: 8 });
+  const previewValue = await slider.inputValue();
+  assert.ok(Number(previewValue) > .5 && Number(previewValue) < .9, "dragging follows a continuous position between stops");
+  assert.equal(commands.filter(command => command.type === "set_thinking_level").length, requestsBeforeDrag, "pointer motion only previews; it does not send model commands");
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('.composer-model-trigger')?.textContent.includes("·中"));
+  assert.equal(level, "medium", "release commits the nearest supported stop");
+  assert.equal(await slider.inputValue(), "1", "release snaps to a discrete position");
+  assert.equal(commands.filter(command => command.type === "set_thinking_level").length, requestsBeforeDrag + 1);
+  await page.mouse.move(track.x + track.width / 2, track.y + track.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width - 16, track.y + track.height / 2, { steps: 4 });
+  await slider.dispatchEvent("pointercancel");
+  await page.mouse.up();
+  assert.equal(await slider.inputValue(), "1", "cancelled drags restore the committed level");
+  assert.equal(commands.filter(command => command.type === "set_thinking_level").length, requestsBeforeDrag + 1, "cancellation sends no command");
+  await slider.press("ArrowRight");
+  await page.waitForFunction(() => document.querySelector('.composer-model-trigger')?.textContent.includes("·高"));
+  assert.equal(await slider.inputValue(), "2", "keyboard arrows keep selecting whole stops");
   await card.getByRole("button", { name: "关闭", exact: true }).click();
   await slider.press("Home");
   await page.waitForFunction(() => document.querySelector('.composer-model-trigger')?.textContent.includes("·低"));
@@ -109,11 +134,18 @@ try {
   await card.screenshot({ path: resolve(artifacts, "card.png") });
   await chooseModel("自定义推理模型");
   assert.equal(await slider.getAttribute("max"), "1", "null mapping and unsupported levels stay out");
+  assert.deepEqual(await card.locator(".model-reasoning-scale span").allTextContents(), ["quick", "turbo"]);
   await slider.press("Home");
   await page.waitForFunction(() => document.querySelector('.model-reasoning-heading')?.textContent.includes("quick"));
   await slider.press("End");
   await page.waitForFunction(() => document.querySelector('.model-reasoning-heading')?.textContent.includes("turbo"));
   assert.equal(level, "high", "mapped labels retain canonical protocol values");
+  await chooseModel("三档推理模型");
+  assert.equal(await slider.getAttribute("max"), "2");
+  assert.deepEqual(await card.locator(".model-reasoning-scale span").allTextContents(), ["低", "高", "最高"]);
+  await slider.press("End");
+  assert.equal(level, "max", "an explicitly supported max remains selectable");
+  await card.screenshot({ path: resolve(artifacts, "three-levels.png"), animations: "disabled" });
   await chooseModel("单档推理模型");
   assert.equal(await slider.count(), 0);
   await card.locator(".model-reasoning-single button").waitFor();

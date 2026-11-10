@@ -1908,6 +1908,8 @@ export const zhTWLocale: LocalePlugin = {
     "models.developerRole": "使用 developer role 傳遞系統提示詞",
     "models.adaptiveThinking": "Claude 自適應思考（effort 等級）",
     "models.thinkingLevelMap": "思考層級對應",
+    "models.thinkingDefaultUnavailable": "預設（未啟用）",
+    "models.thinkingLevelMapHelp": "預設遵循 Pi 的層級支援規則。xhigh 和 max 預設未啟用；要啟用，請選擇「自訂」並填入供應商接受的值，例如 max。",
     "models.clearAll": "全部清除",
     "models.enabledSection": "可用模型",
     "models.enabledCount": "已啟用 {enabled}/{total}",

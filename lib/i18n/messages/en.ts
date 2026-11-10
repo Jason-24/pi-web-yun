@@ -1908,6 +1908,8 @@ export const enLocale: LocalePlugin = {
     "models.developerRole": "Use the developer role for the system prompt",
     "models.adaptiveThinking": "Claude adaptive thinking (effort levels)",
     "models.thinkingLevelMap": "Thinking level map",
+    "models.thinkingDefaultUnavailable": "Default (not enabled)",
+    "models.thinkingLevelMapHelp": "Defaults follow Pi's supported levels. xhigh and max are not enabled by default; to enable one, choose Custom and enter a value accepted by the provider, such as max.",
     "models.clearAll": "Clear all",
     "models.enabledSection": "Available models",
     "models.enabledCount": "{enabled}/{total} enabled",

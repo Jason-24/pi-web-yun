@@ -374,6 +374,7 @@ function watchedStore(store: McpOAuthStateStore, flow: Flow, guard: McpSignInWri
     flow.storedState = typeof value === "string" ? value : undefined;
   };
   return {
+    withRefreshLock: (fn) => store.withRefreshLock(fn),
     load: async () => {
       const state = await store.load();
       note(state);

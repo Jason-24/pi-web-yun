@@ -41,6 +41,7 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CSSProperties | null>(null);
+  const [drag, setDrag] = useState<{ key: string; value: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
@@ -60,11 +61,17 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
     : options.length ? t("chat.selectModel") : t("chat.noModels");
   const selectedIndex = explicit ? steps.indexOf(explicit) : -1;
   const sliderIndex = Math.max(0, selectedIndex);
+  const sliderKey = `${model?.provider}:${model?.modelId}:${steps.join(",")}`;
+  const dragging = drag?.key === sliderKey;
+  const sliderValue = dragging ? drag.value : sliderIndex;
+  const previewLevel = dragging ? steps[Math.round(sliderValue)] : null;
+  const activeIndex = dragging ? Math.round(sliderValue) : selectedIndex;
   const canChangeReasoning = Boolean(onThinkingLevelChange) && !modelSwitching;
   const offAvailable = !availableThinkingLevels || availableThinkingLevels.includes("off");
   const locked = Boolean(modelSwitching || (isStreaming && !onThinkingLevelChange));
   const close = useCallback((restore = false) => {
     setOpen(false);
+    setDrag(null);
     if (restore) triggerRef.current?.focus({ preventScroll: true });
   }, []);
 
@@ -141,7 +148,7 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
       aria-busy={modelSwitching || undefined} disabled={locked}
       title={modelSwitching ? "Switching model" : !options.length && !model ? "No available models"
         : `${modelName}${onThinkingLevelChange ? ` · ${reasoningLabel}` : ""}`}
-      onClick={() => { setPosition(null); setOpen(value => !value); }}>
+      onClick={() => { setPosition(null); setDrag(null); setOpen(value => !value); }}>
       {modelSwitching && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 0.8s linear infinite" }} aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36" /></svg>}
       <span className="model-reasoning-name">{modelName}</span>
       {onThinkingLevelChange && <><span aria-hidden="true">·</span><span className="model-reasoning-level">{reasoningLabel}</span></>}
@@ -161,7 +168,7 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
       }}>
       <div className="model-reasoning-heading">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z" /></svg>
-        <strong>{onThinkingLevelChange ? reasoningLabel : t("chat.selectModel")}</strong>
+        <strong>{onThinkingLevelChange ? label(previewLevel ?? explicit ?? "auto") : t("chat.selectModel")}</strong>
         {onThinkingLevelChange && <button type="button" className="model-reasoning-reset" aria-label={t("chat.resetReasoning")}
           title={t("chat.resetReasoning")} disabled={!canChangeReasoning || automatic} onClick={() => chooseLevel("auto")}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2.5 8M3 4v6h6" /></svg>
@@ -179,26 +186,45 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
           <button type="button" aria-pressed={automatic} disabled={!canChangeReasoning} onClick={() => chooseLevel("auto")}>{t("chat.reasoningShort.auto")}</button>
           {offAvailable && <button type="button" aria-pressed={!automatic && explicit === "off"} disabled={!canChangeReasoning} onClick={() => chooseLevel("off")}>{t("chat.reasoningShort.off")}</button>}
         </div>
-        {steps.length > 1 ? <div className="model-reasoning-sliderGroup" data-inactive={explicit === "off"}>
-          <div className="model-reasoning-track" style={{ "--reasoning-ratio": selectedIndex < 0 ? 0 : selectedIndex / (steps.length - 1) } as CSSProperties}>
+        {steps.length > 1 ? <div className="model-reasoning-sliderGroup" data-dragging={dragging} data-inactive={!dragging && explicit === "off"}>
+          <div className="model-reasoning-track" style={{ "--reasoning-ratio": sliderValue / (steps.length - 1) } as CSSProperties}>
             <div className="model-reasoning-fill" aria-hidden="true" />
             <div className="model-reasoning-dots" aria-hidden="true">{steps.map(level => <span key={level} />)}</div>
-            <input ref={sliderRef} type="range" min={0} max={steps.length - 1} step={1} value={sliderIndex}
+            <span className="model-reasoning-thumb" aria-hidden="true" />
+            <input ref={sliderRef} type="range" min={0} max={steps.length - 1} step="any" value={sliderValue}
               disabled={!canChangeReasoning} aria-label={t("chat.reasoningMenuTitle")}
-              aria-valuetext={selectedIndex < 0 ? reasoningLabel : `${label(steps[sliderIndex])} (${steps[sliderIndex]})`}
-              onClick={event => chooseLevel(steps[Number(event.currentTarget.value)])}
-              onKeyDown={event => {
-                // The first stop must also activate reasoning from Off/Auto:
-                // a range already at zero emits no change for Home or a click.
-                if ((automatic || selectedIndex < 0) && ["Home", "End"].includes(event.key)) {
-                  event.preventDefault(); chooseLevel(event.key === "Home" ? steps[0] : steps[steps.length - 1]);
-                } else if (selectedIndex < 0 && event.key.startsWith("Arrow")) {
-                  event.preventDefault(); chooseLevel(steps[0]);
-                }
+              aria-valuetext={activeIndex < 0 ? reasoningLabel : `${label(steps[Math.max(0, activeIndex)])} (${steps[Math.max(0, activeIndex)]})`}
+              onPointerDown={event => {
+                if (!canChangeReasoning || event.button !== 0) return;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setDrag({ key: sliderKey, value: Number(event.currentTarget.value) });
               }}
-              onChange={event => chooseLevel(steps[Number(event.target.value)])} />
+              onPointerUp={event => {
+                if (!dragging) return;
+                chooseLevel(steps[Math.round(Number(event.currentTarget.value))]);
+                setDrag(null);
+              }}
+              onPointerCancel={() => setDrag(null)}
+              onLostPointerCapture={() => setDrag(null)}
+              onClick={event => { if (event.detail === 0) chooseLevel(steps[Math.round(Number(event.currentTarget.value))]); }}
+              onKeyDown={event => {
+                const direction = { ArrowRight: 1, ArrowUp: 1, PageUp: 1, ArrowLeft: -1, ArrowDown: -1, PageDown: -1 }[event.key];
+                if (direction === undefined && event.key !== "Home" && event.key !== "End") return;
+                event.preventDefault();
+                setDrag(null);
+                const next = event.key === "Home" ? 0 : event.key === "End" ? steps.length - 1
+                  : selectedIndex < 0 ? 0 : Math.max(0, Math.min(steps.length - 1, selectedIndex + (direction ?? 0)));
+                chooseLevel(steps[next]);
+              }}
+              onChange={event => {
+                const value = Number(event.target.value);
+                if (dragging) setDrag({ key: sliderKey, value });
+                else chooseLevel(steps[Math.round(value)]);
+              }} />
           </div>
-          <div className="model-reasoning-scale" aria-hidden="true"><span>{label(steps[0])}</span><span>{label(steps[steps.length - 1])}</span></div>
+          <div className="model-reasoning-scale" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} aria-hidden="true">
+            {steps.map((level, index) => <span key={level} title={label(level)} data-active={index === activeIndex}>{label(level)}</span>)}
+          </div>
         </div> : steps.length === 1 ? <div className="model-reasoning-single"><button type="button" aria-pressed={!automatic && explicit === steps[0]} disabled={!canChangeReasoning} onClick={() => chooseLevel(steps[0])}>{label(steps[0])}</button></div>
           : <p className="model-reasoning-hint">{t("chat.reasoningUnavailable")}</p>}
         {explicit && thinkingLevelMap?.[explicit] != null && thinkingLevelMap[explicit] !== explicit && <p className="model-reasoning-hint">{thinkingLevelMap[explicit]} · {explicit}</p>}
