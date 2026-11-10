@@ -1095,7 +1095,7 @@ export function SkillsConfig({
           </ConfigSidebar>
 
           {/* Right: detail or add panel */}
-          <ConfigDetail>
+          <ConfigDetail motionKey={addMode ? "add" : selected ?? ""}>
             <ConfigDetailStack className="is-fill">
               {addMode ? (
               <AddSkillPanel

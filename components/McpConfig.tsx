@@ -1107,7 +1107,7 @@ export function McpConfigView({
           )}
         </ConfigSidebar>
 
-        <ConfigDetail>
+        <ConfigDetail motionKey={adding ? "add" : selected ?? ""}>
           <ConfigDetailStack className="is-fill">
             {!data || !context || !autoEnable || !emptyKey ? null : adding ? (
               <McpAddServer

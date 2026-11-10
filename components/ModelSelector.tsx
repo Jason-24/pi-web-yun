@@ -293,6 +293,7 @@ export function ModelSelector({
         return (
           <div
             ref={panelRef}
+            className="model-selector-panel"
             role="listbox"
             aria-label={ariaLabel}
             style={{

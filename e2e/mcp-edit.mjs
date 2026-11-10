@@ -36,9 +36,9 @@ try {
       if (path === "/api/mcp") {
         if (request.method() === "GET") return reply({ mcp: { available: true }, codemode: { sandbox: { state: "available" }, preference: "automatic", builtinDisabled: false }, files: [{ scope: "global", path: serverInfo().sourcePath, exists: true, problems: [] }], servers: [serverInfo(), { ...serverInfo(), name: "http-docs", transport: "http", command: undefined, args: undefined, url: "https://example.com/mcp?token=•••", envNames: [], headerNames: ["Authorization"], masked: true }] });
         const body = request.postDataJSON();
-        if (body.action === "read-edit" && body.name === "http-docs") return reply({ version: "http-version", transport: "http", fields: { url: { hidden: true, value: "" } }, names: ["Authorization"] });
+        if (body.action === "read-edit" && body.name === "http-docs") return reply({ version: "http-version", transport: "http", fields: { url: { hidden: true, value: "" } }, names: ["Authorization"], values: { Authorization: { hidden: true, value: "" } } });
         if (body.action === "update" && body.name === "http-docs") return reply({ success: true });
-        if (body.action === "read-edit") return reply({ version: "version", transport: "stdio", fields: { command: { hidden: false, value: command }, args: { hidden: false, value: JSON.stringify(args, null, 2) }, cwd: { hidden: false, value: "" } }, names: ["API_TOKEN"] });
+        if (body.action === "read-edit") return reply({ version: "version", transport: "stdio", fields: { command: { hidden: false, value: command }, args: { hidden: false, value: JSON.stringify(args, null, 2) }, cwd: { hidden: false, value: "" } }, names: ["API_TOKEN", "KIBANA_URL", "TOKEN_REFERENCE"], values: { API_TOKEN: { hidden: true, value: "" }, KIBANA_URL: { hidden: false, value: "https://kibana.example.com/sit" }, TOKEN_REFERENCE: { hidden: false, value: "${MY_TOKEN}" } } });
         if (body.action === "update") {
           if (body.patch.fields.command === "conflict") return route.fulfill({ status: 409, json: { reason: "config-changed" } });
           command = body.patch.fields.command ?? command;
@@ -84,6 +84,10 @@ try {
       const editor = settings.getByRole("region", { name: "Edit connection", exact: true });
       await editor.locator("#mcp-edit-command").waitFor();
       assert.equal(await editor.getByRole("button", { name: "Save", exact: true }).isDisabled(), true);
+      assert.equal(await editor.getByLabel("Configured value for KIBANA_URL", { exact: true }).inputValue(), "https://kibana.example.com/sit");
+      assert.equal(await editor.getByLabel("Configured value for TOKEN_REFERENCE", { exact: true }).inputValue(), "${MY_TOKEN}");
+      assert.equal(await editor.getByLabel("Configured value for API_TOKEN", { exact: true }).getAttribute("placeholder"), "Configured (sensitive value hidden)");
+      assert.equal(await editor.getByLabel("Configured value for API_TOKEN", { exact: true }).inputValue(), "");
       await editor.locator("#mcp-edit-command").fill("conflict");
       await editor.getByRole("button", { name: "Save", exact: true }).click();
       await editor.getByRole("alert").filter({ hasText: "configuration changed" }).waitFor();
@@ -91,6 +95,21 @@ try {
       await settings.getByRole("button", { name: "Edit", exact: true }).click();
       await editor.locator("#mcp-edit-command").fill("node");
       await editor.locator("#mcp-edit-args").fill('["a b", "server.js"]');
+      if (width === 1440) {
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+        const tabs = settings.locator(".settings-section-tabs");
+        await tabs.getByRole("button", { name: "General", exact: true }).click();
+        await tabs.getByRole("button", { name: "MCP", exact: true }).click();
+        await page.waitForFunction(() => {
+          const active = document.querySelector('.settings-section-tab[aria-current="page"]')?.getBoundingClientRect();
+          const indicator = document.querySelector(".settings-section-indicator")?.getBoundingClientRect();
+          return active && indicator && Math.abs(active.x + active.width / 2 - indicator.x - indicator.width / 2) < 1;
+        });
+        assert.equal(await editor.locator("#mcp-edit-command").inputValue(), "node", "category transitions preserve the mounted editor draft");
+        assert.equal(await editor.locator("#mcp-edit-args").inputValue(), '["a b", "server.js"]');
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        assert.equal(await tabs.locator(".settings-section-indicator").evaluate(el => getComputedStyle(el).transitionDuration), "0s");
+      }
       await editor.getByRole("combobox", { name: "Action for API_TOKEN", exact: true }).selectOption("literal");
       await editor.getByLabel("New value for API_TOKEN", { exact: true }).fill("replacement-secret");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

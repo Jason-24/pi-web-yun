@@ -193,6 +193,12 @@
   opacity: 0.45;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-menu-secondary.is-hover-reveal { opacity: 0; pointer-events: none; }
+  .sidebar-menu-row:is(:hover, :focus-within) > .sidebar-menu-secondary.is-hover-reveal { opacity: 1; pointer-events: auto; }
+  .sidebar-menu-row:is(:hover, :focus-within) > .sidebar-menu-secondary.is-hover-reveal[aria-disabled="true"] { opacity: .45; }
+}
+
 /* The filter of a long list of choices: it stays on top while the list
    scrolls. A sticky inset counts from inside the scroller's padding (4px on
    the menu, and on the sheet), so -4px holds it at the scroller's edge. */

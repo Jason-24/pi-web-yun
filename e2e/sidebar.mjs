@@ -25,13 +25,13 @@ export async function showSidebarFiles(page) {
   if (page.viewportSize().width >= 1200) {
     await showRightPanel(page);
     const panel = page.locator("#file-panel");
-    if (!(await panel.getAttribute("class")).includes("is-file-picker") && !await panel.locator(".file-tree-toggle").isVisible()) {
+    const restore = panel.locator(".workbench-tree-restore");
+    if (!await panel.locator("#workbench-file-tree").isVisible() && !await restore.isVisible()) {
       if (!await panel.locator(".panel-tool-launcher").isVisible()) await panel.locator(".file-tab-add").click();
       await panel.locator('[data-panel-tool="files"]').click();
     }
     await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {}))));
-    const directory = page.locator("#file-panel .file-tree-toggle");
-    if (await directory.isVisible() && await directory.getAttribute("aria-expanded") !== "true") await directory.click();
+    if (await restore.isVisible()) await restore.click();
     await page.waitForFunction(() => document.querySelector("#workbench-file-tree")?.getBoundingClientRect().width > 100);
     await page.locator("#workbench-file-tree #session-sidebar-panel-files").waitFor();
     return;

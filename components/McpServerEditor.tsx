@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { McpServerInfo } from "@/lib/api-types";
-import type { McpEditData, McpEditPatch } from "@/lib/mcp-edit";
+import type { McpEditData, McpEditField, McpEditPatch } from "@/lib/mcp-edit";
 import { useI18n } from "@/hooks/useI18n";
 import { revealHiddenCharacters } from "@/lib/mcp-server-display";
 import { ConfigButton, ConfigScopeTag } from "./SettingsUi";
 
-type ValueRow = { id: number; name: string; existing: boolean; action: "keep" | "literal" | "reference" | "remove"; value: string };
+type ValueRow = { id: number; name: string; existing: boolean; configured?: McpEditField; action: "keep" | "literal" | "reference" | "remove"; value: string };
 
 export function McpServerEditor({ server, cwd, onCancel, onSaved }: {
   server: McpServerInfo; cwd: string | null; onCancel: () => void; onSaved: () => void;
@@ -35,7 +35,7 @@ export function McpServerEditor({ server, cwd, onCancel, onSaved }: {
         if (!response.ok) throw new Error(result.reason ?? "internal");
         if (disposed || controller.signal.aborted) return;
         setData(result);
-        setRows(result.names.map((name: string) => ({ id: nextId.current++, name, existing: true, action: "keep", value: "" })));
+        setRows(result.names.map((name: string) => ({ id: nextId.current++, name, existing: true, configured: result.values?.[name], action: "keep", value: "" })));
       }).catch((failure) => { if (!disposed) setError(failure.name === "AbortError" ? "network" : failure.message); })
       .finally(() => clearTimeout(timer));
     return () => { disposed = true; mounted.current = false; controller.abort(); request.current?.abort(); };
@@ -86,6 +86,7 @@ export function McpServerEditor({ server, cwd, onCancel, onSaved }: {
             <option value="literal">{t("mcp.edit.literal")}</option><option value="reference">{t("mcp.edit.reference")}</option>
             {row.existing && <option value="remove">{t("mcp.edit.remove")}</option>}
           </select>
+          {row.action === "keep" && <input readOnly autoComplete="off" spellCheck={false} aria-label={t("mcp.edit.currentValue", { name: revealHiddenCharacters(row.name) })} value={row.configured?.hidden === false ? row.configured.value : ""} placeholder={t("mcp.edit.hiddenValue")} />}
           {(row.action === "literal" || row.action === "reference") && <input type={row.action === "literal" ? "password" : "text"} autoComplete="new-password" aria-label={t("mcp.edit.value", { name: revealHiddenCharacters(row.name) })} placeholder={t(row.action === "reference" ? "mcp.edit.variableName" : "mcp.edit.newValue")} value={row.value} onChange={(event) => updateRow(row.id, { value: event.target.value })} />}
           {!row.existing && <ConfigButton size="small" onClick={() => setRows(rows.filter((item) => item.id !== row.id))}>{t("i18n.remove")}</ConfigButton>}
         </div>)}</div>

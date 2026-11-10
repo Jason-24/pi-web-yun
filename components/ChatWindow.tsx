@@ -962,7 +962,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted">
+      <div role="status" className="chat-loading-state flex h-full items-center justify-center text-text-muted">
          {t("chat.loadingSession")}
       </div>
     );

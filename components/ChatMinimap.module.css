@@ -35,6 +35,26 @@
 .rail:hover .node[data-nearest="true"] .marker { background: var(--text); }
 .node:focus-visible .marker { width: 26px; background: var(--text); }
 .node:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.earlierMarker {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 11.5px;
+  transform: translate(-50%, -.75px);
+  pointer-events: none;
+}
+.earlierMarker::before,
+.earlierMarker::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: var(--text-muted);
+}
+.earlierMarker::before { top: 0; opacity: .12; }
+.earlierMarker::after { bottom: 0; opacity: .24; }
 .preview {
   position: absolute;
   left: calc(100% + 6px);

@@ -50,6 +50,15 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
   page.on("pageerror", error => errors.push(error.message));
   page.on("popup", popup => { popups++; void popup.close(); });
   await context.addInitScript(() => { if (window === window.top) localStorage.setItem("pi-locale", "zh-CN"); });
+  await context.addInitScript(() => {
+    window.__surfaceAnimations = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.id === "workspace-conversation-content") window.__surfaceAnimations.push(animation);
+      return animation;
+    };
+  });
   await page.route("**/api/**", async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -343,6 +352,19 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.equal(await input.getAttribute("data-instance"), "original");
     assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
     assert.ok(Math.abs(await scroller.evaluate(element => element.scrollTop) - settingsScrollPosition) < 2, "returning from Settings preserves the reading position");
+    const motionCount = await page.evaluate(() => window.__surfaceAnimations.length);
+    for (const id of ["settings", "chat", "settings", "chat"]) await view(id).click();
+    assert.ok(await page.evaluate(count => window.__surfaceAnimations.length > count, motionCount), "workspace changes use the shared content transition");
+    assert.equal(await input.getAttribute("data-instance"), "original", "rapid switching does not remount the conversation");
+    assert.equal(await input.inputValue(), "切换视图后仍然保留的草稿");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Browser media-query change events arrive asynchronously after emulation.
+    await page.waitForFunction(() => window.__surfaceAnimations.every(animation => animation.playState !== "running"));
+    const reducedCount = await page.evaluate(() => window.__surfaceAnimations.length);
+    for (const id of ["settings", "chat"]) await view(id).click();
+    assert.equal(await page.evaluate(() => window.__surfaceAnimations.length), reducedCount, "reduced motion updates content immediately without new animations");
+    assert.equal(await page.locator(".chat-content").evaluate(el => getComputedStyle(el).animationName), "none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     // Content stays to the left of the directory; both separators grow leftward.
     await showSidebarFiles(page);
     const filePanel = page.locator("#file-panel");

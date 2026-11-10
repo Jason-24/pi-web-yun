@@ -11,6 +11,7 @@ export interface McpEditData {
   transport: "http" | "stdio";
   fields: Record<string, McpEditField>;
   names: string[];
+  values: Record<string, McpEditField>;
 }
 export interface McpEditPatch {
   fields?: Record<string, string>;
@@ -29,7 +30,7 @@ function entry(value: unknown): Record<string, unknown> {
   return value;
 }
 
-/** File values are never resolved; hidden fields and all env/header values stay server-side. */
+/** File values are never resolved; credential-bearing values stay server-side. */
 export function mcpEditData(value: unknown): McpEditData {
   const config = entry(value);
   const http = typeof config.url === "string";
@@ -42,7 +43,15 @@ export function mcpEditData(value: unknown): McpEditData {
     Object.defineProperty(fields, name, { enumerable: true, value: { hidden, value: hidden ? "" : name === "args" ? JSON.stringify(raw ?? [], null, 2) : String(raw ?? "") } });
   }
   const values = config[http ? "headers" : "env"];
-  return { version: mcpConfigKey(config), transport: http ? "http" : "stdio", fields, names: record(values) ? Object.keys(values) : [] };
+  const secretNames = new Set(literalSecretFields(config).flatMap((field) => (
+    field.kind === (http ? "header" : "env") && "name" in field ? [field.name] : []
+  )));
+  const editableValues = Object.fromEntries(Object.entries(record(values) ? values : {}).map(([name, raw]) => {
+    const hidden = typeof raw !== "string" || secretNames.has(name)
+      || (raw.startsWith("!") && maskCommand(raw.slice(1)).masked);
+    return [name, { hidden, value: hidden ? "" : raw as string }];
+  }));
+  return { version: mcpConfigKey(config), transport: http ? "http" : "stdio", fields, names: Object.keys(editableValues), values: editableValues };
 }
 
 export function applyMcpEdit(value: unknown, patch: unknown, scope: McpScope, name: string, internals: PiSdkInternals): Record<string, unknown> {

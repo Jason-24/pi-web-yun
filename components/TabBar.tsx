@@ -52,16 +52,19 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
-    const revealActive = () => {
+    const revealActive = (smooth = false) => {
       const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
       if (!tab) return;
       const strip = list.getBoundingClientRect();
       const { left, right } = tab.getBoundingClientRect();
-      if (left < strip.left) list.scrollLeft -= strip.left - left;
-      else if (right > strip.right) list.scrollLeft += right - strip.right;
+      const offset = left < strip.left ? left - strip.left : right > strip.right ? right - strip.right : 0;
+      if (offset) list.scrollTo({
+        left: list.scrollLeft + offset,
+        behavior: smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant",
+      });
     };
-    revealActive();
-    const resize = new ResizeObserver(revealActive);
+    revealActive(true);
+    const resize = new ResizeObserver(() => revealActive());
     resize.observe(list);
     return () => resize.disconnect();
   }, [activeTabId, tabs.length]);

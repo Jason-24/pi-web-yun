@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useI18n } from "@/hooks/useI18n";
 import { AgentsIcon } from "./SidebarIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_OPTIONS } from "@/lib/theme";
 import {
@@ -582,7 +583,24 @@ export function SettingsPanel({
   const phone = usePhoneSettingsLevel(isPhone, openAtHome);
   const { dropHistory, enter: enterPhoneLevel, goUp: goUpPhoneLevel, levelRef: phoneLevelRef } = phone;
   const headerRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const tabs = tabsRef.current;
+    const indicator = indicatorRef.current;
+    if (!tabs || !indicator) return;
+    const update = () => {
+      const active = tabs.querySelector<HTMLElement>('[aria-current="page"]');
+      if (active) indicator.style.transform = `translateX(${active.offsetLeft + (active.offsetWidth - 24) / 2}px)`;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(tabs);
+    tabs.querySelectorAll("button").forEach((tab) => observer.observe(tab));
+    return () => observer.disconnect();
+  }, [section, t]);
   const mainRef = useRef<HTMLElement>(null);
+  useSurfaceTransition(mainRef, section, { desktopOnly: true });
   const shownPhoneLevelRef = useRef(phone.level);
   // Before paint, so the new level never shows in place first.
   useLayoutEffect(() => {
@@ -689,7 +707,7 @@ export function SettingsPanel({
               ? t("settings.title")
               : phone.level === "section" ? sectionLabel : detailTitle}
           </strong>}
-          <nav aria-label={t("settings.title")} className="settings-section-tabs">
+          <nav ref={tabsRef} aria-label={t("settings.title")} className="settings-section-tabs">
             {sections.map((item) => {
               const selected = section === item.id;
               const disabled = item.requiresProject && !cwd;
@@ -708,6 +726,7 @@ export function SettingsPanel({
                 </button>
               );
             })}
+            <span ref={indicatorRef} className="settings-section-indicator" aria-hidden="true" />
           </nav>
           <button type="button" onClick={onClose} title={t("i18n.close")} aria-label={t("i18n.close")} className="config-close-button settings-dialog-close">×</button>
         </div>

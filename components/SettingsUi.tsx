@@ -2,6 +2,7 @@
 
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ButtonHTMLAttributes, ClipboardEvent, CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
+import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 
 type ConfigButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ConfigButtonSize = "small" | "default";
@@ -735,9 +736,16 @@ export function ConfigEmptyState({ children }: { children: ReactNode }) {
   return <div className="config-empty-state">{children}</div>;
 }
 
-export function ConfigDetail({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function ConfigDetail({ children, style, motionKey, resetScrollOnChange = false }: { children: ReactNode; style?: CSSProperties; motionKey?: string; resetScrollOnChange?: boolean }) {
+  const detailRef = useRef<HTMLDivElement>(null);
+  const previousKey = useRef(motionKey);
+  useLayoutEffect(() => {
+    if (resetScrollOnChange && previousKey.current !== motionKey && detailRef.current) detailRef.current.scrollTop = 0;
+    previousKey.current = motionKey;
+  }, [motionKey, resetScrollOnChange]);
+  useSurfaceTransition(detailRef, motionKey ?? null, { desktopOnly: true });
   return (
-    <div className="config-detail" style={style}>
+    <div ref={detailRef} className="config-detail" style={style}>
       {children}
     </div>
   );

@@ -14,6 +14,7 @@ import "./home.css";
 import "./workspace-pages.css";
 import "./file-workspace.css";
 import "./sidebar-menu.css";
+import "./interaction.css";
 
 export const metadata: Metadata = {
   title: "PI-YUN",

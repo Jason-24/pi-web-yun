@@ -2471,7 +2471,7 @@ export function ModelsConfig({ onClose, embedded = false, cwd = null }: {
           </ConfigSidebar>
 
           {/* Right: detail */}
-          <ConfigDetail>
+          <ConfigDetail motionKey={selection ? JSON.stringify(selection) : ""}>
             <ConfigDetailStack className="is-fill">
               {loading ? null : detailContent ?? (
                 <ConfigEmptyState>{t("i18n.selectProviderModel")}</ConfigEmptyState>

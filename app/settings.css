@@ -734,6 +734,71 @@
   scrollbar-width: auto;
 }
 
+/* Profile browsing is read-only; forms appear only for Edit or Create. */
+.agents-panel { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.agents-panel .config-detail { padding: 28px 32px; container-type: inline-size; }
+.agents-profile-content { width: 100%; max-width: 900px; margin-inline: auto; gap: 22px; }
+.agents-profile-content > .config-detail-header { align-items: flex-start; gap: 20px; }
+.agents-profile-content .config-detail-header-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.agents-profile-title { flex-basis: 100%; margin: 5px 0 0; color: var(--text); font-size: 22px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.agents-profile-title:focus { outline: none; }
+.agents-profile-id { color: var(--text-dim); font-size: 11px; }
+.agents-profile-description { flex-basis: 100%; margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.agents-profile-content .config-detail-path { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.agents-enabled-control { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.agents-readonly-note { margin: 0; padding: 10px 13px; border-radius: 8px; background: var(--bg-panel); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.agents-profile-section { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 22px 0; border-top: 1px solid var(--border); }
+.agents-profile-section:first-child { border-top: 0; padding-top: 0; }
+.agents-profile-section h4 { margin: 0; color: var(--text); font-size: 13px; font-weight: 600; }
+.agents-profile-overview, .agents-profile-form { display: flex; flex-direction: column; min-width: 0; }
+.agents-prompt-preview { margin: 0; padding: 16px 18px; max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); font: 12px/1.8 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.agents-summary-group { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: baseline; gap: 12px; color: var(--text-muted); font-size: 12px; }
+.agents-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.agents-tags > :is(code, span) { padding: 5px 9px; border-radius: 6px; background: var(--bg-panel); color: var(--text); font-size: 11px; overflow-wrap: anywhere; }
+.agents-tags > .is-muted { color: var(--text-muted); background: transparent; border: 1px solid var(--border); }
+.agents-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 0; }
+.agents-summary-grid dt { margin-bottom: 6px; color: var(--text-muted); font-size: 11px; }
+.agents-summary-grid dd { margin: 0; color: var(--text); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.agents-help { margin: 0; color: var(--text-dim); font-size: 11px; line-height: 1.65; overflow-wrap: anywhere; }
+.agents-delete-row { padding-top: 20px; border-top: 1px solid var(--border); }
+.agents-identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.agents-runtime-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, .7fr); gap: 14px; }
+.agents-tool-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.agents-tool-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.agents-option { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.agents-option input { width: 14px; height: 14px; accent-color: var(--accent); }
+.agents-option:has(input:disabled) { cursor: default; opacity: .6; }
+.agents-tool-options .agents-option { min-width: 74px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px; transition: background-color 120ms ease, border-color 120ms ease; }
+.agents-tool-options .agents-option.is-selected { background: var(--bg-selected); border-color: color-mix(in srgb, var(--text-muted) 40%, var(--border)); color: var(--text); }
+.agents-tool-options .agents-option:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.agents-profile-form :is(input, textarea, select):focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.agents-advanced { border: 1px solid var(--border); border-radius: 9px; padding: 0 14px; }
+.agents-advanced summary { padding: 12px 0; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.agents-advanced[open] { padding-bottom: 12px; }
+.agents-advanced > .config-field { margin: 6px 0 12px; }
+.agents-discard-dialog { position: fixed; inset: 0; width: min(400px, calc(100vw - 32px)); margin: auto; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--text); box-shadow: 0 16px 60px #0002; }
+.agents-discard-dialog::backdrop { background: #0004; }
+.agents-discard-dialog h3 { margin: 0 0 10px; font-size: 16px; font-weight: 600; }
+.agents-discard-dialog p { margin: 0 0 22px; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
+.agents-discard-dialog > div { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+@container (max-width: 620px) {
+  .agents-profile-content > .config-detail-header { flex-direction: column; gap: 14px; }
+  .agents-profile-content .config-detail-header-info { flex-basis: auto; width: 100%; }
+  .agents-profile-content .config-detail-actions { margin-left: 0; justify-content: flex-start; }
+  .agents-runtime-grid, .agents-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agents-runtime-grid > :first-child { grid-column: 1 / -1; }
+}
+@container (max-width: 360px) {
+  .agents-identity-grid, .agents-summary-grid { grid-template-columns: 1fr; }
+  .agents-summary-group { grid-template-columns: 1fr; gap: 8px; }
+}
+@media (max-width: 640px) {
+  .agents-panel .config-detail { padding: 20px 16px 28px; }
+  .agents-profile-title { font-size: 20px; }
+  .agents-panel .config-footer { gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .agents-tool-options .agents-option { transition: none; } }
+
 .agents-system-prompt::-webkit-scrollbar {
   width: 14px;
   height: 14px;
@@ -1514,6 +1579,7 @@
 }
 
 .settings-section-tabs {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -1540,37 +1606,31 @@
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 500;
   white-space: nowrap;
-  transition: color 0.15s ease;
+  transition: color 140ms ease, background-color 140ms ease;
 }
 
-.settings-section-tab::after {
+.settings-section-indicator {
   position: absolute;
   bottom: 0;
-  left: 50%;
+  left: 0;
   width: 24px;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--accent);
-  content: "";
-  opacity: 0;
-  transform: translateX(-50%) scaleX(0.5);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+  transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .settings-section-tab[aria-current="page"] {
   color: var(--text);
-  font-weight: 600;
-}
-
-.settings-section-tab[aria-current="page"]::after {
-  opacity: 1;
-  transform: translateX(-50%) scaleX(1);
+  font-weight: 500;
 }
 
 .settings-section-tab:not(:disabled):hover {
   color: var(--text);
+  background: color-mix(in srgb, var(--bg-hover) 55%, transparent);
 }
 
 .settings-section-tab:disabled {
@@ -2954,3 +3014,32 @@ select.mcp-add-input {
 .mcp-edit-value > input:last-of-type:not(:first-child) { grid-column: 1 / -1; }
 .mcp-edit-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); margin-top: 24px; padding-top: 16px; }
 @media (max-width: 640px) { .mcp-edit-value { grid-template-columns: minmax(0, 1fr); } }
+
+/* Immediate control feedback and short content transitions share one rhythm. */
+@keyframes settings-pane-enter {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
+@media (min-width: 641px) and (prefers-reduced-motion: no-preference) {
+  .mcp-edit {
+    animation: settings-pane-enter 160ms cubic-bezier(.2, .8, .2, 1);
+  }
+}
+:is(.config-button, .config-sidebar-item, .config-list-action-button, .settings-phone-home-item, .config-close-button) {
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease,
+    box-shadow 140ms ease, transform 100ms ease;
+}
+:is(.config-button, .config-sidebar-item, .config-list-action-button, .settings-phone-home-item, .config-close-button):not(:disabled):active {
+  transform: translateY(1px);
+}
+.config-sidebar-item:not(:disabled):active { background: var(--bg-selected); }
+.mcp-edit :is(input, textarea, select) {
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.config-switch-knob { transition: transform 180ms cubic-bezier(.2, .8, .2, 1), background-color 140ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .settings-section-indicator,
+  :is(.config-button, .config-sidebar-item, .config-list-action-button, .settings-phone-home-item, .config-close-button, .config-switch, .config-switch-knob),
+  .settings-section-tab, .mcp-edit :is(input, textarea, select) { transition: none; }
+  :is(.config-button, .config-sidebar-item, .config-list-action-button, .settings-phone-home-item, .config-close-button):active { transform: none; }
+}

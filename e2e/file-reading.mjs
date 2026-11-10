@@ -81,18 +81,29 @@ try {
   await showSidebarFiles(page);
   const panel = page.locator("#file-panel");
   const tree = panel.locator("#workbench-file-tree");
+  const toggleDirectory = async () => {
+    const restore = panel.locator(".workbench-tree-restore");
+    if (await restore.isVisible()) await restore.click();
+    else {
+      const collapse = panel.locator(".workbench-tree-collapse");
+      await collapse.hover();
+      await collapse.click();
+    }
+  };
   const openFile = async name => {
-    if (await panel.locator(".file-tree-toggle").count() && await panel.locator(".file-tree-toggle").getAttribute("aria-expanded") === "false") await panel.locator(".file-tree-toggle").click();
+    if (await panel.locator(".workbench-tree-restore").isVisible()) await toggleDirectory();
     await tree.getByTitle(`${cwd}/${name}`, { exact: true }).click();
     await panel.locator(".file-viewer-content").waitFor();
   };
   const opener = panel.getByRole("tab", { name: "打开文件", exact: true });
   await opener.waitFor();
   await openFile("reading.txt");
-  assert.equal(await panel.locator(".file-tree-toggle").getAttribute("aria-expanded"), "false", "a narrow first file leaves room for reading");
-  await panel.locator(".file-tree-toggle").click();
+  assert.equal(await panel.locator(".workbench-tree-restore").count(), 1, "a narrow first file leaves room for reading");
+  assert.equal(await panel.locator(".file-panel-header .file-tree-toggle").count(), 0, "the header has no duplicate directory toggle");
+  assert.equal(await panel.locator(".workbench-tree-restore svg").count(), 2, "the visible restore handle has a folder and a direction arrow");
+  await toggleDirectory();
   await openFile("notes.md");
-  assert.equal(await panel.locator(".file-tree-toggle").getAttribute("aria-expanded"), "true", "opening another file keeps the user's directory choice");
+  assert.equal(await tree.getAttribute("inert"), null, "opening another file keeps the user's directory choice");
   await panel.getByRole("tab", { name: "reading.txt", exact: true }).getByRole("button").click();
   await panel.getByRole("tab", { name: "notes.md", exact: true }).getByRole("button").click();
   await opener.waitFor();
@@ -201,7 +212,7 @@ try {
   await search.press("Escape");
   await panel.getByRole("search").waitFor({ state: "detached" });
   const beforeRestore = await firstVisibleLine();
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, treeWidth);
   assert.ok(Math.abs(Number(await firstVisibleLine()) - Number(beforeRestore)) <= 1);
   assert.equal(await content.getAttribute("data-instance"), "same");
@@ -236,13 +247,13 @@ try {
   await panel.locator(".workbench-tree-restore").click();
   await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
   await assertFileFocused();
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
   await assertFileFocused();
-  await panel.locator(".file-tree-toggle").click();
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
+  await toggleDirectory();
   await tree.getByTitle(`${cwd}/notes.md`, { exact: true }).waitFor();
   await assertFileFocused();
   assert.ok(Math.abs(Number(await firstVisibleLine()) - Number(beforeRestore)) <= 1, "directory controls preserve the reading position");
@@ -271,10 +282,10 @@ try {
   await page.waitForFunction(width => Math.abs(document.querySelector("#workbench-file-tree").getBoundingClientRect().width - width) < 1, treeWidth);
   await page.waitForFunction(width => Math.abs(document.querySelector("#file-panel").getBoundingClientRect().width - width) < 1, originalPanelWidth);
   assert.equal(await page.evaluate(() => localStorage.getItem("pi-right-panel-width")), savedPanelWidth);
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await panel.locator(".file-panel-expand-button").click();
   await panel.locator(".file-panel-expand-button").click();
-  assert.equal(await panel.locator(".file-tree-toggle").getAttribute("aria-expanded"), "false", "restoring the split preserves a previously collapsed directory");
+  assert.equal(await panel.locator(".workbench-tree-restore").count(), 1, "restoring the split preserves a previously collapsed directory");
   await panel.getByRole("button", { name: "关闭 reading.txt", exact: true }).click();
   await tree.getByTitle(`${cwd}/reading.txt`, { exact: true }).waitFor();
   assert.equal(await panel.locator(".workbench-file-empty").isVisible(), true, "closing the last file returns to the complete open-file picker");
@@ -367,10 +378,13 @@ try {
   await openFile("这是一个用于检查文件标签栏省略与键盘切换的较长文件名称.ts");
   const longTab = panel.getByRole("tab", { name: "这是一个用于检查文件标签栏省略与键盘切换的较长文件名称.ts", exact: true });
   assert.ok((await longTab.boundingBox()).width <= 300);
+  const tabWidths = () => panel.getByRole("tab").evaluateAll(tabs => tabs.map(tab => ({ name: tab.getAttribute("aria-label"), width: tab.getBoundingClientRect().width })));
+  const widthsBeforeSelection = await tabWidths();
   await longTab.focus();
   await longTab.press("ArrowLeft");
   assert.equal(await panel.getByRole("tab", { name: "many.txt", exact: true }).getAttribute("aria-selected"), "true");
-  await panel.locator(".file-tree-toggle").click();
+  assert.deepEqual(await tabWidths(), widthsBeforeSelection, "selecting a tab keeps every tab's width stable, including long names");
+  await toggleDirectory();
   await panel.locator(".file-tab-add").click();
   await panel.locator('[data-panel-tool="files"]').click();
   await page.waitForFunction(() => !document.querySelector("#workbench-file-tree").inert);
@@ -406,9 +420,9 @@ try {
   assert.equal(await contextTab.getAttribute("aria-label"), "显示主页");
   assert.equal(await homeView.isVisible(), false);
   await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).waitFor();
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await page.waitForFunction(() => document.querySelector("#workbench-file-tree").getBoundingClientRect().width === 0);
-  await panel.locator(".file-tree-toggle").click();
+  await toggleDirectory();
   await tree.getByTitle(`${cwd}/components/FileViewer.tsx`, { exact: true }).waitFor();
   assert.equal(await homeView.isVisible(), false, "restoring the directory keeps Home hidden");
   assert.equal(await panel.locator(".file-panel-expand-button").getAttribute("aria-pressed"), "true");

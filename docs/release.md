@@ -16,6 +16,8 @@
 3. 确认 npm 和 GitHub 的发布权限。运行 `npm test`、`npx tsc --noEmit` 和 `npm run lint`，并根据改动检查相关功能。
 4. 从上一个 PI-YUN 发布版本到目标提交整理变更，准备发布说明。不要把上游标签当作本项目的发布记录。
 
+`test-results/` 中的截图、临时验证脚本和开发缓存备份不参与 TypeScript 与 ESLint 检查。保留 `tsconfig.json` 和 `eslint.config.mjs` 对该目录的排除，避免旧 `.next` 路由类型按备份位置解析源码，导致构建报 `TS2307` 或 `TS2344`。
+
 ## 版本、构建与 npm 发布
 
 `package.json` 的 `npm run release` 当前依次执行 `npm ci`、`npm version patch --no-git-tag-version`、`npm run build` 和 `npm publish`。它会直接向 npm 发布，递增补丁版本并修改两个版本文件，但不会创建 Git 提交或标签。使用前应确认递增后的版本可用、npm 登录与权限正确，并在没有开发服务器的独立干净检出目录运行；构建会写入 `.next/`。

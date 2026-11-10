@@ -1004,7 +1004,7 @@ export function PluginsConfig({
             </ConfigListAction>
           </ConfigSidebar>
 
-          <ConfigDetail>
+          <ConfigDetail motionKey={addMode ? "add" : selected ?? ""}>
             <ConfigDetailStack className="is-fill">
               {addMode ? (
               <AddPluginPanel

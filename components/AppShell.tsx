@@ -3,8 +3,9 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { ComposeIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarPeek } from "@/hooks/useSidebarPeek";
 import { ChatWindow } from "./ChatWindow";
 import { ContextUsageIndicator } from "./ContextUsageIndicator";
@@ -292,7 +293,7 @@ export function AppShell() {
   const canFocusWorkspace = isWorkbenchDesktop && fileWorkspaceOpen;
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false);
   const fileTreeHidden = isWorkbenchDesktop && fileTreeCollapsed;
-  const fileTreeToggleRef = useRef<HTMLButtonElement>(null);
+  const fileTreeCollapseRef = useRef<HTMLButtonElement>(null);
   const fileTreeRestoreRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (filePickerActive) setFileTreeCollapsed(false);
@@ -300,7 +301,12 @@ export function AppShell() {
   const toggleFileTree = useCallback(() => {
     setExpandedPane("file");
     setFileTreeCollapsed(fileTreeHidden ? false : true);
-    fileTreeToggleRef.current?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      const target = fileTreeHidden
+        ? fileTreeCollapseRef.current ?? document.querySelector<HTMLElement>("#file-panel .workbench-tree-resizer")
+        : fileTreeRestoreRef.current;
+      if (!target?.closest("[inert]")) target?.focus({ preventScroll: true });
+    });
   }, [fileTreeHidden]);
   useEffect(() => {
     if (!fileWorkspaceOpen || !isWorkbenchDesktop) setRightPanelExpanded(false);
@@ -506,6 +512,10 @@ export function AppShell() {
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const sessionStatsButtonRef = useRef<HTMLButtonElement>(null);
   const workspacePanelRef = useRef<HTMLElement>(null);
+  const workspaceContentRef = useRef<HTMLDivElement>(null);
+  const filePreviewRef = useRef<HTMLDivElement>(null);
+  useSurfaceTransition(workspaceContentRef, settingsSection ? "settings" : activeTopPanel ?? (homeOpen ? "home" : "chat"));
+  useSurfaceTransition(filePreviewRef, activeFileTabId || null);
 
   useLayoutEffect(() => {
     if (activeTopPanel && !settingsSection) workspacePanelRef.current?.focus({ preventScroll: true });
@@ -2335,7 +2345,7 @@ export function AppShell() {
   const renderMainFileToggle = (mobile: boolean) => {
     const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;
     return <PanelTabSwitcher tabs={panelTabs} activeId={activeFileTabId} mobile={mobile} covered={covered}
-      onSelect={selectPanelTab} onNew={openPanelLauncher} />;
+      onSelect={selectPanelTab} onNew={openPanelLauncher} onClose={handleCloseFileTab} />;
   };
 
   return (
@@ -2608,7 +2618,7 @@ export function AppShell() {
         </div>
 
         {/* Embedded views share the conversation workspace. */}
-        <div id="workspace-conversation-content" className="workspace-content" inert={expandedFileVisible} aria-hidden={expandedFileVisible || undefined} style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+        <div ref={workspaceContentRef} id="workspace-conversation-content" className="workspace-content" inert={expandedFileVisible} aria-hidden={expandedFileVisible || undefined} style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {settingsSection && (
             <SettingsPanel embedded
               cwd={projectTrustCwd}
@@ -3042,22 +3052,6 @@ export function AppShell() {
               onOpenTools={openPanelLauncher}
             />
           </div>
-          {isWorkbenchDesktop && fileTreeApplicable && (!filePickerActive || fileTreeHidden) && <button
-            ref={fileTreeToggleRef}
-            type="button"
-            className="file-tree-toggle"
-            onClick={toggleFileTree}
-            aria-controls="workbench-file-tree"
-            aria-expanded={!fileTreeHidden}
-            title={translate(fileTreeHidden ? "files.showDirectory" : "files.hideDirectory")}
-            aria-label={translate(fileTreeHidden ? "files.showDirectory" : "files.hideDirectory")}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="3" />
-              <path d="M15 4v16" />
-              <path d={fileTreeHidden ? "m10 9-3 3 3 3" : "m8 9 3 3-3 3"} />
-            </svg>
-          </button>}
           {isWorkbenchDesktop && <button
             type="button"
             className="file-panel-expand-button"
@@ -3072,7 +3066,7 @@ export function AppShell() {
             </svg>
           </button>}
           {isMobile && panelTabs.length > 0 && <PanelTabSwitcher tabs={panelTabs} activeId={activeFileTabId}
-            mobile covered={false} onSelect={selectPanelTab} onNew={openPanelLauncher} />}
+            mobile covered={false} onSelect={selectPanelTab} onNew={openPanelLauncher} onClose={handleCloseFileTab} />}
           <button
             type="button"
             onClick={handleRightPanelClose}
@@ -3097,7 +3091,7 @@ export function AppShell() {
 
         <div className="workbench-files-body" inert={expandedConversationVisible} aria-hidden={expandedConversationVisible || undefined}>
         {/* Only the active viewer is mounted. Lightweight per-tab state is restored on activation. */}
-        <div className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div ref={filePreviewRef} className="workbench-file-preview" style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom)" }}>
           {panelLauncherActive ? <PanelToolLauncher key={`${selectedSession?.id ?? "new"}:${activeCwd ?? ""}`}
             cwd={selectedSession?.cwd ?? effectiveNewSessionCwd ?? activeCwd} sideDisabled={sideToolDisabled}
             onOpen={openPanelTool} />
@@ -3179,17 +3173,20 @@ export function AppShell() {
         </div>
         <div className="workbench-tree-boundary" inert={effectiveFileTreeHidden} aria-hidden={effectiveFileTreeHidden || undefined}>
           <div className="workbench-tree-resizer" {...fileTreeResizer.separatorProps} aria-controls="workbench-file-tree" />
-          {!filePickerActive && <button type="button" className="workbench-tree-collapse" onClick={toggleFileTree}
+          {!filePickerActive && <button ref={fileTreeCollapseRef} type="button" className="workbench-tree-collapse" onClick={toggleFileTree}
             aria-controls="workbench-file-tree" aria-expanded={!fileTreeHidden}
             title={translate("files.hideDirectory")} aria-label={translate("files.hideDirectory")}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </button>}
         </div>
         <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={effectiveFileTreeHidden} aria-hidden={effectiveFileTreeHidden || undefined} />
-        {isWorkbenchDesktop && fileTreeApplicable && fileTreeHidden && <button ref={fileTreeRestoreRef}
+        {isWorkbenchDesktop && fileTreeApplicable && fileTreeHidden && <div className="workbench-tree-restore-rail"><button ref={fileTreeRestoreRef}
           type="button" className="workbench-tree-restore" onClick={toggleFileTree}
           aria-label={translate("files.showDirectory")} title={translate("files.showDirectory")}
-          aria-controls="workbench-file-tree" aria-expanded={false} />}
+          aria-controls="workbench-file-tree" aria-expanded={false}>
+          <FolderIcon size={16} />
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m7.5 3-3 3 3 3" /></svg>
+        </button></div>}
         </div>
       </div>
       </div>

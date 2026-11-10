@@ -82,9 +82,14 @@ try {
     const mainInput = page.locator(".workspace-chat-view .chat-input-textarea").first();
     const tool = name => panel.locator(".panel-tool-grid").getByRole("button", { name: new RegExp(`^${name}`) });
     const newTab = async () => { await panel.locator(".file-tab-add").click(); await panel.locator(".panel-tool-launcher").waitFor(); };
-    const chooseTab = async label => {
+    const openTabs = async () => {
       await (width <= 640 ? panel.locator(".panel-tab-switcher") : page.locator(".panel-tab-switcher").first()).click();
       const menu = page.getByRole("menu", { name: "Open tabs", exact: true });
+      await menu.waitFor();
+      return menu;
+    };
+    const chooseTab = async label => {
+      const menu = await openTabs();
       await menu.getByRole("menuitemradio", { name: label, exact: true }).click();
     };
     try {
@@ -98,7 +103,21 @@ try {
       await panel.getByRole("tab", { name: "Open file", exact: true }).waitFor();
       await panel.locator("#workbench-file-tree").getByTitle(`${cwd}/doc.txt`, { exact: true }).click();
       await panel.getByText("fixture file body", { exact: true }).waitFor();
-      await panel.getByRole("button", { name: "Close doc.txt", exact: true }).click();
+      let menu = await openTabs();
+      const closeDoc = menu.getByRole("menuitem", { name: "Close doc.txt", exact: true });
+      if (width > 640) await menu.getByRole("menuitemradio", { name: "doc.txt", exact: true }).hover();
+      assert.equal(await closeDoc.evaluate(el => getComputedStyle(el).opacity), "1", "close is visible on hover or touch");
+      await page.screenshot({ path: resolve(artifacts, `tab-close-${theme}-${width}.png`), animations: "disabled" });
+      await closeDoc.click();
+      await menu.getByRole("menuitemradio", { name: "doc.txt", exact: true }).waitFor({ state: "detached" });
+      assert.equal(await menu.getByRole("menuitemradio", { name: "Open file", exact: true }).getAttribute("aria-checked"), "true", "closing the active file falls back to the remaining tab");
+      const closeLast = menu.getByRole("menuitem", { name: "Close Open file", exact: true });
+      await closeLast.focus(); await closeLast.press("Enter");
+      await menu.waitFor({ state: "detached" });
+      assert.equal(await panel.getByRole("tab").count(), 0, "the last tab can be closed from the menu");
+      assert.equal(await mainInput.inputValue(), "Main draft stays here");
+      await page.locator(".panel-tab-switcher").first().click();
+      await tool("Files").click();
       await newTab();
       failFork = true;
       await tool("Side chat").click();
@@ -145,8 +164,22 @@ try {
       await page.keyboard.press("Control+`");
       await panel.getByRole("tab", { selected: true }).filter({ hasText: "panel-tools" }).waitFor();
       assert.equal(writes.filter(w => w.path === "/api/terminal").length, terminalCreates.length, "terminal shortcut reuses the existing terminal");
-      await (width <= 640 ? panel.locator(".panel-tab-switcher") : page.locator(".panel-tab-switcher").first()).click();
-      await page.getByRole("menu", { name: "Open tabs", exact: true }).waitFor();
+      menu = await openTabs();
+      const activeTerminalLabel = await panel.getByRole("tab", { selected: true }).getAttribute("aria-label");
+      if (width > 640) await menu.getByRole("menuitemradio", { name: "change.ts", exact: true }).hover();
+      await menu.getByRole("menuitem", { name: "Close change.ts", exact: true }).click();
+      await menu.getByRole("menuitemradio", { name: "change.ts", exact: true }).waitFor({ state: "detached" });
+      assert.equal(await panel.getByRole("tab", { selected: true }).getAttribute("aria-label"), activeTerminalLabel, "closing an inactive tab never selects it");
+      const closeSide = menu.getByRole("menuitem", { name: "Close Side chat", exact: true });
+      await closeSide.focus(); await closeSide.press("Enter");
+      await menu.getByRole("menuitemradio", { name: "Side chat", exact: true }).waitFor({ state: "detached" });
+      assert.equal(writes.some(write => write.path === `/api/sessions/${childId}`), false, "closing a side tab does not delete its session");
+      const terminate = menu.getByRole("menuitem", { name: /^Terminate terminal / });
+      const terminated = page.waitForResponse(response => new URL(response.url()).pathname.startsWith("/api/terminal/") && response.request().method() === "DELETE");
+      await terminate.focus(); await terminate.press("Enter");
+      await terminated;
+      await panel.getByRole("tab", { name: activeTerminalLabel, exact: true }).waitFor({ state: "detached" });
+      assert.equal(await menu.getByRole("menuitemradio", { checked: true }).count(), 1, "terminating the active terminal selects a remaining tab");
       await page.keyboard.press("Escape");
       assert.equal(commands.some(c => c.type === "abort"), false);
       await panel.locator(".file-panel-close-button").click();

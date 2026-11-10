@@ -1,8 +1,9 @@
 // Secret classification and masking for MCP server entries (ADR 0006). The
 // Settings panel and the trust dialog show a server's command, arguments and
 // URL to a browser that may be on another machine, and a project's `mcp.json`
-// is whatever its repository committed. Env and header values are never sent
-// at all (names only); this module covers what is shown: it masks the parts
+// is whatever its repository committed. Overview/trust env and header values
+// are omitted (names only); the editor uses this classification to show safe
+// configured text. This module masks the parts
 // of a URL or an argument list that look like credentials. The same rules
 // decide which values of an entry are literal secrets, which may only be
 // saved in the global file.

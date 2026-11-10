@@ -37,6 +37,8 @@ export interface SidebarMenuSecondaryAction {
   icon: ReactNode;
   danger?: boolean;
   disabled?: boolean;
+  /** Quiet row actions stay visible on touch and reveal on hover or keyboard focus. */
+  revealOnHover?: boolean;
   onSelect: (event: SidebarMenuSelectEvent) => void;
 }
 
@@ -461,7 +463,7 @@ function MenuItemButton({ item, onActivate }: { item: ActionItem; onActivate: Si
         tabIndex={-1}
         title={secondary.label}
         data-sidebar-menu-item=""
-        className={secondary.danger ? "sidebar-menu-secondary is-danger" : "sidebar-menu-secondary"}
+        className={["sidebar-menu-secondary", secondary.danger ? "is-danger" : "", secondary.revealOnHover ? "is-hover-reveal" : ""].filter(Boolean).join(" ")}
         onClick={(event) => onActivate(secondary, event.shiftKey)}
         onKeyDown={activateOnEnter(secondary, onActivate)}
       >

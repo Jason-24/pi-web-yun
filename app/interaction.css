@@ -1,0 +1,80 @@
+/* Shared timing for navigation and controls. Never animate layout while dragging. */
+:root {
+  --ui-motion-fast: 120ms;
+  --ui-motion-content: 160ms;
+  --ui-motion-panel: 200ms;
+  --ui-ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+
+:is(.workbench-settings-navigation button, .workspace-return-session, .workspace-title-action,
+  .workspace-page-back, .workspace-page-export, .session-tree-session, .session-tree-group-toggle,
+  .session-tree-recents-toggle, .session-tree-group-action, .session-tree-section-action,
+  .sidebar-menu-item, .sidebar-menu-secondary, .sidebar-sheet-cancel,
+  .file-tab, .file-tab-close, .file-tab-add, .panel-tab-switcher,
+  .file-viewer-mode-button, .file-viewer-icon-button, .file-find-row button,
+  .model-reasoning-trigger, .model-reasoning-reset, .model-reasoning-modes button, .model-selector-panel button,
+  .panel-tool-grid button, .panel-changes button, .home-view button) {
+  transition: background-color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease,
+    color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-fast) ease,
+    opacity var(--ui-motion-fast) ease;
+}
+
+/* Virtualized rows keep their positioning transforms; only fixed controls move on press. */
+:is(.workbench-settings-navigation button, .workspace-return-session, .workspace-page-back,
+  .file-tab-close, .file-tab-add, .file-viewer-icon-button,
+  .model-reasoning-trigger, .model-reasoning-reset, .panel-tool-grid button,
+  .home-view button) {
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: var(--ui-motion-fast), var(--ui-motion-fast), var(--ui-motion-fast), var(--ui-motion-fast), var(--ui-motion-fast), 80ms;
+}
+:is(.workbench-settings-navigation button, .workspace-return-session, .workspace-page-back,
+  .file-tab-close, .file-tab-add, .file-viewer-icon-button,
+  .model-reasoning-trigger, .model-reasoning-reset, .panel-tool-grid button,
+  .home-view button):not(:disabled):active { transform: translateY(1px); }
+
+:is(.sidebar-menu-item, .file-tab):not(:disabled):active { background: var(--bg-selected); }
+
+@keyframes ui-content-ready {
+  from { opacity: .72; }
+  to { opacity: 1; }
+}
+/* These mount when content is ready, not on every token, tool result or scroll. */
+.chat-content, .file-viewer-content, .file-find-bar, .model-reasoning-card, .model-selector-panel {
+  animation: ui-content-ready var(--ui-motion-content) var(--ui-ease-out);
+}
+.sidebar-menu { animation-duration: var(--ui-motion-content); animation-timing-function: var(--ui-ease-out); }
+.sidebar-sheet { animation-duration: var(--ui-motion-panel); animation-timing-function: var(--ui-ease-out); }
+.sidebar-sheet-backdrop { animation-duration: var(--ui-motion-content); }
+
+/* Avoid a flash of loading text on fast cached conversation reads. */
+@keyframes ui-loading-ready {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.chat-loading-state { gap: 9px; font-size: 12px; animation: ui-loading-ready var(--ui-motion-content) 120ms backwards; }
+.chat-loading-state::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--text-muted);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.workbench-settings-navigation button, .workspace-return-session, .workspace-title-action,
+    .workspace-page-back, .workspace-page-export, .session-tree-session, .session-tree-group-toggle,
+    .session-tree-recents-toggle, .session-tree-group-action, .session-tree-section-action,
+    .sidebar-menu-item, .sidebar-menu-secondary, .sidebar-sheet-cancel,
+    .file-tab, .file-tab-close, .file-tab-add, .panel-tab-switcher,
+    .file-viewer-mode-button, .file-viewer-icon-button, .file-find-row button,
+    .model-reasoning-trigger, .model-reasoning-reset, .model-reasoning-modes button, .model-selector-panel button,
+    .panel-tool-grid button, .panel-changes button, .home-view button) { transition: none; }
+  :is(.workbench-settings-navigation button, .workspace-return-session, .workspace-page-back,
+    .file-tab-close, .file-tab-add, .file-viewer-icon-button,
+    .model-reasoning-trigger, .model-reasoning-reset, .panel-tool-grid button,
+    .home-view button):active { transform: none; }
+  .chat-content, .chat-loading-state, .chat-loading-state::before, .file-viewer-content, .file-find-bar,
+  .model-reasoning-card, .model-selector-panel, .sidebar-menu, .sidebar-sheet, .sidebar-sheet-backdrop { animation: none; }
+}

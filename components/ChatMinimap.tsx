@@ -646,16 +646,11 @@ export const ChatMinimap = memo(function ChatMinimap({
     >
       {turnsBefore > 0 && (
         <div
+          className={styles.earlierMarker}
           data-minimap-earlier=""
+          aria-hidden="true"
           style={{
-            position: "absolute",
-            left: "50%",
-            top: Math.max(0, (positionedNodes[0]?.topRatio ?? 0) * minimapHeight - MINIMAP_PADDING),
-            height: MINIMAP_PADDING - 8,
-            width: 1,
-            background: "repeating-linear-gradient(to bottom, var(--text-dim) 0 2px, transparent 2px 4px)",
-            transform: "translateX(-50%)",
-            zIndex: 0,
+            top: Math.max(0, (positionedNodes[0]?.topRatio ?? 0) * minimapHeight - 20),
           }}
         />
       )}

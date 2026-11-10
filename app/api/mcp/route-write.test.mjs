@@ -412,14 +412,15 @@ test("a global server is turned off and on in the project alone, through an over
 });
 
 
-test("edit read hides all header values and credential-bearing URLs; update keeps untouched secrets and unknown fields", async () => {
-  const config = { url: "https://example.com/mcp?api_key=super-secret-token", headers: { Authorization: "Bearer private-token", "X-Label": "also-private" }, oauth: { clientId: "client" }, unknown: { keep: true }, enabled: false };
+test("edit read shows ordinary headers and hides credentials; update keeps untouched secrets and unknown fields", async () => {
+  const config = { url: "https://example.com/mcp?api_key=super-secret-token", headers: { Authorization: "Bearer private-token", "X-Label": "test-environment" }, oauth: { clientId: "client" }, unknown: { keep: true }, enabled: false };
   await writeFile(globalPath, JSON.stringify({ mcpServers: { edit: config }, rootKey: "keep" }));
   const read = await post({ action: "read-edit", scope: "global", name: "edit" });
   assert.equal(read.status, 200);
   assert.equal(read.body.fields.url.hidden, true);
   assert.equal(read.body.fields.url.value, "");
   assert.deepEqual(read.body.names, ["Authorization", "X-Label"]);
+  assert.deepEqual(read.body.values, { Authorization: { hidden: true, value: "" }, "X-Label": { hidden: false, value: "test-environment" } });
   assert.ok(!JSON.stringify(read.body).includes("private"));
   assert.ok(!JSON.stringify(read.body).includes("super-secret"));
   const saved = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { values: [{ name: "X-New", action: "literal", value: "!do-not-run $SECRET" }] } });
@@ -427,6 +428,33 @@ test("edit read hides all header values and credential-bearing URLs; update keep
   const result = await readJson(globalPath);
   assert.equal(result.rootKey, "keep");
   assert.deepEqual(result.mcpServers.edit, { ...config, headers: { ...config.headers, "X-New": "$!do-not-run $$SECRET" } });
+});
+
+test("edit read returns configured env text and references without resolving or rewriting them", async () => {
+  const env = {
+    KIBANA_URL: "https://kibana.example.com/sit",
+    API_TOKEN: "private-token",
+    TOKEN_REFERENCE: "${MY_TOKEN}",
+    FROM_COMMAND: "!echo do-not-execute",
+    SECRET_COMMAND: "!echo --token command-secret",
+    ESCAPED: "$!literal $$VALUE",
+    CONNECTION: "https://user:embedded-password@example.com",
+    EMPTY: "",
+  };
+  const bytes = JSON.stringify({ mcpServers: { edit: { command: "node", env } } }, null, 2);
+  await writeFile(globalPath, bytes);
+  const read = await post({ action: "read-edit", scope: "global", name: "edit" });
+  assert.equal(read.status, 200);
+  for (const name of ["KIBANA_URL", "TOKEN_REFERENCE", "FROM_COMMAND", "ESCAPED", "EMPTY"]) {
+    assert.deepEqual(read.body.values[name], { hidden: false, value: env[name] });
+  }
+  for (const name of ["API_TOKEN", "SECRET_COMMAND", "CONNECTION"]) {
+    assert.deepEqual(read.body.values[name], { hidden: true, value: "" });
+    assert.ok(!JSON.stringify(read.body).includes(env[name]));
+  }
+  const saved = await post({ action: "update", scope: "global", name: "edit", version: read.body.version, patch: { fields: {}, values: [] } });
+  assert.equal(saved.status, 200);
+  assert.equal(await readFile(globalPath, "utf8"), bytes);
 });
 
 test("edit preserves argument boundaries, removes a value, and rejects stale versions without writing", async () => {
