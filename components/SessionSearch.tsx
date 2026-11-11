@@ -46,7 +46,23 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
   }, [open, search]);
 
   return !open || !search ? children : (
-    <div className="min-h-20 flex-1 overflow-y-auto" aria-busy={!response && !failed}>
+    <div className="session-search-results min-h-20 flex-1 overflow-y-auto" aria-busy={!response && !failed}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+        const results = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[data-session-search-result]"));
+        const index = results.indexOf(event.target as HTMLButtonElement);
+        if (index < 0) return;
+        if (event.key === "Escape" || (event.key === "ArrowUp" && index === 0)) {
+          event.preventDefault();
+          event.stopPropagation();
+          document.getElementById("session-search-input")?.focus({ preventScroll: true });
+        } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          const next = event.key === "Home" ? 0 : event.key === "End" ? results.length - 1
+            : Math.max(0, Math.min(results.length - 1, index + (event.key === "ArrowUp" ? -1 : 1)));
+          results[next]?.focus();
+        }
+      }}>
       <div role="status" className="px-3 py-2 text-xs text-text-muted">
         {failed ? t("sidebar.sessionSearchFailed") : !response ? t("sidebar.sessionSearching")
           : response.results.length === 0 ? t("sidebar.sessionSearchEmpty")
@@ -59,6 +75,7 @@ export function SessionSearch({ open, query, children, selectedSessionId, onSele
         <button
           key={session.id}
           type="button"
+          data-session-search-result=""
           onClick={() => onSelectSession(session, entryId, blockIndex)}
           aria-current={session.id === selectedSessionId ? "true" : undefined}
           className={`block w-full cursor-pointer border-b border-border px-3 py-2 text-left hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline-accent ${session.id === selectedSessionId ? "bg-bg-selected" : ""}`}

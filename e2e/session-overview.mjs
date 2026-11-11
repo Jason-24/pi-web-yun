@@ -32,11 +32,13 @@ try {
     page.setDefaultTimeout(15000);
     const errors = [], commands = [], requests = [];
     let failGit = false, failSources = false, notGit = false;
+    let refreshGate = null;
     page.on("pageerror", error => errors.push(error.message));
     await context.route("**/api/**", async route => {
       const request = route.request(), url = new URL(request.url()), path = url.pathname;
       requests.push({ path, method: request.method() });
       const reply = json => route.fulfill({ json });
+      if (refreshGate && (path === "/api/git/status" || path.endsWith("/sources"))) await refreshGate;
       if (path === "/api/models") return reply({ models: { "fixture/base": "Fixture" }, modelList: [{ provider: "fixture", id: "base", name: "Fixture" }], defaultModel: { provider: "fixture", modelId: "base" }, thinkingLevels: { "fixture:base": ["off"] } });
       if (path === "/api/sessions") return reply({ sessions: [session, second], sessionListVersion: 1, runningSessionIds: [], awaitingInputSessionIds: [] });
       if (path === "/api/sessions/ui-state") return reply({ state: { version: 1, revision: 1, sessions: {}, projects: {}, projectOrder: [cwd] } });
@@ -92,11 +94,30 @@ try {
       await open();
       await panel.getByText("+407", { exact: true }).waitFor();
       await panel.getByText("Image 1", { exact: true }).waitFor();
+      assert.equal(await panel.evaluate(el => getComputedStyle(el).animationName), "none", "reduced motion disables the panel entrance");
+      assert.equal(await panel.evaluate(el => getComputedStyle(el, "::backdrop").animationName), "none");
+      // A delayed refresh preserves loaded rows and their DOM instead of flashing empty.
+      const firstChange = panel.getByRole("button", { name: /change-0\.ts/ });
+      await firstChange.evaluate(el => { el.dataset.refreshIdentity = "retained"; });
+      let releaseRefresh;
+      refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+      const refresh = panel.getByRole("button", { name: "Refresh overview", exact: true });
+      await refresh.click();
+      await page.waitForFunction(() => document.querySelector('dialog[open] button[aria-busy="true"]'));
+      assert.equal(await firstChange.getAttribute("data-refresh-identity"), "retained");
+      assert.equal(await panel.getByText("Image 1", { exact: true }).isVisible(), true);
+      refreshGate = null;
+      releaseRefresh();
+      await page.waitForFunction(() => document.querySelector('dialog[open] button[aria-busy="false"]'));
+      assert.equal(await firstChange.getAttribute("data-refresh-identity"), "retained");
       assert.equal(await panel.getByRole("button", { name: /^Terminal 1/ }).count(), 1);
       assert.equal(await panel.getByText("D:/workspace/other", { exact: true }).count(), 0);
       assert.equal(commands.length, commandsBefore, "opening never sends an agent command");
       await page.screenshot({ path: resolve(artifacts, `overview-${theme}-${width}.png`) });
       await panel.screenshot({ path: resolve(artifacts, `panel-${theme}-${width}.png`) });
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      assert.notEqual(await panel.evaluate(el => getComputedStyle(el).animationName), "none", "ordinary motion has a panel entrance");
+      await page.emulateMedia({ reducedMotion: "reduce" });
       for (const section of ["Project changes", "Conversation sources"]) {
         const region = panel.getByRole("region", { name: section, exact: true });
         await region.getByRole("button", { name: /^Show all/ }).click();
@@ -134,6 +155,8 @@ try {
       failGit = true; failSources = true;
       await open();
       await panel.getByRole("alert").first().waitFor();
+      assert.equal(await panel.getByRole("button", { name: /change-0\.ts/ }).count(), 1, "failed refresh retains loaded changes");
+      assert.equal(await panel.getByText("Image 1", { exact: true }).count(), 1, "failed refresh retains loaded sources");
       failGit = false; failSources = false; notGit = true;
       await panel.getByRole("button", { name: "Refresh overview", exact: true }).click();
       await panel.getByText("This directory is not a Git repository.", { exact: true }).waitFor();

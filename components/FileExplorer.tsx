@@ -3,6 +3,7 @@
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { getFileIcon, FolderIcon } from "./FileIcons";
 import { DismissButton } from "./DismissButton";
+import { Disclosure } from "./Disclosure";
 import {
   encodeFilePathForApi,
   getFileDirectory,
@@ -389,6 +390,7 @@ export function TreeNode({
       >
         {node.isDir && (
           <svg
+            className="file-tree-chevron"
             width="10" height="10" viewBox="0 0 10 10" fill="none"
             stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
             style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
@@ -571,8 +573,8 @@ export function TreeNode({
           )}
         </div>
       )}
-      {node.isDir && open && !pendingLinkTarget && (
-        <div>
+      {node.isDir && !pendingLinkTarget && (
+        <Disclosure open={open}>
           {children.map((child) => (
             <TreeNode
               key={child.fullPath}
@@ -605,7 +607,7 @@ export function TreeNode({
               {loadError}
             </div>
           )}
-        </div>
+        </Disclosure>
       )}
     </div>
   );
@@ -769,6 +771,7 @@ function ChangesFolderRow({
       }}
     >
       <svg
+        className="file-tree-chevron"
         width="10" height="10" viewBox="0 0 10 10" fill="none"
         stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
         style={{ flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s" }}
@@ -829,7 +832,7 @@ function ChangesTreeRows({
                 open={open}
                 onToggle={onToggleExpanded}
               />
-              {open && (
+              <Disclosure open={open}>
                 <ChangesTreeRows
                   nodes={node.children}
                   depth={depth + 1}
@@ -841,7 +844,7 @@ function ChangesTreeRows({
                   onAtMention={onAtMention}
                   t={t}
                 />
-              )}
+              </Disclosure>
             </div>
           );
         }

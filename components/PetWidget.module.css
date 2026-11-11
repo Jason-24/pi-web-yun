@@ -1,9 +1,13 @@
 .pet {
+  --pet-right: 24px;
+  --pet-bottom: 88px;
+  --pet-safe-right: env(safe-area-inset-right, 0px);
+  --pet-safe-bottom: env(safe-area-inset-bottom, 0px);
   --preferred-figure-height: 280px;
   --figure-height: var(--preferred-figure-height);
   position: fixed;
-  right: max(24px, env(safe-area-inset-right));
-  bottom: max(88px, env(safe-area-inset-bottom));
+  right: max(var(--pet-right), env(safe-area-inset-right));
+  bottom: max(var(--pet-bottom), env(safe-area-inset-bottom));
   z-index: 300;
   width: 220px;
   display: flex;
@@ -41,6 +45,8 @@
 /* Bridge the small gap from the figure so the hover control stays reachable. */
 .more::before { content: ""; position: absolute; inset: -6px -4px -6px -16px; }
 .pet:hover .more, .pet:focus-within .more, .more[aria-expanded="true"] { opacity: 1; transform: translateY(0); transition-delay: 0s; }
+.pet[data-has-notices="true"] .more { opacity: 1; transform: none; }
+.pet[data-dragging="true"] .more { opacity: 0; pointer-events: none; }
 .more:hover, .more[aria-expanded="true"] { background: var(--bg-hover); color: var(--text); }
 .actions { position: absolute; bottom: 50px; left: 0; width: min(288px, calc(100vw - 24px)); padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel); box-shadow: 0 8px 32px color-mix(in srgb, var(--text) 12%, transparent); pointer-events: auto; animation: appear 160ms ease-out; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .pet[data-menu-side="left"] .actions { left: auto; right: calc(100% + 8px); }
@@ -122,12 +128,12 @@
   .more::before { inset: -2px; }
 }
 @media (max-width: 640px) {
-  .pet { --preferred-figure-height: 224px; width: 208px; right: 12px; bottom: max(88px, env(safe-area-inset-bottom)); }
+  .pet { --preferred-figure-height: 224px; --pet-right: 12px; width: 208px; }
   .small { --preferred-figure-height: 168px; width: 200px; }
   .more { width: 40px; height: 40px; right: 0; bottom: 8px; opacity: 1; transform: none; }
 }
 @media (max-height: 480px) {
-  .pet { --preferred-figure-height: 150px; bottom: 12px; }
+  .pet { --preferred-figure-height: 150px; --pet-bottom: 12px; }
   .speech { min-height: 64px; }
   .actions { padding: 8px; }
   .actionHeading { padding-bottom: 6px; }

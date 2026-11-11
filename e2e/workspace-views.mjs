@@ -178,6 +178,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await restoreEdge.waitFor();
     await page.mouse.move(900, 100);
     await page.waitForFunction(() => document.querySelector("#session-sidebar").getBoundingClientRect().width < 1);
+    await sidebar.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished.catch(() => {}))));
     const collapsedConversation = await page.locator(".workspace-conversation").boundingBox();
     const peek = page.locator("[data-sidebar-peek]");
     await restoreEdge.hover();

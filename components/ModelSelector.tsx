@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { SelectorRow } from "./SelectorRow";
@@ -72,6 +72,7 @@ export function ModelSelector({
   const isMobile = useIsMobile();
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
   const [filter, setFilter] = useState("");
@@ -101,6 +102,21 @@ export function ModelSelector({
   const currentName = selectedLabel ?? (value
     ? (isListed(options, value) ?? isListed(allOptions, value))?.name ?? value.modelId
     : emptyLabel ?? (options.length > 0 ? t("chat.selectModel") : t("chat.noModels")));
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false);
+    setFilter("");
+    rootRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const selected = panelRef.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')
+      ?? panelRef.current?.querySelector<HTMLElement>('[role="option"]');
+    selected?.scrollIntoView({ block: "nearest" });
+    // Keep the filter ready on desktop; avoid opening a phone keyboard.
+    if (!showFilter && !isMobile) selected?.focus({ preventScroll: true });
+  }, [open, showFilter, isMobile]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -188,15 +204,13 @@ export function ModelSelector({
 
   const choose = (option: ModelSelectorOption) => {
     const active = option.modelId === value?.modelId && option.provider === value?.provider;
-    setOpen(false);
-    setFilter("");
+    closeAndRestoreFocus();
     if (!active || isAutoSelection) onChange(option.provider, option.modelId);
     else onReselect?.(option.provider, option.modelId);
   };
 
   const saveDefault = (option: ModelSelectorOption) => {
-    setOpen(false);
-    setFilter("");
+    closeAndRestoreFocus();
     onSetDefault?.(option.provider, option.modelId);
   };
 
@@ -206,12 +220,46 @@ export function ModelSelector({
       className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
       style={{ position: "relative", width: variant === "field" || isMobile ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
       onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setFilter("");
-        setOpen(false);
-        rootRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+        if (event.nativeEvent.isComposing || event.keyCode === 229) {
+          if (open) event.stopPropagation();
+          return;
+        }
+        if (!open) {
+          if (!locked && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            event.preventDefault();
+            rootRef.current?.querySelector<HTMLButtonElement>("button")?.click();
+          }
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          closeAndRestoreFocus();
+          return;
+        }
+        const rows = Array.from(panelRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+        const index = rows.indexOf(event.target as HTMLButtonElement);
+        const inFilter = event.target instanceof HTMLInputElement;
+        const arrow = event.key === "ArrowDown" || event.key === "ArrowUp";
+        const edge = !inFilter && (event.key === "Home" || event.key === "End");
+        if ((arrow || edge) && rows.length) {
+          event.preventDefault();
+          event.stopPropagation();
+          const next = event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
+            : index < 0 ? (event.key === "ArrowUp" ? rows.length - 1 : 0)
+            : (index + (event.key === "ArrowUp" ? -1 : 1) + rows.length) % rows.length;
+          rows[next].focus({ preventScroll: true });
+          rows[next].scrollIntoView({ block: "nearest" });
+        } else if (inFilter && event.key === "Enter" && rows.length) {
+          event.preventDefault();
+          rows[0].click();
+        }
+      }}
+      onBlur={(event) => {
+        if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) {
+          setOpen(false);
+          setFilter("");
+        }
       }}
     >
       <button
@@ -219,6 +267,7 @@ export function ModelSelector({
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
         aria-busy={busy || undefined}
         disabled={locked}
         title={busy ? t("chat.switchingModel") : locked ? currentName : options.length > 0 || onClear ? t("chat.changeModel") : t("chat.noAvailableModels")}
@@ -293,6 +342,7 @@ export function ModelSelector({
         return (
           <div
             ref={panelRef}
+            id={listId}
             className="model-selector-panel"
             role="listbox"
             aria-label={ariaLabel}
@@ -342,7 +392,7 @@ export function ModelSelector({
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
                   onKeyDown={(event) => {
-                    if (!onShowAll || event.key !== "Tab") return;
+                    if (!onShowAll || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
                     event.preventDefault();
                     switchScope();
                   }}
@@ -370,11 +420,10 @@ export function ModelSelector({
                 />
               </div>
             )}
-            <div style={{ minHeight: 0, overflowY: "auto" }}>
+            <div style={{ minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
               {onClear && !filter.trim() && (
                 <SelectorRow active={!value} gutter={Boolean(onSetDefault)} onSelect={() => {
-                  setOpen(false);
-                  setFilter("");
+                  closeAndRestoreFocus();
                   onClear();
                 }}>
                   <OptionLabel label={emptyLabel ?? t("i18n.default")} />

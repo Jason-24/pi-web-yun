@@ -6,12 +6,32 @@
   --ui-ease-out: cubic-bezier(.2, .8, .2, 1);
 }
 
+/* Contain child margins while measuring a disclosure, without clipping it at rest. */
+.ui-disclosure-body { display: flow-root; }
+.ui-disclosure[hidden] { display: none; }
+
+/* Both directions share the same geometry and easing, including a quick reversal. */
+@media (min-width: 641px) {
+  .workspace-frame > .sidebar-container.is-sidebar-toggling:not(.is-peeking):not(.sidebar-resizing) {
+    transition: width var(--ui-motion-panel) var(--ui-ease-out),
+      min-width var(--ui-motion-panel) var(--ui-ease-out);
+  }
+}
+.right-panel-container:not(.right-panel-resizing) { transition-timing-function: var(--ui-ease-out); }
+.workspace-frame > .sidebar-container.is-peeking { animation: ui-content-ready var(--ui-motion-content) var(--ui-ease-out); }
+
+:is(.tool-call-toggle, .process-details-toggle, .session-tree-group-toggle,
+  .session-tree-section-toggle, .session-tree-recents-toggle, .custom-message-toggle) svg, .file-tree-chevron {
+  transition: transform var(--ui-motion-panel) var(--ui-ease-out) !important;
+}
+
 :is(.workbench-settings-navigation button, .workspace-return-session, .workspace-title-action,
   .workspace-page-back, .workspace-page-export, .session-tree-session, .session-tree-group-toggle,
   .session-tree-recents-toggle, .session-tree-group-action, .session-tree-section-action,
   .sidebar-menu-item, .sidebar-menu-secondary, .sidebar-sheet-cancel,
   .file-tab, .file-tab-close, .file-tab-add, .panel-tab-switcher,
   .file-viewer-mode-button, .file-viewer-icon-button, .file-find-row button,
+  .custom-message-toggle, .custom-message-details-toggle,
   .model-reasoning-trigger, .model-reasoning-reset, .model-reasoning-modes button, .model-selector-panel button,
   .panel-tool-grid button, .panel-changes button, .home-view button) {
   transition: background-color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease,
@@ -32,10 +52,15 @@
   .model-reasoning-trigger, .model-reasoning-reset, .panel-tool-grid button,
   .home-view button):not(:disabled):active { transform: translateY(1px); }
 
-:is(.sidebar-menu-item, .file-tab):not(:disabled):active { background: var(--bg-selected); }
+.sidebar-menu-item:not([aria-disabled="true"]):active,
+.file-tab:not(:disabled):active { background: var(--bg-selected); }
+.custom-message-toggle:hover, .custom-message-details-toggle:hover { color: var(--text) !important; }
+.custom-message-toggle:focus-visible, .custom-message-details-toggle:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
 
 @keyframes ui-content-ready {
-  from { opacity: .72; }
+  from { opacity: .84; }
   to { opacity: 1; }
 }
 /* These mount when content is ready, not on every token, tool result or scroll. */
@@ -62,13 +87,35 @@
   animation: spin .8s linear infinite;
 }
 
+/* Keyboard navigation must be as visible as pointer hover, including inline-styled controls. */
+.selector-row:focus-within { background: var(--bg-hover) !important; }
+:is(.selector-row button, .model-selector > button, .model-selector-panel input):focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+  border-radius: 5px;
+}
+.session-search-results { overscroll-behavior: contain; }
+@media (pointer: coarse) {
+  .selector-row > button[role="option"] { min-height: 44px; }
+  .selector-row > button:not([role="option"]) { min-width: 36px; min-height: 36px; right: 3px !important; }
+  .selector-row > button[role="option"] { padding-right: 42px !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .workspace-frame > .sidebar-container,
+  .workspace-frame > .sidebar-container.is-peeking,
+  .workspace-frame > .sidebar-container.is-sidebar-toggling:not(.is-peeking):not(.sidebar-resizing),
+  .right-panel-container, .right-panel-overlay-backdrop { transition: none; animation: none; }
+  :is(.tool-call-toggle, .process-details-toggle, .session-tree-group-toggle,
+    .session-tree-section-toggle, .session-tree-recents-toggle, .custom-message-toggle) svg, .file-tree-chevron { transition: none !important; }
+  .selector-row, .selector-row button { transition: none !important; }
   :is(.workbench-settings-navigation button, .workspace-return-session, .workspace-title-action,
     .workspace-page-back, .workspace-page-export, .session-tree-session, .session-tree-group-toggle,
     .session-tree-recents-toggle, .session-tree-group-action, .session-tree-section-action,
     .sidebar-menu-item, .sidebar-menu-secondary, .sidebar-sheet-cancel,
     .file-tab, .file-tab-close, .file-tab-add, .panel-tab-switcher,
     .file-viewer-mode-button, .file-viewer-icon-button, .file-find-row button,
+    .custom-message-toggle, .custom-message-details-toggle,
     .model-reasoning-trigger, .model-reasoning-reset, .model-reasoning-modes button, .model-selector-panel button,
     .panel-tool-grid button, .panel-changes button, .home-view button) { transition: none; }
   :is(.workbench-settings-navigation button, .workspace-return-session, .workspace-page-back,

@@ -614,6 +614,7 @@ export function SidebarMenu({
   const visible = open && portalTarget !== null && (sheet || anchor !== null);
   const custom = hasCustomMenuBody(children);
   const anchorKey = anchor ? JSON.stringify(anchor) : "";
+  const filterable = !custom && filter !== undefined && sidebarMenuHasFilter(items, filter.minChoices);
 
   const activate = (item: MenuAction, shiftKey: boolean) => {
     if (item.disabled) return;
@@ -629,6 +630,7 @@ export function SidebarMenu({
     const surface = surfaceRef.current;
     if (!visible || sheet || !surface) return;
     const viewport = window.visualViewport;
+    let initialTop: number | null = null;
     const position = () => {
       const current = anchorRef.current;
       if (!current) return;
@@ -639,22 +641,27 @@ export function SidebarMenu({
         width: viewport?.width ?? window.innerWidth,
         height: viewport?.height ?? window.innerHeight,
       });
+      if (initialTop === null) initialTop = top;
+      // Filtering must not move the field away from the pointer or typing caret.
+      const stableTop = filterable ? Math.max((viewport?.offsetTop ?? 0) + MENU_MARGIN,
+        Math.min(initialTop, (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight) - MENU_MARGIN - rect.height)) : top;
       surface.style.left = `${left}px`;
-      surface.style.top = `${top}px`;
+      surface.style.top = `${stableTop}px`;
     };
+    const reposition = () => { initialTop = null; position(); };
     position();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(position);
     observer?.observe(surface);
-    window.addEventListener("resize", position);
-    viewport?.addEventListener("resize", position);
-    viewport?.addEventListener("scroll", position);
+    window.addEventListener("resize", reposition);
+    viewport?.addEventListener("resize", reposition);
+    viewport?.addEventListener("scroll", reposition);
     return () => {
       observer?.disconnect();
-      window.removeEventListener("resize", position);
-      viewport?.removeEventListener("resize", position);
-      viewport?.removeEventListener("scroll", position);
+      window.removeEventListener("resize", reposition);
+      viewport?.removeEventListener("resize", reposition);
+      viewport?.removeEventListener("scroll", reposition);
     };
-  }, [visible, sheet, anchorKey, custom]);
+  }, [visible, sheet, anchorKey, custom, filterable]);
 
   useEffect(() => {
     setFilterQuery("");

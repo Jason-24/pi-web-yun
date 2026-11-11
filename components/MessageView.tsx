@@ -1,4 +1,5 @@
 "use client";
+import { Disclosure } from "./Disclosure";
 
 import { Fragment, memo, useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
@@ -1207,15 +1208,6 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
   // A running script's progress snapshot has calls but no content yet.
   const codemodeRunning = codemode !== null && result !== undefined && result.content.length === 0;
 
-  // Flat arguments as rows instead of a JSON blob, unless the card has a view of
-  // its own (a write's file text, codemode, an applied patch). See `lib/tool-fields.ts`.
-  // Input still streaming goes through pi's own partial parse, the arguments its
-  // TUI draws live, so a multi-line command shows its lines before the call ends.
-  const toolFields =
-    expanded && writtenFileText === null && codemode === null && patchFiles === null
-      ? toolFieldsOfInput(isStreamingInput ? parseStreamingJson(block.rawInput) : block.input)
-      : null;
-
   // `server/tool` instead of the registered `mcp__server__tool`, as pi's TUI shows it.
   const mcpLabel = mcpToolLabel(block.toolName, result?.details);
 
@@ -1305,74 +1297,87 @@ function ToolCallBlock({ block, result, duration, onOpenSubagent }: { block: Too
         )}
       </div>
 
-      {/* ── Expanded: input args (only when no richer view exists); a codemode script in place of its JSON ── */}
-      {expanded && (isStreamingInput || !isEditTool) && !patchFiles && (
-        toolFields ? (
-          <div
-            style={{
-              padding: "6px 10px 8px",
-              background: "var(--bg-subtle)",
-              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
-            }}
-          >
-            <ToolFieldRows fields={toolFields} />
-          </div>
-        ) : (
-          <pre
-            style={{
-              margin: 0,
-              padding: "8px 10px",
-              color: "var(--text-muted)",
-              fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-              lineHeight: 1.5,
-              overflow: "auto",
-              background: "var(--bg-subtle)",
-              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-            }}
-          >
-            {codemode ? codemode.code.replace(/\r/g, "").trimEnd() : inputStr}
-          </pre>
-        )
-      )}
+      <Disclosure open={expanded}>
+        {() => {
+          // Parse flat arguments lazily, retaining their rows during closing.
+          // Streaming input uses pi's partial parser, as its TUI does.
+          const toolFields = writtenFileText === null && codemode === null && patchFiles === null
+            ? toolFieldsOfInput(isStreamingInput ? parseStreamingJson(block.rawInput) : block.input)
+            : null;
+          return <>
+            {/* ── Expanded: input args (only when no richer view exists); a codemode script in place of its JSON ── */}
+            {(isStreamingInput || !isEditTool) && !patchFiles && (
+              toolFields ? (
+                <div
+                  style={{
+                    padding: "6px 10px 8px",
+                    background: "var(--bg-subtle)",
+                    borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
+                  }}
+                >
+                  <ToolFieldRows fields={toolFields} />
+                </div>
+              ) : (
+                <pre
+                  style={{
+                    margin: 0,
+                    padding: "8px 10px",
+                    color: "var(--text-muted)",
+                    fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
+                    lineHeight: 1.5,
+                    overflow: "auto",
+                    background: "var(--bg-subtle)",
+                    borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid var(--border)",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {codemode ? codemode.code.replace(/\r/g, "").trimEnd() : inputStr}
+                </pre>
+              )
+            )}
 
-      {/* ── Expanded: the calls a codemode script made ── */}
-      {expanded && codemode && (
-        <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
-      )}
+            {/* ── Expanded: the calls a codemode script made ── */}
+            {codemode && (
+              <CodemodeCallList calls={codemode.calls} omitted={codemode.omitted} isError={isError} />
+            )}
+          </>;
+        }}
+      </Disclosure>
 
       {/* ── Result images — always visible, independent of the collapsed details ── */}
       {resultImages.length > 0 && <ResultImages images={resultImages} isError={isError} />}
 
-      {/* ── Expanded: applied-patch split diff ── */}
-      {expanded && patchFiles && (
-        <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
-          <SplitFilesView files={patchFiles} />
-        </div>
-      )}
+      <Disclosure open={expanded}>
+        {/* ── Expanded: applied-patch split diff ── */}
+        {patchFiles && (
+          <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
+            <SplitFilesView files={patchFiles} />
+          </div>
+        )}
 
-      {/* ── Paired result — only shown when expanded ── */}
-      {expanded && result && patchFiles && isError && (
-        <PairedResult
-          text={resultText ?? ""}
-          isEmpty={resultIsEmpty}
-          isError={isError}
-        />
-      )}
-      {expanded && result && !patchFiles && !codemodeRunning && (
-        resultDiff ? (
-          <PairedDiffResult
-            diff={resultDiff}
-          />
-        ) : (!resultIsEmpty || resultImages.length === 0) && (
+        {/* ── Paired result — only shown when expanded ── */}
+        {result && patchFiles && isError && (
           <PairedResult
             text={resultText ?? ""}
             isEmpty={resultIsEmpty}
             isError={isError}
           />
-        )
-      )}
+        )}
+        {result && !patchFiles && !codemodeRunning && (
+          resultDiff ? (
+            <PairedDiffResult
+              diff={resultDiff}
+            />
+          ) : (!resultIsEmpty || resultImages.length === 0) && (
+            <PairedResult
+              text={resultText ?? ""}
+              isEmpty={resultIsEmpty}
+              isError={isError}
+            />
+          )
+        )}
+      </Disclosure>
     </div>
   );
 }
@@ -1894,7 +1899,7 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
               )}
             </span>
           </button>
-          {expanded && <CompactionSummaryDetails summary={summary} />}
+          <Disclosure open={expanded}><CompactionSummaryDetails summary={summary} /></Disclosure>
         </div>
       </div>
     </div>
@@ -1997,6 +2002,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
           <button
             type="button"
             onClick={() => setContentExpanded((v) => !v)}
+            className="custom-message-toggle"
             aria-expanded={contentExpanded}
             title={contentExpanded ? t("i18n.collapse") : t("i18n.expand")}
             style={{
@@ -2029,7 +2035,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
           </button>
         </div>
 
-        {contentExpanded && (
+        <Disclosure open={contentExpanded}>
           <>
             <div style={{ padding: "6px 9px" }}>
               {images.length > 0 && (
@@ -2081,6 +2087,8 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
               {hasDetails && (
                 <button
                   onClick={() => setDetailsExpanded((v) => !v)}
+                  className="custom-message-details-toggle"
+                  aria-expanded={detailsExpanded}
                   style={{
                     marginLeft: "auto",
                     padding: "3px 7px",
@@ -2096,7 +2104,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
               )}
             </div>
 
-            {hasDetails && detailsExpanded && (
+            {hasDetails && <Disclosure open={detailsExpanded}>
               <pre
                 style={{
                   margin: 0,
@@ -2115,9 +2123,9 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
               >
                 {detailsText}
               </pre>
-            )}
+            </Disclosure>}
           </>
-        )}
+        </Disclosure>
       </div>
     </div>
   );

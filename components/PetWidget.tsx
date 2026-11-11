@@ -19,13 +19,20 @@ import { PetPreferencesControls } from "./PetPreferencesControls";
 import { usePetCare } from "@/hooks/usePetCare";
 import { PetCareControls } from "./PetCareControls";
 import { PetCareNotice } from "./PetCareNotice";
+import { placePet, type PetRect } from "@/lib/pet-placement";
 
 const VISIBLE_KEY = "pi-yun-pet-visible";
 const POSITION_KEY = "pi-yun-pet-pos";
 const SMALL_KEY = "pi-yun-pet-small";
 type Mood = "idle" | "busy" | "waiting";
 type Position = { x: number; y: number };
-type PetIcon = "paw" | "wave" | "heart" | "cheer" | "moon" | "size" | "close" | "more";
+type PetIcon = "paw" | "wave" | "heart" | "cheer" | "moon" | "size" | "close" | "more" | "reset";
+
+function visibleViewport(): PetRect {
+  const viewport = window.visualViewport;
+  return { x: viewport?.offsetLeft ?? 0, y: viewport?.offsetTop ?? 0,
+    width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight };
+}
 
 function Icon({ name }: { name: PetIcon }) {
   const paths: Record<PetIcon, React.ReactNode> = {
@@ -43,6 +50,7 @@ function Icon({ name }: { name: PetIcon }) {
     size: <path d="M9 3H3v6m12 12h6v-6M3 3l6 6m12 12-6-6" />,
     close: <path d="m6 6 12 12M6 18 18 6" />,
     more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+    reset: <path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" />,
   };
   const size = name === "paw" ? 20 : 17;
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === "paw" ? 1.7 : 1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
@@ -93,7 +101,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const dragRef = useRef<{ pointerId: number; x: number; y: number; origin: Position; moved: boolean } | null>(null);
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; origin: Position; latest: Position; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
   const previousMoodRef = useRef<Mood>("idle");
   const previousPhaseRef = useRef(activity.phase);
@@ -182,17 +190,31 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
 
   useEffect(() => {
     if (!visible || !menuOpen) return;
+    const menu = menuRef.current;
+    menu?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus({ preventScroll: true });
     const dismiss = (event: PointerEvent) => {
       if (!petRef.current?.contains(event.target as Node)) setMenuOpen(false);
     };
+    let focusFrame: number | null = null;
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        if (focusFrame !== null) cancelAnimationFrame(focusFrame);
+        focusFrame = requestAnimationFrame(() => {
+          focusFrame = null;
+          if (!petRef.current?.contains(document.activeElement)) setMenuOpen(false);
+        });
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault(); event.stopPropagation(); setMenuOpen(false);
       menuButtonRef.current?.focus();
     };
     document.addEventListener("pointerdown", dismiss);
     document.addEventListener("keydown", onKey, true);
-    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", onKey, true); };
+    return () => {
+      if (focusFrame !== null) cancelAnimationFrame(focusFrame);
+      document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", onKey, true);
+    };
   }, [visible, menuOpen]);
 
   useEffect(() => {
@@ -222,8 +244,8 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(menu);
-    window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit);
-    return () => { observer.disconnect(); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
+    window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit); window.visualViewport?.addEventListener("scroll", fit);
+    return () => { observer.disconnect(); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("scroll", fit); };
   }, [visible, menuOpen, menuTab, menuSide, petName, results.length, waitingIds.length, placement.position, care.state.focus.phase]);
 
   const wake = () => {
@@ -246,7 +268,8 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     if (!event.isPrimary || event.button !== 0 || !petRef.current) return;
     wake();
     const rect = petRef.current.getBoundingClientRect();
-    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, origin: { x: rect.left, y: rect.top }, moved: false };
+    const origin = { x: rect.left, y: rect.top };
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, origin, latest: origin, moved: false };
     suppressClickRef.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -257,10 +280,8 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     if (!drag.moved && Math.hypot(dx, dy) < 6) return;
     drag.moved = true; setDragging(true); setMenuOpen(false);
     const rect = petRef.current.getBoundingClientRect();
-    setPosition({
-      x: Math.max(8, Math.min(drag.origin.x + dx, window.innerWidth - rect.width - 8)),
-      y: Math.max(8, Math.min(drag.origin.y + dy, window.innerHeight - rect.height - 8)),
-    });
+    drag.latest = placePet({ x: drag.origin.x + dx, y: drag.origin.y + dy }, rect, visibleViewport(), []).position;
+    setPosition(drag.latest);
   };
   const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
     const drag = dragRef.current;
@@ -268,7 +289,7 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
     suppressClickRef.current = cancelled || drag.moved;
     dragRef.current = null; setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (drag.moved && position) storePreference(POSITION_KEY, JSON.stringify(position));
+    if (drag.moved) storePreference(POSITION_KEY, JSON.stringify(drag.latest));
   };
 
   const asleep = mood === "idle" && resting;
@@ -304,8 +325,9 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
       <Icon name="paw" /><span className="workbench-settings-label">{t("pet.title")}</span>
     </button>
     {visible && createPortal(
-      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging} data-pet-focusing={care.focusing}
-        style={placement.position ? { left: placement.position.x, top: placement.position.y, right: "auto", bottom: "auto" } : undefined}>
+      <div ref={petRef} className={`${styles.pet} ${small ? styles.small : ""}`} data-pet-companion="" data-pose={pose} data-status={status} data-chat-phase={activity.phase} data-menu-side={menuSide} data-compact={placement.compact} data-dragging={dragging} data-pet-focusing={care.focusing} data-has-notices={pending.length > 0}
+        style={placement.position ? { left: placement.position.x, top: placement.position.y, right: "auto", bottom: "auto" } : undefined}
+        onBlur={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setMenuOpen(false); }}>
         <div className={styles.speech} role="status" aria-live="polite" aria-atomic="true">
           {(waitingSessionId || bubbleResult || careNotice || greeting) && <div key={waitingSessionId ?? bubbleResult?.id ?? careNotice?.id ?? greeting} className={styles.bubble} data-pet-notice={waitingSessionId ? "waiting" : bubbleResult ? "result" : careNotice ? "care" : "transient"}>
             {careNotice ? <PetCareNotice notice={careNotice} onRespond={care.respond} /> : <span>{waitingSessionId ? t("pet.attention") : bubbleResult ? t(`pet.background.${bubbleResult.kind}`) : greeting}</span>}
@@ -328,7 +350,8 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
             if (!offset[event.key] || !petRef.current) return;
             event.preventDefault();
             const rect = petRef.current.getBoundingClientRect(), [dx, dy] = offset[event.key];
-            const next = { x: Math.max(8, Math.min(rect.left + dx, window.innerWidth - rect.width - 8)), y: Math.max(8, Math.min(rect.top + dy, window.innerHeight - rect.height - 8)) };
+            const step = event.shiftKey ? 2 : 1;
+            const next = placePet({ x: rect.left + dx * step, y: rect.top + dy * step }, rect, visibleViewport(), []).position;
             setPosition(next); storePreference(POSITION_KEY, JSON.stringify(next));
           }}>
           <span className={styles.ground} aria-hidden="true" />
@@ -368,6 +391,11 @@ export function PetWidget({ sessions, onSelectSession }: PetWidgetProps) {
             }}><Icon name="moon" />{t(asleep ? "pet.wake" : "pet.rest")}</button>
           </div>}
           <div className={styles.actionFooter}>
+            <button type="button" onClick={() => {
+              setPosition(null); setMenuOpen(false);
+              try { localStorage.removeItem(POSITION_KEY); } catch { /* Storage is optional. */ }
+              menuButtonRef.current?.focus();
+            }}><Icon name="reset" />{t("pet.resetPosition")}</button>
             <button type="button" onClick={() => { setSmallPreference(!small); storePreference(SMALL_KEY, small ? "0" : "1"); }}><Icon name="size" />{t(small ? "pet.enlarge" : "pet.shrink")}</button>
             <button type="button" onClick={hide}><Icon name="close" />{t("pet.hide")}</button>
           </div>

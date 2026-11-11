@@ -9,6 +9,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import ReactMarkdown from "react-markdown";
 import { useTheme } from "@/hooks/useTheme";
 import { usePrismLanguages } from "@/hooks/usePrismLanguages";
+import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 import {
   DOCX_PREVIEW_MAX_BYTES,
   HTML_PREVIEW_MAX_BYTES,
@@ -1499,6 +1500,7 @@ function TextFileViewer({
     ? !!data && (!data.truncated || data.size <= HTML_PREVIEW_MAX_BYTES)
     : isMarkdown && !data?.truncated);
   const effectiveDisplayMode = isDeletedDiff ? "diff" : displayMode;
+  useSurfaceTransition(contentRef, effectiveDisplayMode);
   const rawHtml = data?.truncated ? htmlFull?.text : viewerContent;
   const htmlPreview = useMemo(
     () => isHtml && effectiveDisplayMode === "preview" ? injectSandboxedHtmlPolyfill(rawHtml ?? "") : "",

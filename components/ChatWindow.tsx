@@ -1,4 +1,5 @@
 "use client";
+import { Disclosure } from "./Disclosure";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { isHiddenRelation, SIDE_BOUNDARY_MESSAGE_TYPE } from "@/lib/session-family";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -183,11 +184,11 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cacheMis
           {cacheMissText && <span style={{ color: TRANSCRIPT_NOTICE_WARNING_COLOR }}>{` · ${cacheMissText}`}</span>}
         </span>
       </button>
-      {(expanded || reveal) && (
+      <Disclosure open={expanded || reveal}>
         <div style={{ marginTop: 8 }}>
           {children}
         </div>
-      )}
+      </Disclosure>
     </div>
   );
 }

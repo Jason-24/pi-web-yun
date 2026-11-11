@@ -34,3 +34,20 @@
 .panel[data-sheet] .row { min-height: 44px; font-size: 13px; }
 .panel[data-sheet] .icon { width: 36px; height: 36px; }
 @media (max-width: 640px) { .trigger { height: 40px; flex-basis: 36px; width: 36px; margin: 0; } }
+
+.trigger, .icon, .panel .row, .more {
+  transition: background-color var(--ui-motion-fast) ease, color var(--ui-motion-fast) ease;
+}
+.panel[open] { animation: overview-enter var(--ui-motion-content) var(--ui-ease-out); }
+.panel[open][data-sheet] { animation-name: overview-sheet-enter; animation-duration: var(--ui-motion-panel); }
+.panel[open][data-sheet]::backdrop { animation: overview-backdrop-enter var(--ui-motion-content) ease; }
+.icon[aria-busy="true"] > svg { animation: overview-refresh .8s linear infinite; }
+@keyframes overview-enter { from { opacity: .84; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes overview-sheet-enter { from { opacity: .84; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes overview-backdrop-enter { from { background: transparent; } to { background: rgb(0 0 0 / .22); } }
+@keyframes overview-refresh { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .trigger, .icon, .panel .row, .more { transition: none; }
+  .panel[open], .panel[open][data-sheet], .panel[open][data-sheet]::backdrop,
+  .icon[aria-busy="true"] > svg { animation: none; }
+}

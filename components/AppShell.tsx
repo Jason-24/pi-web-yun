@@ -4,8 +4,9 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
+import { useSidebarMotion } from "@/hooks/useSidebarMotion";
 import { SessionSidebar, type SelectSessionOptions, type SessionSidebarControl } from "./SessionSidebar";
-import { ComposeIcon, FolderIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { ComposeIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarPeek } from "@/hooks/useSidebarPeek";
 import { ChatWindow } from "./ChatWindow";
 import { ContextUsageIndicator } from "./ContextUsageIndicator";
@@ -278,6 +279,13 @@ export function AppShell() {
   const [projectTrustBusy, setProjectTrustBusy] = useState(false);
   const [projectTrustError, setProjectTrustError] = useState<ProjectTrustFailure | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => !initialNavigation.sidebarCollapsed);
+  const { phase: sidebarMotionPhase, start: startSidebarMotion } = useSidebarMotion();
+  const previousSidebarOpen = useRef(sidebarOpen);
+  useLayoutEffect(() => {
+    if (previousSidebarOpen.current === sidebarOpen) return;
+    previousSidebarOpen.current = sidebarOpen;
+    startSidebarMotion(sidebarOpen ? "in" : "out");
+  }, [sidebarOpen, startSidebarMotion]);
   const desktopSidebarOpenRef = useRef(!initialNavigation.sidebarCollapsed);
   const sidebarRestoreRef = useRef<HTMLButtonElement>(null);
   const sidebarHomeRef = useRef<HTMLButtonElement>(null);
@@ -2413,7 +2421,7 @@ export function AppShell() {
         onPointerEnter={sidebarPeek.cancel}
         onPointerLeave={sidebarPeek.scheduleHide}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) sidebarPeek.scheduleHide(); }}
-        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${sidebarPeek.open ? " is-peeking" : ""}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`}
+        className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${sidebarMotionPhase ? " is-sidebar-toggling" : ""}${sidebarPeek.open ? " is-peeking" : ""}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`}
         style={{
           "--sidebar-width": `${sidebarResizer.width}px`,
           background: "var(--bg-panel)",
@@ -2639,9 +2647,9 @@ export function AppShell() {
           {activeTopPanel && !settingsSection && <section className="workspace-page" ref={workspacePanelRef} tabIndex={-1}
             id={activeTopPanel === "session" ? "workspace-usage-page" : undefined}
             data-theme={activeTopPanel === "history" ? "dark" : undefined}
-            data-workspace-page={activeTopPanel} aria-label={translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}>
+            data-workspace-page={activeTopPanel} aria-label={translate(activeTopPanel === "agents" ? "collaboration.title" : WORKSPACE_VIEW_LABELS[activeTopPanel])}>
             <header className="workspace-page-header">
-              <div><h1>{translate(WORKSPACE_VIEW_LABELS[activeTopPanel])}</h1>
+              <div><h1>{translate(activeTopPanel === "agents" ? "collaboration.title" : WORKSPACE_VIEW_LABELS[activeTopPanel])}</h1>
                 <p>{activeTopPanel === "archive" ? translate("archive.subtitle") : selectedSession ? sessionDisplayTitle(selectedSession) : activeCwdName}</p>
               </div>
               {activeTopPanel === "history" && selectedSession && <>
@@ -2665,6 +2673,7 @@ export function AppShell() {
                 onLeafChange={handleBranchLeafChange} locked={branchSwitchLocked} hasSession={Boolean(selectedSession)} />}
               {activeTopPanel === "agents" && activeSessionFamily && selectedSession && (
                 <AgentSessionPanel
+                  key={activeSessionFamily.root.id}
                   rootSession={activeSessionFamily.root}
                   subagents={activeSessionFamily.subagents}
                   selectedSessionId={selectedSession.id}
@@ -3180,13 +3189,13 @@ export function AppShell() {
           </button>}
         </div>
         <div ref={attachFileExplorerDock} id="workbench-file-tree" className="workbench-file-tree" inert={effectiveFileTreeHidden} aria-hidden={effectiveFileTreeHidden || undefined} />
-        {isWorkbenchDesktop && fileTreeApplicable && fileTreeHidden && <div className="workbench-tree-restore-rail"><button ref={fileTreeRestoreRef}
+        {isWorkbenchDesktop && fileTreeApplicable && <div className="workbench-tree-restore-rail" inert={!fileTreeHidden} aria-hidden={!fileTreeHidden || undefined}>{fileTreeHidden && <button ref={fileTreeRestoreRef}
           type="button" className="workbench-tree-restore" onClick={toggleFileTree}
           aria-label={translate("files.showDirectory")} title={translate("files.showDirectory")}
           aria-controls="workbench-file-tree" aria-expanded={false}>
-          <FolderIcon size={16} />
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m7.5 3-3 3 3 3" /></svg>
-        </button></div>}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m7.5 3-3 3 3 3" /></svg>
+            <span className="workbench-tree-restore-label" aria-hidden="true">{translate("files.directoryTab")}</span>
+        </button>}</div>}
         </div>
       </div>
       </div>

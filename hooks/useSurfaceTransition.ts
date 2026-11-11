@@ -15,8 +15,14 @@ export function useSurfaceTransition<T extends HTMLElement>(
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const cancel = () => { activeAnimation.current?.cancel(); activeAnimation.current = null; };
     const onPreferenceChange = () => { if (media.matches) cancel(); };
+    const onVisibilityChange = () => { if (document.hidden) cancel(); };
     media.addEventListener("change", onPreferenceChange);
-    return () => { media.removeEventListener("change", onPreferenceChange); cancel(); };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      media.removeEventListener("change", onPreferenceChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      cancel();
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -25,7 +31,7 @@ export function useSurfaceTransition<T extends HTMLElement>(
     const element = ref.current;
     const previous = activeAnimation.current;
     // Continue an interrupted entrance from its current opacity instead of flashing again.
-    const opacity = previous?.playState === "running" && element ? getComputedStyle(element).opacity : .72;
+    const opacity = previous?.playState === "running" && element ? getComputedStyle(element).opacity : .84;
     previous?.cancel();
     activeAnimation.current = null;
     if (viewKey === null || !element || typeof element.animate !== "function" || document.hidden

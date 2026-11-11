@@ -3073,9 +3073,22 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
               placeholder={t("sidebar.searchSessions")}
               onChange={(event) => setSessionSearchQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Escape" && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                if (event.key === "Escape") {
+                  event.preventDefault();
                   event.stopPropagation();
-                  setSessionSearchQuery("");
+                  if (sessionSearchQuery) setSessionSearchQuery("");
+                  else {
+                    setSessionSearchOpen(false);
+                    searchButtonRef.current?.focus({ preventScroll: true });
+                  }
+                } else if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter") {
+                  const results = sessionsPanelRef.current?.querySelectorAll<HTMLButtonElement>("[data-session-search-result]");
+                  if (!results?.length) return;
+                  event.preventDefault();
+                  const result = results[event.key === "ArrowUp" ? results.length - 1 : 0];
+                  if (event.key === "Enter") result.click();
+                  else result.focus();
                 }
               }}
               className="sidebar-search-input"

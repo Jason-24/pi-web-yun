@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/hooks/useI18n";
 import { getFileName, getRelativeFilePath } from "@/lib/file-paths";
@@ -23,7 +23,7 @@ interface Props {
   onOpenFile(path: string, diff?: boolean): void;
   onOpenTerminal(id: string): void;
 }
-type Remote<T> = { data: T | null; loading: boolean; error: boolean };
+type Remote<T> = { data: T | null; loading: boolean; error: boolean; url?: string };
 const initial = { data: null, loading: true, error: false };
 const PREVIEW_LIMIT = 3;
 
@@ -46,14 +46,14 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
   useEffect(() => {
     if (!open || !cwd) return;
     const controller = new AbortController();
-    const load = <T,>(url: string, set: (value: Remote<T>) => void) => {
-      set({ data: null, loading: true, error: false });
+    const load = <T,>(url: string, set: Dispatch<SetStateAction<Remote<T>>>) => {
+      set(previous => ({ data: previous.url === url ? previous.data : null, url, loading: true, error: false }));
       fetch(url, { signal: controller.signal }).then(async response => {
         if (!response.ok) throw new Error("read failed");
         const data = await response.json() as T;
-        if (!controller.signal.aborted) set({ data, loading: false, error: false });
+        if (!controller.signal.aborted) set({ data, url, loading: false, error: false });
       }).catch(() => {
-        if (!controller.signal.aborted) set({ data: null, loading: false, error: true });
+        if (!controller.signal.aborted) set(previous => ({ ...previous, loading: false, error: true }));
       });
     };
     load(`/api/git/status?cwd=${encodeURIComponent(cwd)}`, setGit);
@@ -109,8 +109,9 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
   }, [open, mobile, allFiles, allSources, git, sources]);
 
   const close = (restore = true) => { restoreFocus.current = restore; setOpen(false); };
+  const failure = <p role="alert">{t("overview.loadFailed")} <button className={styles.more} onClick={() => setReload(value => value + 1)}>{t("overview.retry")}</button></p>;
   const retry = <T,>(remote: Remote<T>, empty: string) => remote.loading ? <p role="status">{t("overview.loading")}</p>
-    : remote.error ? <p role="alert">{t("overview.loadFailed")} <button className={styles.more} onClick={() => setReload(value => value + 1)}>{t("overview.retry")}</button></p>
+    : remote.error ? failure
       : <p>{empty}</p>;
   const files = git.data?.files ?? [];
   const items = sources.data?.sources ?? [];
@@ -129,7 +130,7 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
       <div className={styles.card}>
         <header className={styles.header}>
           <div><h2>{t("overview.title")}</h2><span title={cwd ?? ""}>{cwd ? getFileName(cwd) || cwd : ""}</span></div>
-          <button type="button" className={styles.icon} onClick={() => setReload(value => value + 1)} aria-label={t("overview.refresh")} title={t("overview.refresh")}>
+          <button type="button" className={styles.icon} onClick={() => setReload(value => value + 1)} aria-busy={git.loading || sources.loading} aria-label={t("overview.refresh")} title={t("overview.refresh")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7" /></svg>
           </button>
           <button ref={closeButton} type="button" className={styles.icon} onClick={() => close()} aria-label={t("overview.close")} title={t("overview.close")}>×</button>
@@ -137,6 +138,7 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
         <section className={styles.section} aria-label={t("overview.changes")}>
           <div className={styles.heading}><h3>{t("overview.changes")}</h3>{git.data?.isGitRepository && <span className={styles.counts}><span>+{git.data.additions}</span><span>−{git.data.deletions}</span></span>}</div>
           <p className={styles.hint}>{t("overview.changesHint")}</p>
+          {git.error && files.length > 0 && failure}
           {files.length ? <>
             {(allFiles ? files : files.slice(0, PREVIEW_LIMIT)).map(file => <button key={file.filePath} type="button" className={styles.row} onClick={() => { close(false); onOpenFile(file.filePath, true); }} title={file.filePath}>
               {getFileIcon(getFileName(file.filePath))}<span>{getRelativeFilePath(file.filePath, cwd ?? undefined)}</span><small>{file.code}</small>
@@ -153,6 +155,7 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
         </section>
         <section className={styles.section} aria-label={t("overview.sources")}>
           <div className={styles.heading}><h3>{t("overview.sources")}</h3>{sources.data && <small>{sources.data.total}</small>}</div>
+          {sources.error && items.length > 0 && failure}
           {items.length ? <>
             {(allSources ? items : items.slice(0, PREVIEW_LIMIT)).map(source => source.kind === "file" ? <button key={source.id} type="button" className={styles.row} title={source.path} onClick={() => { close(false); onOpenFile(source.path); }}>
               {getFileIcon(source.name)}<span>{source.name}{getRelativeFilePath(source.path, cwd ?? undefined) !== source.name && <small>{getRelativeFilePath(source.path, cwd ?? undefined)}</small>}</span>

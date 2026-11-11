@@ -30,6 +30,7 @@
 .workspace-page-back, .workspace-page-export { flex-shrink: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-muted); cursor: pointer; font-family: inherit; font-size: 12px; text-decoration: none; }
 .workspace-page-back:hover, .workspace-page-export:hover { color: var(--text); background: var(--bg-hover); }
 .workspace-page-content { flex: 1; min-height: 0; overflow: auto; }
+.workspace-page[data-workspace-page="agents"] > .workspace-page-header { width: 100%; max-width: 1000px; align-self: center; border-bottom: 0; padding-bottom: 0; }
 .workspace-page-content > .system-prompt-panel, .workspace-page-content > .tool-definitions-panel { height: 100%; min-height: 0; border: 0; background: var(--bg); }
 .workspace-page-content .system-prompt-scroll { padding: 24px 28px; }
 .workspace-page-content .system-prompt-text { max-width: 1000px; font-size: 13px; line-height: 1.8; }

@@ -52,7 +52,7 @@ export function SelectorRow({
 
   return (
     <div
-      className={className}
+      className={["selector-row", className].filter(Boolean).join(" ")}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setFocused(true)}

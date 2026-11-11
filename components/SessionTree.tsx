@@ -35,6 +35,7 @@ import { skillExpansionToCommand } from "@/lib/slash-display";
 import { useGroupDrag, type GroupDragHandlers } from "@/hooks/useGroupDrag";
 import { useI18n } from "@/hooks/useI18n";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
+import { useTreeMotion } from "@/hooks/useTreeMotion";
 import type { SidebarMenuAnchor } from "./SidebarMenu";
 import {
   ArchiveIcon,
@@ -406,6 +407,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
   const ghostProject = dragView?.phase === "dragging"
     ? rows.find((row): row is Extract<SidebarRow, { kind: "group" }> => row.kind === "group" && row.project.key === dragView.projectKey)?.project ?? null
     : null;
+  const captureFold = useTreeMotion(scrollRef, dragView?.phase === "dragging");
 
   return (
     <div ref={treeRef} className={`session-tree${layout === "mobile" ? " is-mobile" : ""}${ghostProject ? " is-group-dragging" : ""}`}>
@@ -419,7 +421,10 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
         onFocus={handleFocus}
         onBlur={handleBlur}
         onPointerDownCapture={groupDrag.onPointerDownCapture}
-        onClickCapture={groupDrag.onClickCapture}
+        onClickCapture={(event) => {
+          groupDrag.onClickCapture(event);
+          captureFold(event);
+        }}
       >
         {!loading && (
           <div ref={innerRef} className="session-tree-inner" style={{ height: offsets[rows.length] }}>

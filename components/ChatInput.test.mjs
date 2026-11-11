@@ -528,8 +528,7 @@ test("the live model selector can reapply its current model without changing dra
     const calls = [];
     const choose = script.runInNewContext({
       value: active ? option : null, isAutoSelection: automatic,
-      setOpen: (value) => calls.push(["open", value]),
-      setFilter: (value) => calls.push(["filter", value]),
+      closeAndRestoreFocus: () => calls.push(["open", false], ["filter", ""]),
       onChange: (provider, id) => calls.push(["change", provider, id]),
       onReselect: live ? (provider, id) => calls.push(["reselect", provider, id]) : undefined,
     });

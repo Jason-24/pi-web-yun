@@ -11,7 +11,6 @@ export function usePetPlacement(petRef: RefObject<HTMLDivElement | null>, {
   const [placement, setPlacement] = useState<{ position: PetPosition; compact: boolean } | null>(null);
   const placementRef = useRef(placement);
   placementRef.current = placement;
-  const defaultPositionRef = useRef<PetPosition | null>(null);
 
   useLayoutEffect(() => {
     const pet = petRef.current;
@@ -27,7 +26,6 @@ export function usePetPlacement(petRef: RefObject<HTMLDivElement | null>, {
       const style = getComputedStyle(pet);
       const figureHeight = parseFloat(style.getPropertyValue("--preferred-figure-height"));
       if (!character || !Number.isFinite(figureHeight)) return;
-      defaultPositionRef.current ??= { x: bounds.x, y: bounds.y };
       const viewport = window.visualViewport;
       const available = { x: viewport?.offsetLeft ?? 0, y: viewport?.offsetTop ?? 0,
         width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight };
@@ -45,7 +43,11 @@ export function usePetPlacement(petRef: RefObject<HTMLDivElement | null>, {
       }
       for (const element of observed) if (!elements.has(element)) { observer.unobserve(element); observed.delete(element); }
       const speechHeight = bounds.height - character.height;
-      const next = choosePetPlacement(preferred ?? defaultPositionRef.current,
+      const defaultPosition = {
+        x: available.x + available.width - bounds.width - Math.max(parseFloat(style.getPropertyValue("--pet-right")), parseFloat(style.getPropertyValue("--pet-safe-right")) || 0),
+        y: available.y + available.height - speechHeight - figureHeight - Math.max(parseFloat(style.getPropertyValue("--pet-bottom")), parseFloat(style.getPropertyValue("--pet-safe-bottom")) || 0),
+      };
+      const next = choosePetPlacement(preferred ?? defaultPosition,
         { width: bounds.width, height: speechHeight + figureHeight },
         { width: bounds.width, height: speechHeight + Math.min(96, figureHeight) }, available, obstacles, placementRef.current ?? undefined);
       setPlacement((current) => current?.compact === next.compact
