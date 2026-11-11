@@ -5,7 +5,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import type { DebugClientSession, DebugEventConnectionSnapshot, DebugSessionDetail, DebugSessionSummary, DebugSnapshotResponse } from "@/lib/debug-types";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
-import { StatusIcon } from "./AgentSessionPanel";
+import { StatusIcon } from "./AgentStatus";
 import { MCP_SESSION_STATE_KEYS } from "./mcp-config-helpers";
 import { sessionRowTitle } from "./SessionTree";
 import { FolderIcon, SpinnerIcon } from "./SidebarIcons";
