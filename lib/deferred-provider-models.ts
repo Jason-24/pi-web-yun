@@ -1,3 +1,4 @@
+import { LLAMA_CPP_PROVIDER_ID } from "./provider-listing";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { invalidateModelsCache } from "./models-cache";
@@ -18,6 +19,7 @@ type RuntimeModel = Awaited<ReturnType<ModelRuntime["getAvailable"]>>[number];
  */
 declare global {
   var __piWebProviderModelCatalog: Map<string, RuntimeModel[]> | undefined;
+  var __piWebProviderNameCatalog: Map<string, string> | undefined;
 }
 
 function catalog(): Map<string, RuntimeModel[]> {
@@ -30,12 +32,19 @@ export async function rememberProviderModels(runtime: ModelRuntime): Promise<voi
   const extensionProviders = new Set(runtime.getRegisteredProviderIds());
   const byProvider = new Map<string, RuntimeModel[]>();
   for (const model of await runtime.getAvailable()) {
+    // The built-in registers at resource load. Its router may now be empty,
+    // or the project may disable builtin:llama.cpp. Always use its live list.
+    if (model.provider === LLAMA_CPP_PROVIDER_ID) continue;
     // Only current virtual models qualify without a provider registration.
     // A concurrent refresh may have removed a physical model while availability loaded.
     if (!extensionProviders.has(model.provider)) {
       if (!runtime.getModel(model.provider, model.id) || runtime.getPhysicalModel(model.provider, model.id)) continue;
     }
     byProvider.set(model.provider, [...(byProvider.get(model.provider) ?? []), model]);
+  }
+  globalThis.__piWebProviderNameCatalog ??= new Map();
+  for (const provider of runtime.getProviders?.() ?? []) {
+    if (byProvider.has(provider.id) && provider.name.trim()) globalThis.__piWebProviderNameCatalog.set(provider.id, provider.name.trim());
   }
   const added = [...byProvider.keys()].some((provider) => !catalog().has(provider));
   for (const [provider, models] of byProvider) catalog().set(provider, models);
@@ -51,6 +60,13 @@ export async function rememberProviderModels(runtime: ModelRuntime): Promise<voi
 export function deferredProviderModels(runtime: ModelRuntime): RuntimeModel[] {
   const registered = new Set(runtime.getModels().map((model) => model.provider));
   return [...catalog()].flatMap(([provider, models]) => (registered.has(provider) ? [] : models));
+}
+
+/** Display names by provider id: this runtime's, then a deferred provider's remembered one, so its heading does not flip to the id. */
+export function providerDisplayNames(runtime: ModelRuntime): Map<string, string> {
+  const names = new Map(globalThis.__piWebProviderNameCatalog ?? []);
+  for (const provider of runtime.getProviders()) names.set(provider.id, provider.name.trim() || provider.id);
+  return names;
 }
 
 /** The runtime as a model listing should see it: its own available models plus deferred ones. */

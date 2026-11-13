@@ -166,7 +166,9 @@ try {
   streaming = true;
   await page.reload({ waitUntil: "domcontentloaded" });
   await trigger.click();
-  assert.equal(await modelPicker.isDisabled(), true);
+  assert.equal(await modelPicker.isEnabled(), true, "models remain editable mid-run");
+  await chooseModel("DeepSeek V4.1 Flash");
+  assert.equal(commands.at(-1).type, "set_model");
   assert.equal(await slider.isEnabled(), true, "reasoning remains editable mid-run");
   await slider.press("End");
   assert.equal(commands.at(-1).type, "set_thinking_level");

@@ -11,7 +11,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
+const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, RUN_END_CLICK_GUARD_MS, autoGrowTextarea, scrollTextareaCaretIntoView, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, isRunEndStrayClick, modelSupportsImageInput, offersBuiltinSlashCommandWhileStreaming, replaceLinksWithMarkdown, readImageFile, replaceTextareaRange, stacksComposerLayout, submitsSlashCommandOnEnter } = await jiti.import("./ChatInput.tsx");
 const { isBareMcpCommand } = await jiti.import("@/lib/mcp-command");
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 // As ChatInput.tsx imports it: on Windows jiti loads "@/lib/draft-store.ts"
@@ -216,6 +216,66 @@ test("file mention insertion falls back to a plain edit when execCommand refuses
   } finally {
     globalThis.document = originalDocument;
   }
+});
+
+test("a plain-text paste the browser dropped is inserted from the event's own text (#1513)", () => {
+  const source = ts.createSourceFile("ChatInput.tsx", readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  function findHandler(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(source) === "handlePaste") {
+      return node.initializer.arguments[0];
+    }
+    return ts.forEachChild(node, findHandler);
+  }
+  const script = new Script(ts.transpileModule(findHandler(source).getText(source), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText);
+
+  // inputFollows: the browser's own insertion fired input (handleInput clears the ref).
+  function paste({ text, html = "", links = [], inputFollows = false, connected = true }) {
+    const timers = [];
+    const inserted = [];
+    const pendingPasteRef = { current: null };
+    const handler = script.runInNewContext({
+      compact: false, processImageFiles() {}, pendingPasteRef,
+      setTimeout(callback, delay) { timers.push([callback, delay]); },
+      replaceTextareaRange(ta, start, end, value) { inserted.push([start, end, value]); },
+      replaceLinksWithMarkdown,
+      DOMParser: class {
+        parseFromString() {
+          return {
+            body: {},
+            querySelectorAll: () => links.map(([label, href]) => ({ textContent: label, getAttribute: () => href })),
+            createRange: () => ({ setStart() {}, setEndBefore() {}, toString: () => "" }),
+          };
+        }
+      },
+      valueRef: { current: "" }, setValue() {}, setHistoryMenuOpen() {}, updateAtQuery() {}, updateCompletionQueries() {}, requestAnimationFrame() {},
+    });
+    const nativeEvent = { defaultPrevented: false };
+    handler({
+      clipboardData: { items: [], getData: (type) => (type === "text/plain" ? text : type === "text/html" ? html : "") },
+      currentTarget: { value: "a draft", selectionStart: 2, selectionEnd: 5, isConnected: connected },
+      nativeEvent,
+      preventDefault() { nativeEvent.defaultPrevented = true; },
+    });
+    if (inputFollows) pendingPasteRef.current = null;
+    for (const [callback, delay] of timers) {
+      assert.equal(delay, 0);
+      callback();
+    }
+    return { inserted, prevented: nativeEvent.defaultPrevented, pending: pendingPasteRef.current };
+  }
+
+  // The native paste stays in charge: never prevented, nothing inserted twice.
+  assert.deepEqual(paste({ text: "dictated", inputFollows: true }), { inserted: [], prevented: false, pending: null });
+  // Dropped by the browser: the delivered text replaces the selection at paste time.
+  assert.deepEqual(paste({ text: "dictated" }), { inserted: [[2, 5, "dictated"]], prevented: false, pending: null });
+  // Rich text without links pastes natively too, and is recovered the same way.
+  assert.deepEqual(paste({ text: "rich", html: "<b>rich</b>" }).inserted, [[2, 5, "rich"]]);
+  // The link path takes the paste over itself: nothing to recover.
+  assert.deepEqual(paste({ text: "rich", html: "<a>rich</a>", links: [["rich", "https://example.com"]] }), { inserted: [], prevented: true, pending: null });
+  assert.deepEqual(paste({ text: "", html: "" }).inserted, []);
+  assert.deepEqual(paste({ text: "gone", connected: false }).inserted, []);
 });
 
 test("file mention arrows wrap around the match list", () => {
@@ -648,6 +708,9 @@ test("locks built-in command submission until it settles", async () => {
     attachedImages: [],
     attachedImagesRef: { current: [] },
     builtinCommandPendingRef: { current: false },
+    builtinCommandFocusRef: { current: null },
+    textareaRef: { current: null },
+    document: { activeElement: {} },
     canClearBuiltinCommandInput,
     clearInput() {},
     onBuiltinCommand: async () => new Promise((resolve) => { callback.resolve = resolve; }),
@@ -1041,6 +1104,7 @@ test("grows the composer to its text and hides the scrollbar until the text is t
   const fake = (value, scrollHeight, clientHeight) => ({
     value,
     style: { height: "", overflowY: "" },
+    scrollTop: 0,
     get scrollHeight() { return scrollHeight; },
     clientHeight,
   });
@@ -1059,4 +1123,46 @@ test("grows the composer to its text and hides the scrollbar until the text is t
   autoGrowTextarea(tall);
   assert.equal(tall.style.height, "200px", "the box caps at 200 px");
   assert.equal(tall.style.overflowY, "auto", "capped text scrolls");
+});
+
+test("a capped composer keeps its scroll while it regrows, so a caret at the end stays visible", () => {
+  // As a browser does: an "auto" height fits the whole text, which clamps
+  // scrollTop to 0.
+  const fake = (value, scrollHeight, clientHeight) => {
+    let height = "";
+    const ta = {
+      value,
+      style: {
+        overflowY: "",
+        get height() { return height; },
+        set height(next) { height = next; if (next === "auto") ta.scrollTop = 0; },
+      },
+      scrollTop: 40,
+      get scrollHeight() { return scrollHeight; },
+      clientHeight,
+    };
+    return ta;
+  };
+
+  const tall = fake("lots of lines", 320, 24);
+  autoGrowTextarea(tall);
+  assert.equal(tall.style.height, "200px");
+  assert.equal(tall.scrollTop, 40, "the auto-height reset does not leave the box scrolled back to the top");
+});
+
+test("a programmatic caret at the end scrolls an overflowing box to its bottom, a mid-text caret does not", () => {
+  const fake = (value, selectionEnd, scrollHeight) => ({
+    value,
+    selectionEnd,
+    scrollTop: 0,
+    get scrollHeight() { return scrollHeight; },
+  });
+
+  const atEnd = fake("many\nlines", 10, 320);
+  scrollTextareaCaretIntoView(atEnd);
+  assert.equal(atEnd.scrollTop, 320, "a caret at the very end scrolls to the bottom");
+
+  const mid = fake("many\nlines", 3, 320);
+  scrollTextareaCaretIntoView(mid);
+  assert.equal(mid.scrollTop, 0, "a mid-text caret leaves the scroll alone");
 });

@@ -1,7 +1,7 @@
 import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
 import { randomUUID } from "node:crypto";
 import { invalidateModelsCache } from "@/lib/models-cache";
-import { createModelRuntimeWithExtensions } from "@/lib/model-runtime";
+import { createLoginOptions, createModelRuntimeWithExtensions } from "@/lib/model-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +50,22 @@ export async function GET(
   const { provider } = await params;
 
   const encoder = new TextEncoder();
+  // An extension's login can report progress from a timer or a server event
+  // after this stream closed (login settled, or the client went away). Enqueue
+  // then throws outside any await of ours: an uncaughtException in the log.
+  let closed = false;
   const send = (controller: ReadableStreamDefaultController, data: unknown) => {
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+    if (closed) return;
+    try {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+    } catch {
+      closed = true;
+    }
+  };
+  const close = (controller: ReadableStreamDefaultController) => {
+    if (closed) return;
+    closed = true;
+    try { controller.close(); } catch { /* already closed */ }
   };
 
   // AbortController propagates client disconnect into ModelRuntime.login().
@@ -63,7 +77,7 @@ export async function GET(
       const modelRuntime = await createModelRuntimeWithExtensions();
       if (!modelRuntime.getProvider(provider)?.auth.oauth) {
         send(controller, { type: "error", message: `Unknown provider: ${provider}` });
-        controller.close();
+        close(controller);
         return;
       }
 
@@ -119,6 +133,7 @@ export async function GET(
       // Also cancel on client disconnect
       abort.signal.addEventListener("abort", cleanup);
 
+      const loginOptions = createLoginOptions();
       try {
         await modelRuntime.login(provider, "oauth", {
           prompt: async (prompt: AuthPrompt) => {
@@ -164,7 +179,7 @@ export async function GET(
             }
           },
           signal: abort.signal,
-        });
+        }, loginOptions.options);
 
         invalidateModelsCache();
         send(controller, { type: "success" });
@@ -177,10 +192,12 @@ export async function GET(
         }
       } finally {
         cleanup();
-        controller.close();
+        await loginOptions.flush();
+        close(controller);
       }
     },
     cancel() {
+      closed = true;
       abort.abort();
     },
   });
