@@ -64,7 +64,7 @@ function readProcessCommand(pid, { platform = process.platform, run = spawnSync,
   const result = platform === "win32"
     ? run("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8", windowsHide: true, timeout: 5_000 })
     : run("ps", ["-ww", "-p", String(pid), "-o", "args="], { encoding: "utf8", timeout: 5_000 });
-  if (result.error) return null;
+  if (result.error || (platform === "win32" && result.status !== undefined && result.status !== 0)) return null;
   const output = (result.stdout || "").trim();
   if (platform !== "win32") return output;
   // `"node.exe","1234",...`, or an INFO line when nothing matches.

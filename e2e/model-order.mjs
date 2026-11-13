@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { closeSettings, openSettings } from "./settings.mjs";
 
 export async function checkModelOrder(page) {
   const initial = { providers: {
@@ -33,7 +34,7 @@ export async function checkModelOrder(page) {
     if (route.request().method() === "PUT") resync = route.request().postDataJSON();
     return route.fulfill({ json: enabledView });
   });
-  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  const settings = page.getByRole("region", { name: "Settings", exact: true });
   const modelRows = settings.locator(".models-sidebar-indented-item:not(.models-sidebar-add-item)");
   const row = (label) => modelRows.filter({ hasText: label });
   const drag = async (label, target, after) => {
@@ -54,12 +55,7 @@ export async function checkModelOrder(page) {
     await backToList();
   };
   try {
-    const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
-    if (await showSidebar.isVisible()) await showSidebar.click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    const section = settings.getByRole("combobox", { name: "Settings", exact: true });
-    if (await section.isVisible()) await section.selectOption("models");
-    else await settings.getByRole("button", { name: "Models", exact: true }).click();
+    await openSettings(page, "Models");
     await modelRows.first().waitFor();
     assert.deepEqual(await labels(), ["Zulu", "alpha", "Model 10", "Model 2", "keep-last"]);
     assert.equal(await settings.getByRole("button", { name: "Sort models by shown name (A–Z)", exact: true }).last().isDisabled(), true);
@@ -108,7 +104,7 @@ export async function checkModelOrder(page) {
     assert.equal(saved.providers["order-relay"].models.find((model) => model.id === "z-renamed").contextWindow, 123456);
     assert.deepEqual(saved.providers["order-other"], initial.providers["order-other"]);
     assert.deepEqual(resync.modelRenames, [{ from: "order-relay/z-id", to: "order-relay/z-renamed" }]);
-    await settings.getByRole("button", { name: "Close", exact: true }).click();
+    await closeSettings(page);
     console.log("PASS: model drag and Alt+arrow moves, keyboard focus, one-shot A–Z, append order and rename-safe Save");
   } finally {
     for (const route of routes) await page.unroute(route);

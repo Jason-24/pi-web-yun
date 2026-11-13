@@ -97,3 +97,7 @@ Both default to `http://127.0.0.1:30141`; set `E2E_BASE_URL` for another existin
 
 - `project-create.mjs`: desktop light/dark and mobile layouts, folder browsing, nested Escape and focus restoration, long paths, validation failures, save rollback/retry, aliases after reload, and default folders. Screenshots go to `test-results/project-create/`.
 - `project-retention.mjs`: projects without sessions survive reload, failed removal rolls back, removed projects stay hidden even while current, and explicitly adding a known folder through Create project restores its project entry. Screenshots go to `test-results/project-retention/`.
+
+The full runner finishes loading `/` after API readiness and before starting browser interaction timers. This separates a cold Turbopack document compilation from UI timeouts. Settings fixtures, including model ordering, use the embedded workspace through `openSettings` / `closeSettings` in `settings.mjs`.
+
+Isolated settings fixtures share the full tools settings response in `tool-settings-fixture.mjs`. Renderer fixtures import `@/hooks/useI18n` through the same alias as components to preserve one React context. Directory picker checks start in their fixture cwd and reopen the Files dock after a project selection focuses the composer.

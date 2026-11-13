@@ -253,6 +253,11 @@ try {
     console.log("PASS: external session-file appends are visible on force/mount reads");
   }
 
+  // Readiness of /api/sessions does not compile the page and its client chunks.
+  // Finish the first document before starting the browser's interaction timers.
+  const firstPage = await fetch(base, { signal: AbortSignal.timeout(120_000) });
+  assert.equal(firstPage.status, 200, "The application page must be served before browser checks");
+  await firstPage.arrayBuffer();
   browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL || undefined });
   for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     context = await browser.newContext({ viewport, locale: "en-US" });

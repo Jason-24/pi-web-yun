@@ -83,3 +83,8 @@
 
 ## Git compatibility
 - Resolve `--git-common-dir` relative to the command cwd and use `--absolute-git-dir`; do not depend on `--path-format=absolute` (Git 2.31+). Git 2.30 echoes the unknown flag into stdout, silently shifting project identity fields and breaking branch-holder checks. Main, linked and bare worktrees keep the same realpath/allowed-root checks.
+
+## Canonical Windows aliases in Git operations
+
+- `resolveExistingPath()` and worktree root resolution use `realpathSync.native()` so Windows 8.3 aliases (such as `JIANGS~1`) expand to the same long paths Git reports. Resolve both existing ancestors and missing-file suffixes before containment checks. This preserves the rule refusing files outside the repository.
+- The test launcher canonicalizes the OS temporary directory before creating fixtures. An 8.3 alias of the operator's home otherwise makes pi's ancestor scan misidentify the operator's own `.agents/skills` as project resources. Trust breadth tests use the actual home boundary while placing their project content in temporary directories.

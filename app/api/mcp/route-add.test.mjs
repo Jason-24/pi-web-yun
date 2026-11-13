@@ -1,3 +1,4 @@
+import { symlinkTestOptions } from "../../../test-support/symlinks.mjs";
 import assert from "node:assert/strict";
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
@@ -190,7 +191,7 @@ test("a fresh folder that gained resources since the panel offered the step is n
   assert.equal(existsSync(projectPath(fresh)), false);
 });
 
-test("a fresh folder with a link to nothing under .pi is not offered the step, and the step refuses it", async () => {
+test("a fresh folder with a link to nothing under .pi is not offered the step, and the step refuses it", symlinkTestOptions, async () => {
   // The SDK's existsSync sees nothing that needs trust yet; the link would need it once its target appears.
   await mkdir(join(fresh, ".pi"));
   await symlink(join(root, "not-there-yet"), join(fresh, ".pi", "extensions"));

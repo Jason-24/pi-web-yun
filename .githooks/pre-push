@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Push blocked: commit or stash changes first so checks test the code being pushed." >&2
+  exit 1
+fi
+echo "Running Pi Web checks before push..."
+npm run check

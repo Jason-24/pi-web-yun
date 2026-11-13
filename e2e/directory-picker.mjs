@@ -54,13 +54,18 @@ export async function checkDirectoryPicker({ browser, base, fixture }) {
     // The sidebar's first session list: the page is mounted, so the first click
     // on the project box opens its menu.
     const mounted = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/sessions");
-    await page.goto(`${base}/`, { waitUntil: "domcontentloaded" });
+    // PI-YUN's Home has no active directory. Start a fresh composer in the
+    // fixture so the Files dock is available before opening its project picker.
+    await page.goto(`${base}/?cwd=${encodeURIComponent(fixture.root)}`, { waitUntil: "domcontentloaded" });
     await mounted;
     const files = page.locator("#session-sidebar-panel-files");
     const project = files.locator(".project-picker-button.is-project").first();
     await showSidebarFiles(page);
 
     const openPicker = async () => {
+      // Choosing a project focuses its composer. Reopen the Files dock before
+      // using its project picker again, as a user does.
+      await showSidebarFiles(page);
       await project.click();
       const menu = page.getByRole("menu");
       await menu.waitFor();

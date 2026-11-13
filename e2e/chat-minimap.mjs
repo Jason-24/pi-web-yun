@@ -1,3 +1,4 @@
+import { toolSettingsFixture } from "./tool-settings-fixture.mjs";
 // Run against an existing dev server: E2E_BROWSER_CHANNEL=chrome node e2e/chat-minimap.mjs
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -34,7 +35,7 @@ export async function checkChatMinimap({ browser, base, artifacts }) {
     if (path === "/api/project-trust") return reply({ cwd, requiresTrust: false, trusted: true, mcpServers: [] });
     if (path === "/api/models") return reply({ models: [], modelList: [], defaultModel: null });
     if (path === "/api/home") return reply({ home: "C:/Users/test" });
-    if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
+    if (path === "/api/tools/settings") return reply(toolSettingsFixture);
     if (path === "/api/cache-miss-notices") return reply({ enabled: true });
     if (path === "/api/web-auth") return reply({ enabled: false });
     if (path === `/api/sessions/${session.id}/context`) return reply({ context: chatContext });

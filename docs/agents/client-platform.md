@@ -61,3 +61,9 @@
 - `devIndicators: false` hides the normal Next.js development badge. Next 16 still renders the red issue count on errors, so the development-only `DevIndicatorPreference` adds a narrowly scoped rule inside Next's shadow root to hide `[data-nextjs-toast]`. It does not hide the full error dialog or suppress console errors. Its observer handles a portal mounted after React's effects and disconnects/removes its styles on unmount. Production does not mount this component.
 
 - The E2E runner accepts `E2E_BROWSER_CHANNEL` (for example `chrome`) to use an installed browser when the bundled Playwright browser is unavailable.
+
+## Local checks and push gate
+
+- `npm run check` is shared by CI's checks job and `.githooks/pre-push`. Enable it per clone with `npm run setup:hooks`; `.gitattributes` preserves the hook's LF shebang on Windows. The preview server does not need to stop for lint/type/unit checks.
+- `bin/test.mjs` bounds test-file concurrency at four, assigns a private agent directory and canonical temporary directory, forwards Node test options, preserves nonzero test exit status, and cleans its fixtures after the child exits. Capability skips in `test-support/symlinks.mjs` apply only after a Windows permission probe; Linux runs the assertions.
+- `readProcessCommand()` treats a nonzero Windows `tasklist` exit as an unavailable identity lookup, distinct from a successful lookup with no matching PID. Liveness and the URL check still apply; a failed lookup must not delete a live server's run record.
