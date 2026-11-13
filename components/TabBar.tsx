@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getFileIcon } from "./FileIcons";
 import { useI18n } from "@/hooks/useI18n";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
@@ -25,13 +25,16 @@ interface Props {
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onReorderTab?: (source: string, target: string, after: boolean) => void;
   onOpenFiles?: () => void;
   onOpenTools?: () => void;
 }
 
-export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles, onOpenTools }: Props) {
+export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles, onOpenTools, onReorderTab }: Props) {
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
+  const draggedId = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
 
   // The strip has no scrollbar (globals.css), so a vertical wheel scrolls it
   // sideways. Non-passive: the page must not scroll as well.
@@ -85,6 +88,35 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
             className={`file-tab${isActive ? " is-active" : ""}`}
             aria-label={tab.kind === "terminal" ? t("terminal.tabLabel", { name: tab.label }) : tab.kind === "agent" ? t("subagent.tabLabel", { name: tab.label }) : tab.kind === "side" ? t("sideChat.tabLabel") : tab.label}
             aria-selected={isActive}
+            draggable={Boolean(onReorderTab)}
+            onDragStart={(event) => {
+              if (!onReorderTab) return;
+              draggedId.current = tab.id;
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", tab.id);
+            }}
+            onDragOver={(event) => {
+              if (!draggedId.current || draggedId.current === tab.id) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              const rect = event.currentTarget.getBoundingClientRect();
+              const after = event.clientX >= rect.left + rect.width / 2;
+              setDropTarget((prev) => prev?.id === tab.id && prev.after === after ? prev : { id: tab.id, after });
+            }}
+            onDrop={(event) => {
+              if (!draggedId.current || draggedId.current === tab.id) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              onReorderTab?.(draggedId.current, tab.id, event.clientX >= rect.left + rect.width / 2);
+              draggedId.current = null;
+              setDropTarget(null);
+            }}
+            onDragLeave={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              setDropTarget((prev) => prev?.id === tab.id ? null : prev);
+            }}
+            onDragEnd={() => { draggedId.current = null; setDropTarget(null); }}
             tabIndex={isActive || (!activeTabId && tabs[0].id === tab.id) ? 0 : -1}
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -110,6 +142,7 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
               e.stopPropagation();
               if (!tab.closing) onCloseTab(tab.id);
             }}
+            style={{ boxShadow: dropTarget?.id === tab.id ? `inset ${dropTarget.after ? "-2px" : "2px"} 0 var(--accent)` : undefined }}
           >
             <span className="file-tab-icon">
               {tab.kind === "files" || tab.kind === "changes" || tab.kind === "launcher" ? <PanelToolIcon tool={tab.kind} size={17} /> : tab.kind === "terminal" ? (
@@ -135,6 +168,8 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles
             <button
               type="button"
               className="file-tab-close"
+              draggable={false}
+              onDragStart={(event) => event.stopPropagation()}
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
                title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}

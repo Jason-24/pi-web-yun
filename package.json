@@ -1,6 +1,6 @@
 {
   "name": "pi-yun",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Web UI for the pi coding agent (fork of @agegr/pi-web)",
   "homepage": "https://github.com/Jason-24/pi-web-yun#readme",
   "repository": {
@@ -45,18 +45,20 @@
     "lint": "eslint .",
     "test:terminal": "node e2e/terminal.mjs",
     "test:e2e": "node e2e/run.mjs",
-    "test": "node --experimental-strip-types --test \"app/**/*.test.mjs\" \"components/**/*.test.mjs\" \"hooks/**/*.test.mjs\" \"lib/**/*.test.mjs\" \"public/**/*.test.mjs\"",
-    "release": "npm ci && npm version patch --no-git-tag-version && npm run build && npm publish"
+    "test": "node bin/test.mjs",
+    "release": "npm ci && npm version patch --no-git-tag-version && npm run build && npm publish",
+    "check": "npm run lint && tsc --noEmit && npm test",
+    "setup:hooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "1.5.1",
-    "@earendil-works/pi-ai": "1.5.1",
-    "@earendil-works/pi-codemode": "1.5.1",
-    "@earendil-works/pi-coding-agent": "1.5.1",
-    "@earendil-works/pi-mcp": "1.5.1",
-    "@earendil-works/pi-schema": "1.5.1",
-    "@earendil-works/pi-telemetry": "1.5.1",
-    "@earendil-works/pi-tui": "1.5.1",
+    "@earendil-works/pi-agent-core": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-codemode": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-mcp": "1.5.2",
+    "@earendil-works/pi-schema": "1.5.2",
+    "@earendil-works/pi-telemetry": "1.5.2",
+    "@earendil-works/pi-tui": "1.5.2",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "js-yaml": "^5.2.3",

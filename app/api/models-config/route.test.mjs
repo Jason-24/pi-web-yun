@@ -1,3 +1,4 @@
+import { symlinkTestOptions } from "../../../test-support/symlinks.mjs";
 import assert from "node:assert/strict";
 import { lstat, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -146,7 +147,7 @@ test("a provider entry pi would not load is refused, and deleting it lets Save t
   assert.deepEqual(await (await GET()).json(), edited);
 });
 
-test("a symlinked models.json keeps its link: Save writes through it to its target", async () => {
+test("a symlinked models.json keeps its link: Save writes through it to its target", symlinkTestOptions, async () => {
   const targetPath = join(testAgentDir, "models-target.json");
   await writeFile(targetPath, JSON.stringify({ providers: { relay: { models: [{ id: "a" }] } } }));
   await rm(modelsPath, { force: true });
@@ -159,7 +160,7 @@ test("a symlinked models.json keeps its link: Save writes through it to its targ
   assert.deepEqual(JSON.parse(await readFile(targetPath, "utf8")), draft);
 });
 
-test("a dangling models.json symbolic link is refused instead of replaced", async () => {
+test("a dangling models.json symbolic link is refused instead of replaced", symlinkTestOptions, async () => {
   await rm(modelsPath, { force: true });
   await symlink(join(testAgentDir, "models-gone.json"), modelsPath);
 

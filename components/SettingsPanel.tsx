@@ -19,6 +19,7 @@ import {
 import { useEnterSendMode, setEnterSendMode } from "@/hooks/useEnterSendMode";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
+import { SETTINGS_BUILTIN_TOOLS } from "@/lib/tool-presets";
 import {
   setLastSettingsSection,
   settingsSectionRequiresProject,
@@ -87,6 +88,8 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
   const [shellSettings, setShellSettings] = useState<ToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [builtinToolsSaving, setBuiltinToolsSaving] = useState(false);
+  const [builtinToolsError, setBuiltinToolsError] = useState<string | null>(null);
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [cacheMissNotices, setCacheMissNotices] = useState<boolean | null>(null);
   const [cacheMissNoticesSaving, setCacheMissNoticesSaving] = useState(false);
@@ -191,6 +194,28 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
     }
   };
 
+  // The global defaultTools the configured preset follows: new sessions only.
+  const toggleBuiltinTool = async (name: string, enabled: boolean) => {
+    if (!shellSettings) return;
+    setBuiltinToolsSaving(true);
+    setBuiltinToolsError(null);
+    try {
+      const builtinTools = enabled ? [...shellSettings.builtinTools, name] : shellSettings.builtinTools.filter((tool) => tool !== name);
+      const response = await fetch("/api/tools/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ builtinTools }),
+      });
+      const data = await response.json() as ToolSettingsResponse & { error?: string };
+      if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+      setShellSettings(data);
+    } catch (cause) {
+      setBuiltinToolsError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBuiltinToolsSaving(false);
+    }
+  };
+
   const registerPush = async () => {
     if (pushRegistering) return;
     setPushRegistering(true);
@@ -258,70 +283,6 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
       </section>
 
       <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.typography")}</h3>
-        <p id="settings-typography-description" className="settings-general-description">{t("settings.fontDescription")}</p>
-        <div className="settings-chat-options">
-          <FontSettings />
-          <div className="settings-chat-option settings-chat-range-option">
-            <div className="settings-chat-range-header">
-              <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
-              <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
-              <ConfigButton
-                variant="ghost"
-                size="small"
-                className="settings-chat-reset"
-                title={t("settings.resetChatContentFontSize")}
-                aria-label={t("settings.resetChatContentFontSize")}
-                disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
-                onClick={() => setFontSize(CHAT_CONTENT_FONT_SIZE_DEFAULT)}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
-                </svg>
-              </ConfigButton>
-            </div>
-            <input
-              id="settings-chat-content-font-size"
-              type="range"
-              min={CHAT_CONTENT_FONT_SIZE_MIN}
-              max={CHAT_CONTENT_FONT_SIZE_MAX}
-              step={1}
-              value={fontSize}
-              onChange={(event) => setFontSize(Number(event.target.value))}
-            />
-          </div>
-          <div className="settings-chat-option settings-chat-range-option">
-            <div className="settings-chat-range-header">
-              <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
-              <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
-              <ConfigButton
-                variant="ghost"
-                size="small"
-                className="settings-chat-reset"
-                title={t("settings.resetChatContentWidth")}
-                aria-label={t("settings.resetChatContentWidth")}
-                disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
-                onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
-                </svg>
-              </ConfigButton>
-            </div>
-            <input
-              id="settings-chat-content-width"
-              type="range"
-              min={CHAT_CONTENT_WIDTH_MIN}
-              max={CHAT_CONTENT_WIDTH_MAX}
-              step={10}
-              value={chatContentWidth}
-              onChange={(event) => setChatContentWidth(Number(event.target.value))}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-general-section">
         <h3 className="settings-general-heading">{t("settings.chat")}</h3>
         <div className="settings-chat-options">
           <div className="settings-chat-option settings-chat-switch-option">
@@ -385,47 +346,107 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         {cacheMissNoticesError && <p role="alert" className="settings-general-error">{cacheMissNoticesError}</p>}
       </section>
 
-      {shellSettings?.isWindows && (
-        <section className="settings-general-section">
-          <h3 className="settings-general-heading">{t("settings.shellTool")}</h3>
-          <p className="settings-general-description">{t("settings.shellToolDescription")}</p>
-          <div className="settings-shell-option">
-            <span>{t("settings.usePowerShell")}</span>
-            <ConfigSwitch
-              checked={shellSettings.powerShellEnabled}
-              loading={shellSaving}
-              label={t("settings.usePowerShell")}
-              onChange={(enabled) => void togglePowerShell(enabled)}
+      <section className="settings-general-section">
+        <h3 className="settings-general-heading">{t("settings.typography")}</h3>
+        <p id="settings-typography-description" className="settings-general-description">{t("settings.fontDescription")}</p>
+        <div className="settings-chat-options">
+          <FontSettings />
+          <div className="settings-chat-option settings-chat-range-option">
+            <div className="settings-chat-range-header">
+              <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
+              <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
+              <ConfigButton
+                variant="ghost"
+                size="small"
+                className="settings-chat-reset"
+                title={t("settings.resetChatContentFontSize")}
+                aria-label={t("settings.resetChatContentFontSize")}
+                disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
+                onClick={() => setFontSize(CHAT_CONTENT_FONT_SIZE_DEFAULT)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
+                </svg>
+              </ConfigButton>
+            </div>
+            <input
+              id="settings-chat-content-font-size"
+              type="range"
+              min={CHAT_CONTENT_FONT_SIZE_MIN}
+              max={CHAT_CONTENT_FONT_SIZE_MAX}
+              step={1}
+              value={fontSize}
+              onChange={(event) => setFontSize(Number(event.target.value))}
             />
           </div>
-          {shellError && <p role="alert" className="settings-general-error">{shellError}</p>}
+          <div className="settings-chat-option settings-chat-range-option">
+            <div className="settings-chat-range-header">
+              <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
+              <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
+              <ConfigButton
+                variant="ghost"
+                size="small"
+                className="settings-chat-reset"
+                title={t("settings.resetChatContentWidth")}
+                aria-label={t("settings.resetChatContentWidth")}
+                disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
+                onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
+                </svg>
+              </ConfigButton>
+            </div>
+            <input
+              id="settings-chat-content-width"
+              type="range"
+              min={CHAT_CONTENT_WIDTH_MIN}
+              max={CHAT_CONTENT_WIDTH_MAX}
+              step={10}
+              value={chatContentWidth}
+              onChange={(event) => setChatContentWidth(Number(event.target.value))}
+            />
+          </div>
+        </div>
+      </section>
+
+      {shellSettings && (
+        <section className="settings-general-section">
+          <h3 className="settings-general-heading">{t("settings.builtinTools")}</h3>
+          <p id="settings-builtin-tools-description" className="settings-general-description">{t("settings.builtinToolsDescription")}</p>
+          <div className="settings-send-mode-options settings-builtin-tools" role="group" aria-label={t("settings.builtinTools")} aria-describedby="settings-builtin-tools-description">
+            {SETTINGS_BUILTIN_TOOLS.map((name) => (
+              <label key={name} className="settings-send-mode-option">
+                <input
+                  type="checkbox"
+                  checked={shellSettings.builtinTools.includes(name)}
+                  disabled={builtinToolsSaving}
+                  onChange={(event) => void toggleBuiltinTool(name, event.target.checked)}
+                  className="sr-only"
+                />
+                <span className="settings-send-mode-label">{name === "bash" && shellSettings.powerShellEnabled ? "powershell" : name}</span>
+              </label>
+            ))}
+          </div>
+          {builtinToolsError && <p role="alert" className="settings-general-error">{builtinToolsError}</p>}
+          {shellSettings.isWindows && (
+            <div className="settings-general-subsection">
+              <h3 className="settings-general-heading">{t("settings.shellTool")}</h3>
+              <p className="settings-general-description">{t("settings.shellToolDescription")}</p>
+              <div className="settings-shell-option">
+                <span>{t("settings.usePowerShell")}</span>
+                <ConfigSwitch
+                  checked={shellSettings.powerShellEnabled}
+                  loading={shellSaving}
+                  label={t("settings.usePowerShell")}
+                  onChange={(enabled) => void togglePowerShell(enabled)}
+                />
+              </div>
+              {shellError && <p role="alert" className="settings-general-error">{shellError}</p>}
+            </div>
+          )}
         </section>
       )}
-
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.pushPermission")}</h3>
-        <p className="settings-general-description">{t("settings.pushPermissionDescription")}</p>
-        <div className="settings-shell-option">
-          <span>{t("settings.pushPermission")}</span>
-          <button
-            type="button"
-            className="config-button config-button-small config-button-secondary"
-            disabled={pushRegistering}
-            onClick={() => void registerPush()}
-          >
-            {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
-          </button>
-        </div>
-        {pushStatus && (
-          <p
-            role="status"
-            className="settings-general-error"
-            style={pushStatus.kind === "ok" ? { color: "var(--accent)" } : undefined}
-          >
-            {pushStatus.message}
-          </p>
-        )}
-      </section>
 
       <section className="settings-general-section">
         <h3 className="settings-general-heading">{t("common.language")}</h3>
@@ -450,6 +471,30 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
             );
           })}
         </div>
+      </section>
+
+      <section className="settings-general-section">
+        <h3 className="settings-general-heading">{t("settings.pushPermission")}</h3>
+        <p className="settings-general-description">{t("settings.pushPermissionDescription")}</p>
+        <div className="settings-push-action">
+          <button
+            type="button"
+            className="config-button config-button-small config-button-secondary"
+            disabled={pushRegistering}
+            onClick={() => void registerPush()}
+          >
+            {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
+          </button>
+        </div>
+        {pushStatus && (
+          <p
+            role="status"
+            className="settings-general-error"
+            style={pushStatus.kind === "ok" ? { color: "var(--accent)" } : undefined}
+          >
+            {pushStatus.message}
+          </p>
+        )}
       </section>
 
       {webAuthEnabled && (

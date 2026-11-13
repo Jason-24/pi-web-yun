@@ -46,3 +46,11 @@ test("current SDK exports download as HTML, including deep sessions and Unicode 
   }
   assert.equal(await readFile(file, "utf8"), original, "Export must not change the session file");
 });
+
+const source = await readFile(new URL("./[id]/export/route.ts", import.meta.url), "utf8");
+
+test("session export uses a private per-request temp directory", () => {
+  assert.match(source, /mkdtempSync\(join\(tmpdir\(\), "pi-web-export-"\)\)/);
+  assert.doesNotMatch(source, /join\(tmpdir\(\), "pi-web-export"\)/);
+  assert.match(source, /rmSync\(tempDir, \{ recursive: true, force: true \}\)/);
+});

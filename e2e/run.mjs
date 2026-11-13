@@ -12,8 +12,11 @@ import { chromium } from "playwright";
 import { checkFilePanel, checkLargeHtmlStorage, filePanelFixture, largeStorageFixture } from "./file-panel.mjs";
 import { checkExtensionDialogSizing, checkExtensionDialogs, extensionSource } from "./extension-dialog.mjs";
 import { checkChatAppearance } from "./chat-appearance.mjs";
+import { checkComposerFocus } from "./composer-focus.mjs";
 import { checkCodeBackground } from "./code-background.mjs";
+import { checkStreamingMetrics } from "./streaming-metrics.mjs";
 import { checkModelDiscovery } from "./model-discovery.mjs";
+import { checkModelOrder } from "./model-order.mjs";
 import { checkModelContext } from "./model-context.mjs";
 import { checkModelSelector } from "./model-selector.mjs";
 import { checkFilesPlacement, showSidebarSessions } from "./sidebar.mjs";
@@ -22,6 +25,7 @@ import { checkProjectNavigation, createProjectNavigationFixtures } from "./proje
 import { checkWorkspaceViews } from "./workspace-views.mjs";
 import { checkArchiveWorkspace } from "./archive-workspace.mjs";
 import { checkChatMinimap } from "./chat-minimap.mjs";
+import { checkDirectoryPicker, createDirectoryPickerFixtures } from "./directory-picker.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -155,6 +159,7 @@ try {
   ]);
 
   const projectNavigation = createProjectNavigationFixtures({ agentDir, sessionDir, timestamp });
+  const directoryPicker = createDirectoryPickerFixtures(agentDir);
 
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
@@ -248,6 +253,11 @@ try {
     console.log("PASS: external session-file appends are visible on force/mount reads");
   }
 
+  // Readiness of /api/sessions does not compile the page and its client chunks.
+  // Finish the first document before starting the browser's interaction timers.
+  const firstPage = await fetch(base, { signal: AbortSignal.timeout(120_000) });
+  assert.equal(firstPage.status, 200, "The application page must be served before browser checks");
+  await firstPage.arrayBuffer();
   browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL || undefined });
   for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     context = await browser.newContext({ viewport, locale: "en-US" });
@@ -492,6 +502,7 @@ try {
     await checkLargeHtmlStorage(page, largeStorageFile);
     await checkExtensionDialogs(page, artifacts, viewport.width);
     await checkExtensionDialogSizing(page, viewport.width);
+    await checkComposerFocus(page, { base, sessionId: RICH });
     if (viewport.width > 600) {
       await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
       await page.locator(".markdown-code-block pre").waitFor();
@@ -519,9 +530,11 @@ try {
       await checkModelDiscovery(page);
     }
     await checkModelContext(page);
+    await checkModelOrder(page);
     await page.goto(`${base}/?session=${CODE_BACKGROUND}`, { waitUntil: "domcontentloaded" });
     await page.locator(".markdown-code-block pre").waitFor();
     await checkCodeBackground(page);
+    await checkStreamingMetrics(page);
     await checkModelSelector(page, { base, project, artifacts });
     assert.deepEqual(errors, [], `Browser errors at width ${viewport.width}`);
     console.log(`PASS: ${viewport.width}px browser pagination, branch, markdown, code, tool call, and compaction navigation`);
@@ -548,6 +561,7 @@ try {
   await checkWorkspaceViews({ browser, base, artifacts });
   await checkArchiveWorkspace({ browser, base, artifacts });
   await checkChatMinimap({ browser, base, artifacts });
+  await checkDirectoryPicker({ browser, base, fixture: directoryPicker });
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

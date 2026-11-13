@@ -68,7 +68,7 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
   const activeIndex = dragging ? Math.round(sliderValue) : selectedIndex;
   const canChangeReasoning = Boolean(onThinkingLevelChange) && !modelSwitching;
   const offAvailable = !availableThinkingLevels || availableThinkingLevels.includes("off");
-  const locked = Boolean(modelSwitching || (isStreaming && !onThinkingLevelChange));
+  const locked = Boolean(modelSwitching);
   const close = useCallback((restore = false) => {
     setOpen(false);
     setDrag(null);
@@ -176,7 +176,7 @@ export function ComposerModelControl({ options, allOptions, onShowAll, model, is
       </div>
       {onModelChange && <div ref={modelRef} className="model-reasoning-model">
         <ModelSelector options={options} allOptions={allOptions} onShowAll={onShowAll} value={model} variant="field" placement="auto" ariaLabel={t("chat.selectModel")}
-          isAutoSelection={isAutoModelSelection} disabled={isStreaming} busy={modelSwitching}
+          isAutoSelection={isAutoModelSelection} busy={modelSwitching}
           onChange={(provider, modelId) => { onModelChange(provider, modelId); focusModel(); }}
           onReselect={(provider, modelId) => { onModelChange(provider, modelId); focusModel(); }}
           defaultValue={defaultModel} onSetDefault={onSetDefaultModel ? (provider, modelId) => { onSetDefaultModel(provider, modelId); focusModel(); } : undefined} />

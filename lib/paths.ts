@@ -93,7 +93,7 @@ export function resolveExistingPath(target: string): string {
   let candidate = absolute;
   for (;;) {
     try {
-      return join(realpathSync(candidate), relative(candidate, absolute));
+      return join(realpathSync.native(candidate), relative(candidate, absolute));
     } catch {
       const parent = dirname(candidate);
       if (parent === candidate) return absolute;

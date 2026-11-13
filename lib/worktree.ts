@@ -85,7 +85,7 @@ function isTransientGitError(error: unknown): boolean {
 
 function realPathOrSelf(filePath: string): string {
   try {
-    return realpathSync(filePath);
+    return realpathSync.native(filePath);
   } catch {
     return filePath;
   }

@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 /** Opens the desktop directory, the Files tab, or the inline files section. */
 export async function showRightPanel(page) {
   const panel = page.locator("#file-panel");
-  if (await panel.getAttribute("class").then(value => value.includes("right-panel-open"))) return;
+  const conversationFocused = await page.locator(".workspace-main.is-conversation-focused").count() > 0;
+  if (!conversationFocused && await panel.getAttribute("class").then(value => value.includes("right-panel-open"))) return;
   await page.locator(".panel-tab-switcher").first().click();
   const menu = page.getByRole("menu").filter({ has: page.locator('[role="menuitemradio"]') });
   if (await menu.isVisible()) {

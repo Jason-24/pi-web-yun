@@ -83,7 +83,7 @@ export async function checkChatAppearance(page) {
   await checkFontPreferences(page);
   for (const viewport of [{ width: 1280, height: 600 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport);
-    await page.locator(".settings-general").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await page.locator(".settings-language-options button:last-child").scrollIntoViewIfNeeded();
     assert.equal(await page.locator(".settings-language-options button:last-child").evaluate((el) => {
       const rect = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));

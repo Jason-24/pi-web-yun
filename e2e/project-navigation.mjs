@@ -144,7 +144,12 @@ export async function checkProjectNavigation({ browser, base, artifacts, fixture
           [other.projectKey, other.projectRoot, "other project"],
           [empty.projectKey, empty.cwd, "pinned project without sessions"],
         ]) {
-          const expanded = await group(key).locator(".session-tree-group-toggle").getAttribute("aria-expanded");
+          const toggle = group(key).locator(".session-tree-group-toggle");
+          // Record an explicit user fold choice. Opening a project in another
+          // tab may pin it globally in PI-YUN; that changes its default fold.
+          await toggle.click();
+          await toggle.click();
+          const expanded = await toggle.getAttribute("aria-expanded");
           const tab = await openTab(key, !mobile && key === current.projectKey);
           await expectComposer(tab, cwd);
           await tab.reload({ waitUntil: "domcontentloaded" });
@@ -166,7 +171,8 @@ export async function checkProjectNavigation({ browser, base, artifacts, fixture
         if (mobile) {
           // A gone directory stays an explicit failed destination; it must
           // not turn into another project/session or recreate the directory.
-          rmSync(fixture.empty, { recursive: true });
+          // Windows may still have a just-closed tab's watcher or Git cwd open.
+          rmSync(fixture.empty, { recursive: true, maxRetries: 10, retryDelay: 100 });
           const tab = await openTab(empty.projectKey);
           await tab.getByText(`Directory does not exist: ${empty.cwd}`, { exact: true }).waitFor();
           assert.equal(new URL(tab.url()).searchParams.get("cwd"), empty.cwd);

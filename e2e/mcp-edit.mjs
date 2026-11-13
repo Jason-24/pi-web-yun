@@ -1,3 +1,4 @@
+import { toolSettingsFixture } from "./tool-settings-fixture.mjs";
 // Reuse an existing dev server. Every API is isolated; no real prompts or settings writes.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -63,7 +64,7 @@ try {
       if (path === "/api/worktrees") return reply({ projectRoot: cwd, projectKey: cwd, isGit: false, worktrees: [] });
       if (path === "/api/project-trust") return reply({ cwd, trusted: true, requiresTrust: false, mcpServers: [] });
       if (path === "/api/cache-miss-notices") return reply({ showCacheMissNotices: true });
-      if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
+      if (path === "/api/tools/settings") return reply(toolSettingsFixture);
       return reply({});
     });
     try {

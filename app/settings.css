@@ -283,6 +283,48 @@
   padding-left: 26px;
 }
 
+.models-sidebar-model-footer {
+  display: flex;
+  align-items: center;
+}
+
+.models-sidebar-model-footer > .config-sidebar-item {
+  flex: 1;
+  width: auto;
+  padding-right: 4px;
+}
+
+.models-sidebar-sort-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 30px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.models-sidebar-sort-button:not(:disabled):hover,
+.models-sidebar-sort-button:not(:disabled):focus-visible {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.models-sidebar-sort-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.models-sidebar-sort-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 .models-sidebar-add-item {
   color: var(--text-dim);
 }
@@ -1759,44 +1801,56 @@
    workspace, including when the session or file panels are open. */
 .settings-general {
   display: grid;
-  grid-template-columns: minmax(0, 680px);
+  grid-template-columns: minmax(0, 560px);
   align-content: start;
   justify-content: center;
-  gap: 32px;
+  gap: 24px;
   width: 100%;
   height: 100%;
-  padding: 26px clamp(18px, 4vw, 40px) 40px;
+  padding: 28px clamp(16px, 3vw, 36px) 40px;
   overflow-y: auto;
+  background: var(--bg-panel);
 }
 
 .settings-general-section {
   min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  container-type: inline-size;
+}
+
+.settings-general-subsection {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 
 @container (min-width: 900px) {
   .settings-general {
-    grid-template-columns: repeat(2, minmax(0, 480px));
-    column-gap: 48px;
+    grid-template-columns: repeat(2, minmax(0, 520px));
   }
+
 }
 
 .settings-general-heading {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 650;
 }
 
 .settings-general-description {
   margin: 0 0 12px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.7;
 }
 
 /* A note on the options above it, not an introduction to them. */
 .settings-chat-options + .settings-general-description {
-  margin: 6px 0 0;
+  margin: 12px 0 0;
 }
 
 /* Fifteen columns: System and Breeze each span a row; then five light themes and five dark ones
@@ -1945,7 +1999,8 @@
 
 /* Drawn in the font it names: the live preview. */
 .settings-chat-range-option .settings-font-input {
-  height: 26px;
+  min-width: 0;
+  height: 32px;
   margin: 0;
   padding: 0 8px;
   border: 1px solid var(--border);
@@ -1996,7 +2051,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 28px;
+  min-height: 36px;
 }
 
 .settings-chat-range-option {
@@ -2059,6 +2114,92 @@
 
 .settings-send-mode-label {
   white-space: nowrap;
+}
+
+.settings-builtin-tools {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-mono);
+}
+
+.settings-builtin-tools .settings-send-mode-option {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-builtin-tools .settings-send-mode-option:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.settings-builtin-tools .settings-send-mode-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-builtin-tools .settings-send-mode-label::before {
+  content: "";
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.settings-builtin-tools .settings-send-mode-option:has(input:checked) .settings-send-mode-label::before {
+  content: "✓";
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.settings-push-action {
+  display: flex;
+  margin-top: 16px;
+}
+
+.settings-push-action .config-button {
+  min-height: 36px;
+}
+
+@container (min-width: 381px) and (max-width: 460px) {
+  .settings-builtin-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 380px) {
+  .settings-font-rows {
+    grid-template-columns: minmax(0, 1fr) auto 28px;
+  }
+
+  .settings-chat-range-header.settings-font-header label {
+    grid-column: 1 / -1;
+    padding: 0 0 6px;
+  }
+
+  .settings-builtin-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-general {
+    gap: 16px;
+    padding: 16px 12px 28px;
+  }
+
+  .settings-general-section { padding: 16px; }
 }
 
 .settings-chat-reset {
@@ -2265,6 +2406,12 @@
     height: 44px;
     min-height: 44px;
     font-size: 14px;
+  }
+
+  .config-split-view[data-pane] .models-sidebar-sort-button {
+    width: 40px;
+    height: 44px;
+    font-size: 12px;
   }
 
   .config-split-view[data-pane] .config-sidebar-group-label {

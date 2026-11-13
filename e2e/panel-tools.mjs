@@ -138,7 +138,7 @@ try {
       await newTab();
       await tool("Files").click();
       assert.equal(await panel.getByRole("tab", { name: "Open file", exact: true }).count(), 1, "file tool is reused");
-      await chooseTab("Side chat");
+      await chooseTab("Side chat 1");
       assert.equal(await sideInput.inputValue(), "Side draft stays here");
       const sidePromptSent = page.waitForResponse(response => new URL(response.url()).pathname === `/api/agent/${childId}`
         && response.request().method() === "POST" && response.request().postDataJSON()?.type === "prompt");
@@ -170,9 +170,9 @@ try {
       await menu.getByRole("menuitem", { name: "Close change.ts", exact: true }).click();
       await menu.getByRole("menuitemradio", { name: "change.ts", exact: true }).waitFor({ state: "detached" });
       assert.equal(await panel.getByRole("tab", { selected: true }).getAttribute("aria-label"), activeTerminalLabel, "closing an inactive tab never selects it");
-      const closeSide = menu.getByRole("menuitem", { name: "Close Side chat", exact: true });
+      const closeSide = menu.getByRole("menuitem", { name: "Close Side chat 1", exact: true });
       await closeSide.focus(); await closeSide.press("Enter");
-      await menu.getByRole("menuitemradio", { name: "Side chat", exact: true }).waitFor({ state: "detached" });
+      await menu.getByRole("menuitemradio", { name: "Side chat 1", exact: true }).waitFor({ state: "detached" });
       assert.equal(writes.some(write => write.path === `/api/sessions/${childId}`), false, "closing a side tab does not delete its session");
       const terminate = menu.getByRole("menuitem", { name: /^Terminate terminal / });
       const terminated = page.waitForResponse(response => new URL(response.url()).pathname.startsWith("/api/terminal/") && response.request().method() === "DELETE");

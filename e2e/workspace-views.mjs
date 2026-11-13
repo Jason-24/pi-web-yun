@@ -1,3 +1,4 @@
+import { toolSettingsFixture } from "./tool-settings-fixture.mjs";
 // Run against an existing dev server: E2E_BROWSER_CHANNEL=chrome node e2e/workspace-views.mjs
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -79,7 +80,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
       if (type === "watch") return route.fulfill({ contentType: "text/event-stream", body: "" });
     }
     if (path === "/api/home") return reply({ home: "C:/Users/test" });
-    if (path === "/api/tools/settings") return reply({ powershell: false, codemode: false });
+    if (path === "/api/tools/settings") return reply(toolSettingsFixture);
     if (path === "/api/cache-miss-notices") return reply({ enabled: true });
     if (path === "/api/web-auth") return reply({ enabled: false });
     if (path === `/api/sessions/${session.id}/export`) {

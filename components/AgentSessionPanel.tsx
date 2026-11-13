@@ -144,8 +144,8 @@ function SessionIcon({ kind }: { kind: "main" | "side" | "subagent" }) {
   </svg>;
 }
 
-function memberTitle(session: SessionInfo, t: (key: string) => string): string {
-  return session.relation?.kind === "side" ? sideChatTitle(session, t("agentSwitcher.sideChat"))
+function memberTitle(session: SessionInfo, t: (key: string) => string, family: readonly SessionInfo[]): string {
+  return session.relation?.kind === "side" ? sideChatTitle(session, t("agentSwitcher.sideChat"), family)
     : session.relation?.kind === "subagent" ? session.relation.description || sessionTitle(session) : sessionTitle(session);
 }
 
@@ -170,7 +170,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const visible = sorted.filter(session => {
     const relation = session.relation?.kind === "subagent" ? session.relation : null;
-    return !normalizedQuery || [memberTitle(session, t), relation?.profile, session.firstMessage,
+    return !normalizedQuery || [memberTitle(session, t, subagents), relation?.profile, session.firstMessage,
       session.relation?.kind === "side" ? t("agentSwitcher.sideChat") : t("agentSwitcher.subagent")]
       .some(value => value?.toLocaleLowerCase(locale).includes(normalizedQuery));
   });
@@ -187,7 +187,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   const running = runningSessionIds.has(inspected.id);
   const status = running ? "running" : relation?.status;
   const kind = main ? "main" : side ? "side" : "subagent";
-  const title = memberTitle(inspected, t);
+  const title = memberTitle(inspected, t, subagents);
   const typeLabel = t(main ? "collaboration.mainSession" : side ? "agentSwitcher.sideChat" : "agentSwitcher.subagent");
   const familyIds = useMemo(() => [rootSession.id, ...subagents.map(session => session.id)], [rootSession.id, subagents]);
   const runningKey = familyIds.filter(id => runningSessionIds.has(id)).join(",");
@@ -246,9 +246,9 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
       const metadata = [child?.profile, model?.modelId, level && level !== "off" ? level : null].filter(Boolean).join(" · ");
       return <button key={session.id} type="button" data-collaboration-session={session.id}
         className={styles.member} aria-pressed={inspected.id === session.id} aria-controls="collaboration-detail"
-        onClick={() => inspect(session.id)} title={[memberTitle(session, t), model ? `${model.provider}/${model.modelId}` : "", metadata].filter(Boolean).join("\n")}>
+        onClick={() => inspect(session.id)} title={[memberTitle(session, t, subagents), model ? `${model.provider}/${model.modelId}` : "", metadata].filter(Boolean).join("\n")}>
         <span className={styles.memberIcon}><SessionIcon kind={isMain ? "main" : isSide ? "side" : "subagent"} /></span>
-        <span className={styles.memberCopy}><strong>{memberTitle(session, t)}</strong>
+        <span className={styles.memberCopy}><strong>{memberTitle(session, t, subagents)}</strong>
           <span>{isMain ? t(session.id === selectedSessionId ? "collaboration.currentChat" : "agentSwitcher.main")
             : metadata || formatRelativeTime(session.modified, locale)}</span>
           {hasUsage(usage[session.id]) && <UsageLine usage={usage[session.id]} />}

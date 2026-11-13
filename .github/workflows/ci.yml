@@ -23,9 +23,7 @@ jobs:
           node-version: 22.19.0
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit
-      - run: npm test
+      - run: npm run check
 
   e2e:
     runs-on: ubuntu-latest
