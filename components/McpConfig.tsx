@@ -1142,6 +1142,8 @@ export function McpConfigView({
                 toolSearchDisabled={data.toolSearchDisabled}
                 autoEnable={autoEnable}
                 block={writeBlock(selectedServer.scope)}
+                blockNoticeId={blockNoticeId(writeBlock(selectedServer.scope))}
+                uncheckedSaid={unavailable?.key === "mcp.unavailable.internals-unavailable"}
                 inProject={mcpInProjectView(selectedServer, data)}
                 inProjectBlock={writeBlock("project")}
                 savedWhileOff={!data.mcp.available && !writesOff}
@@ -1420,6 +1422,8 @@ function McpServerDetail({
   toolSearchDisabled,
   autoEnable,
   block,
+  blockNoticeId,
+  uncheckedSaid,
   inProject,
   inProjectBlock,
   savedWhileOff,
@@ -1451,6 +1455,10 @@ function McpServerDetail({
   autoEnable: McpAutoEnableCodemode;
   /** Why this server cannot be changed here. */
   block: McpWriteBlock | undefined;
+  /** The notice above the list that already says `block`, so the pane does not say it again. */
+  blockNoticeId: string | undefined;
+  /** The MCP-off notice already says the entries are listed unchecked. */
+  uncheckedSaid: boolean;
   /** A global server's "This project" row (`mcpInProjectView()`), when it has one. */
   inProject: McpInProjectView | undefined;
   /** Why the project's file cannot be changed here. */
@@ -1506,8 +1514,9 @@ function McpServerDetail({
   const switchless = server.notAnObject === true;
   // The note under the controls: why they cannot be used, or, under -builtin:mcp, that a change is
   // written but no session connects its servers. Nothing when they simply work.
+  // A block the notice above the list already states is not repeated here; the controls point at that notice.
   const note = block
-    ? t(`mcp.reason.${block}`)
+    ? (blockNoticeId ? undefined : t(`mcp.reason.${block}`))
     : switchless
       ? t("mcp.reason.entry-not-object")
       : passwordKeepsOff
@@ -1515,6 +1524,9 @@ function McpServerDetail({
         : savedWhileOff
           ? t("mcp.write.savedWhileOff")
           : undefined;
+  const whyId = note ? noteId : block ? blockNoticeId : undefined;
+  // A test, sign-in or sign-out block that is the write block is said by that notice too.
+  const saidAbove = (reason: McpTestBlock | undefined) => reason !== undefined && reason === block && blockNoticeId !== undefined;
 
   if (editing) return <McpServerEditor server={server} cwd={editCwd} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); setEditSaved(true); onEdited(); }} />;
 
@@ -1528,12 +1540,18 @@ function McpServerDetail({
           </ConfigDetailHeaderInfo>
           <ConfigDetailActions>
             {!server.override && !server.notAnObject && <ConfigButton size="small" disabled={controlsBusy || block !== undefined} aria-describedby={block ? noteId : undefined} onClick={() => setEditing(true)}>{t("mcp.edit.action")}</ConfigButton>}
-            <McpTestButton server={server} test={test} testBlock={testBlock} describedBy={testBlockId} onTest={onTest} />
+            <McpTestButton
+              server={server}
+              test={test}
+              testBlock={testBlock}
+              describedBy={saidAbove(testBlock) ? blockNoticeId! : testBlockId}
+              onTest={onTest}
+            />
             <ConfigButton
               variant="danger"
               size="small"
               disabled={controlsBusy || block !== undefined}
-              aria-describedby={block ? noteId : undefined}
+              aria-describedby={block ? whyId : undefined}
               onClick={() => onRemove(server)}
             >
               {busy === `remove:${key}` ? t("i18n.removing") : t("i18n.remove")}
@@ -1542,7 +1560,7 @@ function McpServerDetail({
               checked={server.enabled}
               disabled={controlsBusy || block !== undefined || switchless || passwordKeepsOff}
               loading={busy === `switch:${key}`}
-              describedBy={note ? noteId : undefined}
+              describedBy={whyId}
               label={t(server.enabled ? "mcp.server.switchOff" : "mcp.server.switchOn", { name })}
               onChange={(enabled) => onSwitch(server, enabled)}
             />
@@ -1558,7 +1576,14 @@ function McpServerDetail({
       )}
 
       <ConfigDetailGrid>
-        <McpStatusRow server={server} state={state} test={test} testBlock={testBlock} testBlockId={testBlockId} />
+        <McpStatusRow
+          server={server}
+          state={state}
+          test={test}
+          testBlock={testBlock}
+          testBlockSaid={saidAbove(testBlock)}
+          testBlockId={testBlockId}
+        />
         {server.description !== undefined && (
           <ConfigDetailGridRow label={t("mcp.detail.description")} tone="plain">
             {revealHiddenCharacters(server.description)}
@@ -1619,6 +1644,8 @@ function McpServerDetail({
             run={signIn}
             block={signInBlock}
             signOutBlock={signOutBlock}
+            blockSaidBy={saidAbove(signInBlock) ? blockNoticeId : undefined}
+            signOutBlockSaidBy={saidAbove(signOutBlock) ? blockNoticeId : undefined}
             controlsBusy={controlsBusy}
             signingOut={busy === `sign-out:${key}`}
             onSignIn={onSignIn}
@@ -1636,7 +1663,7 @@ function McpServerDetail({
                     <select
                       className="mcp-add-input mcp-exposure-select"
                       aria-label={t("mcp.exposure.label", { name })}
-                      aria-describedby={[exposureId, block ? noteId : null].filter(Boolean).join(" ")}
+                      aria-describedby={[exposureId, block ? whyId : null].filter(Boolean).join(" ")}
                       value={server.exposure}
                       disabled={controlsBusy || block !== undefined}
                       onChange={(event) => {
@@ -1683,7 +1710,7 @@ function McpServerDetail({
                     <ConfigButton
                       size="small"
                       disabled={controlsBusy || inProjectBlock !== undefined || passwordKeepsOff}
-                      aria-describedby={[inProjectNoteId, inProjectBlock || passwordKeepsOff ? noteId : null].filter(Boolean).join(" ")}
+                      aria-describedby={[inProjectNoteId, inProjectBlock || passwordKeepsOff ? whyId : null].filter(Boolean).join(" ")}
                       onClick={() => onSwitchInProject(server, !server.enabled)}
                     >
                       {busy === `in-project:${key}`
@@ -1706,7 +1733,7 @@ function McpServerDetail({
         {mcpServerHasHiddenCharacters(server) && (
           <p className="mcp-config-line is-warning">{t("mcp.server.hiddenCharacters")}</p>
         )}
-        {!server.validated && <p className="mcp-config-line is-warning">{t("mcp.server.unchecked")}</p>}
+        {!server.validated && !uncheckedSaid && <p className="mcp-config-line is-warning">{t("mcp.server.unchecked")}</p>}
         {server.replacesGlobal && <p className="mcp-config-line is-warning">{t("mcp.server.replacesGlobal")}</p>}
         {server.override && <p className="mcp-config-line">{noticeText(mcpOverrideNotice(server.override.keys), t)}</p>}
         {server.shadowedByProject && state !== "replaced" && (
@@ -1880,7 +1907,7 @@ function McpTestButton({
   server: McpServerInfo;
   test: McpTestRun | undefined;
   testBlock: McpTestBlock | undefined;
-  /** The id of the Status row's line that says why Test cannot be used. */
+  /** The id of the line that says why Test cannot be used: the Status row's, or the notice above the list. */
   describedBy: string;
   onTest: (server: McpServerInfo) => void;
 }) {
@@ -1924,12 +1951,15 @@ function McpStatusRow({
   state,
   test,
   testBlock,
+  testBlockSaid,
   testBlockId,
 }: {
   server: McpServerInfo;
   state: McpServerRowState;
   test: McpTestRun | undefined;
   testBlock: McpTestBlock | undefined;
+  /** A notice above the list already says why Test cannot be used, and Test points at it. */
+  testBlockSaid: boolean;
   testBlockId: string;
 }) {
   const { t } = useI18n();
@@ -1967,7 +1997,7 @@ function McpStatusRow({
             {t("mcp.test.requestFailed")} {testFailureText(test.error, t)}
           </span>
         )}
-        {testBlock && !blockSaidBy && (
+        {testBlock && !blockSaidBy && !testBlockSaid && (
           <span id={testBlockId} className="mcp-config-line is-dim">{t(MCP_TEST_BLOCK_KEYS[testBlock])}</span>
         )}
         {/* Its own line, so no locale has to join two sentences with a space. */}

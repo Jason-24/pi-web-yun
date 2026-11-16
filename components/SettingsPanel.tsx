@@ -644,6 +644,7 @@ export function SettingsPanel({
     tabs.querySelectorAll("button").forEach((tab) => observer.observe(tab));
     return () => observer.disconnect();
   }, [section, t]);
+  const backdropPressRef = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   useSurfaceTransition(mainRef, section, { desktopOnly: true });
   const shownPhoneLevelRef = useRef(phone.level);
@@ -725,7 +726,15 @@ export function SettingsPanel({
       aria-modal={embedded ? undefined : true}
       aria-label={t("settings.title")}
       tabIndex={-1}
-      onClick={(event) => { if (!embedded && event.target === event.currentTarget) onClose(); }}
+      onPointerDown={(event) => {
+        backdropPressRef.current = event.target === event.currentTarget;
+      }}
+      onPointerCancel={() => { backdropPressRef.current = false; }}
+      onClick={(event) => {
+        const pressedBackdrop = backdropPressRef.current;
+        backdropPressRef.current = false;
+        if (!embedded && pressedBackdrop && event.target === event.currentTarget) onClose();
+      }}
       className={`settings-dialog-backdrop${embedded ? " is-embedded" : ""}`}
     >
       <div className="settings-dialog-surface">

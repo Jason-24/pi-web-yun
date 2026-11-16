@@ -166,10 +166,33 @@ try {
   await detail.getByRole("heading", { name: "更多任务 6", exact: true }).waitFor();
   const listHeight = await panel.getByRole("navigation", { name: "选择会话", exact: true }).evaluate(el => ({ height: el.clientHeight, scroll: el.scrollHeight }));
   assert.ok(listHeight.height <= 340 && listHeight.scroll > listHeight.height, "Long lists scroll independently on phones so details remain reachable");
+  // Opening a child closes the collaboration page and keeps the chat composer
+  // below the new family strip at both desktop and phone widths.
+  await detail.getByRole("button", { name: "在主区打开", exact: true }).click();
+  const strip = page.getByRole("toolbar", { name: "此会话的 Agents", exact: true });
+  await strip.waitFor();
+  await panel.waitFor({ state: "detached" });
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await composer.waitFor();
+    const stripBox = await strip.boundingBox(), composerBox = await composer.boundingBox();
+    assert.ok(stripBox && composerBox && composerBox.y >= stripBox.y + stripBox.height);
+    assert.ok(composerBox.y + composerBox.height <= 900, `${width}px composer fits below the strip`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: resolve(artifacts, `agent-strip-${width}.png`) });
+  }
+  await strip.getByRole("button", { name: "锁定：主 Agent 上也显示这一条", exact: true }).click();
+  await strip.getByRole("button", { name: "主 Agent", exact: true }).click();
+  await page.waitForURL(url => url.searchParams.get("session") === root.id);
+  await composer.waitFor();
+  assert.ok(page.url().includes(root.id));
+  await strip.waitFor();
+  await strip.getByRole("button", { name: "锁定：主 Agent 上也显示这一条", exact: true }).click();
+  await strip.waitFor({ state: "detached" });
   assert.equal(commands.includes("prompt"), false);
   assert.equal(commands.includes("abort"), false);
   assert.deepEqual(errors, []);
-  console.log("PASS: split list/details, keyboard inspection without chat reads, live stats, unknown usage, queued status, retained draft, create refusal/retry, delete cancel/failure/success, desktop/mobile/dark bounds");
+  console.log("PASS: split list/details, keyboard inspection without chat reads, live stats, unknown usage, queued status, retained draft, create refusal/retry, delete cancel/failure/success, desktop/mobile/dark bounds, family strip selection/lock/root return and composer bounds");
 } catch (error) {
   await page.screenshot({ path: resolve(artifacts, "failure.png") });
   throw error;

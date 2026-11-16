@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { getFileIcon } from "./FileIcons";
+import { useHorizontalStrip } from "@/hooks/useHorizontalStrip";
 import { useI18n } from "@/hooks/useI18n";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
 import { PanelToolIcon } from "./PanelTools";
@@ -32,45 +33,11 @@ interface Props {
 
 export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab, onOpenFiles, onOpenTools, onReorderTab }: Props) {
   const { t } = useI18n();
-  const listRef = useRef<HTMLDivElement>(null);
+  // The strip has no scrollbar (globals.css): a vertical wheel scrolls it
+  // sideways, and an opened or selected tab is brought into view.
+  const listRef = useHorizontalStrip<HTMLDivElement>('[role="tab"][aria-selected="true"]', `${tabs.length}\n${activeTabId}`);
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
-
-  // The strip has no scrollbar (globals.css), so a vertical wheel scrolls it
-  // sideways. Non-passive: the page must not scroll as well.
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || list.scrollWidth <= list.clientWidth) return;
-      event.preventDefault();
-      list.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1);
-    };
-    list.addEventListener("wheel", onWheel, { passive: false });
-    return () => list.removeEventListener("wheel", onWheel);
-  }, []);
-
-  // Bring an opened or selected tab into view by moving the strip only:
-  // scrollIntoView could also scroll the panels around it.
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const revealActive = (smooth = false) => {
-      const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-      if (!tab) return;
-      const strip = list.getBoundingClientRect();
-      const { left, right } = tab.getBoundingClientRect();
-      const offset = left < strip.left ? left - strip.left : right > strip.right ? right - strip.right : 0;
-      if (offset) list.scrollTo({
-        left: list.scrollLeft + offset,
-        behavior: smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant",
-      });
-    };
-    revealActive(true);
-    const resize = new ResizeObserver(() => revealActive());
-    resize.observe(list);
-    return () => resize.disconnect();
-  }, [activeTabId, tabs.length]);
 
   return (
     <div className="file-tab-strip">

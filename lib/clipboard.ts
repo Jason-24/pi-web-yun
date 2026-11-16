@@ -2,12 +2,14 @@ export const CLIPBOARD_FAILURE_EVENT = "pi-web:clipboard-failure";
 
 /** Resolve only when the browser confirms the copy, without exposing text in the failure event. */
 export async function copyText(text: string): Promise<void> {
+  let activeElement: Element | null = null;
   let ta: HTMLTextAreaElement | null = null;
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
       return;
     }
+    activeElement = document.activeElement;
     ta = document.createElement("textarea");
     ta.value = text;
     ta.style.position = "fixed";
@@ -20,5 +22,8 @@ export async function copyText(text: string): Promise<void> {
     throw error;
   } finally {
     ta?.remove();
+    if (activeElement?.isConnected && activeElement instanceof HTMLElement) {
+      activeElement.focus({ preventScroll: true });
+    }
   }
 }

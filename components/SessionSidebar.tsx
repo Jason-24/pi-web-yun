@@ -229,6 +229,8 @@ interface Props {
   fileExplorerTarget?: HTMLElement | null;
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean, entryId?: string, blockIndex?: number, options?: SelectSessionOptions) => void;
+  /** A side chat's search hit: its parent opens, then the side chat's tab. */
+  onSelectSideChat: (session: SessionInfo) => void;
   /** projectKey: the target's project identity when it is known (a group's "+", the composer's bar). */
   onNewSession?: (sessionId: string, cwd: string, projectKey?: string | null, options?: NewSessionOptions) => void;
   onOpenSettings?: () => void;
@@ -255,9 +257,10 @@ interface Props {
   onExplorerRefresh?: () => void;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
   onAtMentions?: (relativePaths: string[]) => void;
-  /** Fired when a session that is not currently selected finishes running.
-   *  Lets the app play a cross-workspace completion tone. */
-  onBackgroundTaskDone?: () => void;
+  /** Fired when sessions that are not currently selected finish running.
+   *  Lets the app play a cross-workspace completion tone. `since`: no earlier
+   *  than the poll that last saw them running (a chime claim's bound, #1688). */
+  onBackgroundTaskDone?: (sessionIds: string[], since: number) => void;
   /**
    * Sessions that finished while the tab was hidden (#1484): usually the
    * selected one, which `unreadSessionIds` excludes. Counted by the favicon
@@ -528,7 +531,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
   return { kind: "rect", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, align };
 }
 
-export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchiveStateChange, fileExplorerTarget, selectedSessionId, onSelectSession, onNewSession, onOpenSettings, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchiveStateChange, fileExplorerTarget, selectedSessionId, onSelectSession, onSelectSideChat, onNewSession, onOpenSettings, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -1183,7 +1186,10 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
       void loadSessions();
     }
     if (completedWithNotifications.length > 0) {
-      onBackgroundTaskDone?.();
+      // They finished after the poll that last saw them running started. Without one
+      // (the set came from the session list), the last two polls' span stands in.
+      const since = runningObservedAtRef.current.before ?? Date.now() - 2 * RUNNING_SESSIONS_POLL_MS;
+      onBackgroundTaskDone?.(completedWithNotifications, since);
     }
 
     previousRunningSessionIdsRef.current = runningSessionIds;
@@ -3267,6 +3273,8 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
           query={sessionSearchQuery}
           selectedSessionId={selectedSessionId}
           onSelectSession={handleSelectSessionFromList}
+          onSelectSideChat={onSelectSideChat}
+          sessions={allSessions}
           archivedSessionIds={archiveIndex.ids}
           projectNames={projectNames}
         >
