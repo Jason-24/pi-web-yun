@@ -63,10 +63,11 @@ interface Props {
 
 export function WorkspaceNavigation({ petSessions, onPetSelectSession, activeView, conversationAvailable, inspectionAvailable, sessionAvailable, mobile, covered = false, homeButtonRef, onHomeHover, onHomeLeave, onNavigate }: Props) {
   const { t } = useI18n();
-  const items: (WorkspaceView | "pet" | "update")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
-    : ["home", "chat", "history", "system", "tools", "agents", "branches", "update", "pet", "settings"];
+  const items: (WorkspaceView | "pet" | "update" | "project-divider" | "session-divider")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
+    : ["home", "chat", "project-divider", "system", "tools", "session-divider", "agents", "branches", "history", "update", "pet", "settings"];
   return <nav className={`workbench-settings-navigation${mobile ? " is-mobile" : ""}`} aria-label={t("navigation.workspace")} inert={covered}>
     {items.map((view) => {
+      if (view === "project-divider" || view === "session-divider") return <div key={view} className="workbench-rail-divider" aria-hidden="true" />;
       if (view === "update") return <AppUpdateButton key="update" mobile={mobile} />;
       if (view === "pet") return <PetWidget key="pet" sessions={petSessions} onSelectSession={onPetSelectSession} />;
       const disabled = view === "chat" ? !conversationAvailable : view === "system" || view === "tools" ? !inspectionAvailable
