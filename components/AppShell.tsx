@@ -60,7 +60,7 @@ import type { DebugClientSession } from "@/lib/debug-types";
 import { getInitialNavigation, linkedSessionId, withTabOpen } from "@/lib/initial-navigation";
 import { clearTabOpenSession, getTabOpen, setTabOpenNewSession, setTabOpenSession } from "@/lib/tab-session";
 import { mergeCatalogRow } from "./session-catalog-helpers";
-import { getDraft, parkedNewSessionDraftKey, rekeyDraft } from "@/lib/draft-store";
+import { clearDraft, getDraft, parkedNewSessionDraftKey, rekeyDraft } from "@/lib/draft-store";
 import {
   contextForCwd,
   type NewSessionContext,
@@ -102,6 +102,7 @@ import { getLastSettingsSection, type SettingsSection } from "@/lib/settings-nav
 import { focusIfLost } from "@/lib/stacked-dialog";
 import { loadAgentStripLocked, saveAgentStripLocked } from "@/lib/agent-strip-lock";
 import { claimDoneChime } from "@/lib/done-chime";
+import { readJsonOrThrow } from "@/lib/fetch-json";
 
 type SessionCopyField = "file" | "id" | "projectDir" | "gitBranch" | "gitWorktree";
 type AutoNameStatus =
@@ -1003,7 +1004,9 @@ export function AppShell() {
     projectKey?: string | null,
   ) => {
     invalidateWorkspaceRestore();
-    const currentFreshCwd = newSessionCwd ?? activeCwd;
+    // A selected copy can reach its cwd before the sidebar's catalogue does.
+    // Its first report may still use the path as its temporary project key.
+    const currentFreshCwd = newSessionCwd ?? selectedSession?.cwd ?? activeCwd;
     setActiveCwd(cwd);
     // Skip if cwd is null (initial mount).
     if (!cwd) return;
@@ -1375,7 +1378,15 @@ export function AppShell() {
     if (toolEndRefreshTimerRef.current) clearTimeout(toolEndRefreshTimerRef.current);
   }, []);
 
-  const handleSessionForked = useCallback((newSessionId: string) => {
+  const handleSessionForked = useCallback((newSessionId: string, session?: SessionInfo) => {
+    if (session) {
+      // A fork into another folder is another project's session: opened as a
+      // pick from the list, so the shell adopts its project before the sidebar
+      // reports the new cwd (which would otherwise close it as stale).
+      setRefreshKey((k) => k + 1);
+      handleSelectSession(session);
+      return;
+    }
     invalidateWorkspaceRestore();
     activeNewSessionDraftKeyRef.current = null;
     setRefreshKey((k) => k + 1);
@@ -1388,7 +1399,7 @@ export function AppShell() {
     }));
     hydrateSelectedSession(newSessionId);
     router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
-  }, [invalidateWorkspaceRestore, router, hydrateSelectedSession]);
+  }, [handleSelectSession, invalidateWorkspaceRestore, router, hydrateSelectedSession]);
 
   // The sidebar calls this when the initial session is not in its list.
   const handleInitialRestoreDone = useCallback(() => {
@@ -1616,6 +1627,7 @@ export function AppShell() {
   const handleDeleteSideChat = useCallback(async (sessionId: string, root: SessionInfo): Promise<string | null> => {
     const result = await deleteSideChat(sessionId);
     if (result) return result.error;
+    clearDraft(sessionId);
     handleCloseFileTab(`agent:${sessionId}`);
     if (selectedSessionRef.current?.id === sessionId) {
       handleSelectSession(root);
@@ -1724,8 +1736,7 @@ export function AppShell() {
       signal: controller.signal,
     })
       .then(async (response) => {
-        const data = await response.json() as ProjectTrustStatus & { error?: string };
-        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+        const data = await readJsonOrThrow<ProjectTrustStatus>(response);
         setProjectTrust(data);
       })
       .catch((error) => {
@@ -3309,9 +3320,9 @@ export function AppShell() {
               quoteSelectionEnabled={quoteSelectionEnabled}
               onOpenFile={handleOpenLinkedFile}
               onOpenSubagent={handleOpenSubagentTab}
-              onSessionForked={(newSessionId) => {
+              onSessionForked={(newSessionId, session) => {
                 if (isMobile) setRightPanelOpen(false);
-                handleSessionForked(newSessionId);
+                handleSessionForked(newSessionId, session);
               }}
               onOpenSettings={openSettingsSection}
               onToolEnd={handleToolEnd}

@@ -144,6 +144,10 @@ export async function checkProjectNavigation({ browser, base, artifacts, fixture
           [other.projectKey, other.projectRoot, "other project"],
           [empty.projectKey, empty.cwd, "pinned project without sessions"],
         ]) {
+          // Returning from another tab reveals the selected worktree in the
+          // virtual list. Rows above it may no longer be mounted on a phone.
+          await showSessions();
+          await page.locator("#session-sidebar-panel-sessions .session-tree-scroll").evaluate((element) => element.scrollTo(0, 0));
           const toggle = group(key).locator(".session-tree-group-toggle");
           // Record an explicit user fold choice. Opening a project in another
           // tab may pin it globally in PI-YUN; that changes its default fold.

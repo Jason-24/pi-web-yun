@@ -17,6 +17,40 @@ function callbackBody(name, nextName) {
   return source.slice(start, end);
 }
 
+test("a copy selected in a new folder survives the sidebar's temporary project identity", () => {
+  const cwd = "D:\\Moved project";
+  const key = cwd.toLowerCase();
+  const session = { id: "forked", cwd, projectKey: key };
+  const callback = callbackBody("handleCwdChange", "handleSelectSession");
+  const context = vm.createContext({
+    useCallback: (fn) => fn,
+    invalidateWorkspaceRestore() {},
+    activeCwd: "D:\\Gone project", newSessionCwd: null, selectedSession: session,
+    activeProjectKeyRef: { current: key },
+    skipWorkspaceRestoreRef: { current: false }, suppressCwdBumpRef: { current: false },
+    workspaceKeyOf: (value) => value.projectKey ?? value.cwd,
+    homeOpen: false, sessionKey: 0,
+    changeFileWorkspace() { assert.fail("Identity hydration must not switch file workspaces"); },
+    restoreWorkspaceContext() { assert.fail("The selected copy must stay open"); },
+    router: { replace() { assert.fail("The copy's URL must stay selected"); } },
+  });
+  for (const [setter] of callback.matchAll(/\bset[A-Z]\w*(?=\()/g)) {
+    const state = setter[3].toLowerCase() + setter.slice(4);
+    context[setter] = (value) => {
+      context[state] = typeof value === "function" ? value(context[state]) : value;
+    };
+  }
+  const changeCwd = vm.runInContext(stripTypeScriptTypes(`${callback}\nhandleCwdChange`), context);
+  // The copy is not in the sidebar's old catalogue; its worktree listing then
+  // supplies the canonical Windows key. Neither report is a user navigation.
+  changeCwd(cwd, cwd, cwd);
+  changeCwd(cwd, cwd, key);
+  assert.equal(context.selectedSession, session);
+  assert.equal(context.activeCwd, cwd);
+  assert.equal(context.activeProjectKeyRef.current, key);
+  assert.equal(context.sessionKey, 0);
+});
+
 test("a linked session that is gone gets no other session in its place (#1168)", async (t) => {
   const callbacks = [
     callbackBody("restoreWorkspaceContext", "handleCwdChange"),

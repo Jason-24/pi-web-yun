@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useChatAppearance";
 import { useEnterSendMode, setEnterSendMode } from "@/hooks/useEnterSendMode";
 import { sendAgentCommand } from "@/lib/agent-client";
+import { clearStoredDrafts } from "@/lib/draft-store";
 import type { ProjectTrustStatus, ToolSettingsResponse } from "@/lib/api-types";
 import { SETTINGS_BUILTIN_TOOLS } from "@/lib/tool-presets";
 import {
@@ -38,6 +39,7 @@ import { PluginsConfig } from "./PluginsConfig";
 import { McpConfig } from "./McpConfig";
 import { ConfigButton, ConfigDetailNavigationContext, ConfigSwitch, type ConfigDetailNavigation } from "./SettingsUi";
 import { FontSettings } from "./FontSettings";
+import { readJsonOrThrow } from "@/lib/fetch-json";
 
 interface Props {
   embedded?: boolean;
@@ -114,6 +116,8 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
     try {
       const response = await fetch("/api/web-auth", { method: "DELETE" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      // Unsent text stays in this browser's storage otherwise.
+      clearStoredDrafts();
       window.location.replace("/login");
     } catch {
       setLogoutError(t("auth.logoutFailed"));
@@ -126,8 +130,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
     let cancelled = false;
     void fetch("/api/tools/settings")
       .then(async (response) => {
-        const data = await response.json() as ToolSettingsResponse & { error?: string };
-        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+        const data = await readJsonOrThrow<ToolSettingsResponse>(response);
         if (!cancelled) setShellSettings(data);
       })
       .catch((cause) => {
@@ -140,8 +143,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
     let cancelled = false;
     void fetch("/api/cache-miss-notices")
       .then(async (response) => {
-        const data = await response.json() as { enabled?: boolean; error?: string };
-        if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+        const data = await readJsonOrThrow<{ enabled?: boolean }>(response);
         if (!cancelled) setCacheMissNotices(data.enabled === true);
       })
       .catch((cause) => {
@@ -160,8 +162,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });
-      const data = await response.json() as { enabled?: boolean; error?: string };
-      if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+      const data = await readJsonOrThrow<{ enabled?: boolean }>(response);
       setCacheMissNotices(data.enabled === true);
       if (sessionId) onSessionReloaded();
     } catch (cause) {
@@ -180,8 +181,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });
-      const data = await response.json() as ToolSettingsResponse & { error?: string };
-      if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+      const data = await readJsonOrThrow<ToolSettingsResponse>(response);
       setShellSettings(data);
       if (sessionId) {
         await sendAgentCommand(sessionId, { type: "reload" });
@@ -206,8 +206,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ builtinTools }),
       });
-      const data = await response.json() as ToolSettingsResponse & { error?: string };
-      if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+      const data = await readJsonOrThrow<ToolSettingsResponse>(response);
       setShellSettings(data);
     } catch (cause) {
       setBuiltinToolsError(cause instanceof Error ? cause.message : String(cause));

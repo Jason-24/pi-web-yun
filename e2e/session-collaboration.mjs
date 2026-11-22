@@ -16,6 +16,7 @@ const side = { ...root, id: "collaboration-side", name: "侧聊", relation: { ki
 const child = (id, status, description) => ({ ...root, id, name: description,
   relation: { kind: "subagent", parentSessionId: root.id, profile: "explore", status, description } });
 const worker = child("collaboration-worker", "running", "梳理项目结构");
+worker.name = "恢复后检查项目结构";
 const failed = child("collaboration-failed", "failed", "检查依赖");
 const queued = child("collaboration-queued", "queued", "排队任务");
 let sessions = [root, side, worker, failed, queued];
@@ -127,7 +128,8 @@ try {
   await inspect(side.id).waitFor({ state: "detached" });
   await detail.getByRole("heading", { name: "你好", exact: true }).waitFor();
   await inspect(worker.id).click();
-  await detail.getByRole("heading", { name: "梳理项目结构", exact: true }).waitFor();
+  await detail.getByRole("heading", { name: worker.name, exact: true }).waitFor();
+  assert.match(await inspect(worker.id).innerText(), new RegExp(worker.name));
   await page.screenshot({ path: resolve(artifacts, "desktop-light.png") });
   await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; document.documentElement.classList.add("dark"); });
   await page.screenshot({ path: resolve(artifacts, "desktop-dark.png") });

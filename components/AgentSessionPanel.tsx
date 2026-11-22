@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { sideChatTitle } from "@/lib/session-family";
-import type { SessionUsageSummary } from "@/lib/session-stats";
+import { MAX_SESSION_STATS_IDS, type SessionUsageSummary } from "@/lib/session-stats";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo } from "@/lib/types";
 import { DeleteConfirm } from "./SessionTree";
@@ -32,6 +32,34 @@ interface Props {
 const STATS_POLL_MS = 3000;
 
 /**
+ * Every id's usage, read in batches the stats route accepts (#1728): a family
+ * past MAX_SESSION_STATS_IDS sent in one request got a 400 and every row lost
+ * its numbers. Batches go one after another; null when any of them fails, so
+ * rows keep their last numbers rather than half the family dropping out.
+ */
+export async function fetchAgentUsage(
+  ids: readonly string[],
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Record<string, SessionUsageSummary> | null> {
+  const stats: Record<string, SessionUsageSummary> = {};
+  for (let start = 0; start < ids.length; start += MAX_SESSION_STATS_IDS) {
+    const res = await fetchImpl("/api/sessions/stats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ids.slice(start, start + MAX_SESSION_STATS_IDS) }),
+      signal,
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { stats?: Record<string, SessionUsageSummary> };
+    if (!data.stats) return null;
+    Object.assign(stats, data.stats);
+  }
+  return stats;
+}
+
+/**
  * Usage of every agent in the family, as the toolbar's stats popover counts
  * it. Read on open and whenever a run starts or ends; polled while one runs,
  * on a visible page, one request at a time.
@@ -48,16 +76,8 @@ function useAgentUsage(ids: readonly string[], runningKey: string): Record<strin
       if (inFlight) return;
       inFlight = true;
       try {
-        const res = await fetch("/api/sessions/stats", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: requested }),
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = await res.json() as { stats?: Record<string, SessionUsageSummary> };
-        if (!controller.signal.aborted && data.stats) setUsage(data.stats);
+        const stats = await fetchAgentUsage(requested, controller.signal);
+        if (!controller.signal.aborted && stats) setUsage(stats);
       } catch {
         /* best-effort: rows keep their last numbers */
       } finally {
@@ -123,10 +143,13 @@ export function sessionTitle(session: SessionInfo): string {
   return session.name || session.firstMessage || session.id.slice(0, 12);
 }
 
-/** A subagent row's first line: the task it was given, else the session's title. */
+/**
+ * A subagent row's first line: the session's name, which a spawn sets to the task's description
+ * and a resume with a new description renames (#1735), else that first description.
+ */
 export function subagentTitle(session: SessionInfo): string {
   const relation = session.relation?.kind === "subagent" ? session.relation : null;
-  return relation?.description || sessionTitle(session);
+  return session.name || relation?.description || sessionTitle(session);
 }
 
 /** A row's icon: a person for the main agent, a bubble for a side chat, a robot for a subagent. */
@@ -167,7 +190,7 @@ function SessionIcon({ kind }: { kind: "main" | "side" | "subagent" }) {
 
 function memberTitle(session: SessionInfo, t: (key: string) => string, family: readonly SessionInfo[]): string {
   return session.relation?.kind === "side" ? sideChatTitle(session, t("agentSwitcher.sideChat"), family)
-    : session.relation?.kind === "subagent" ? session.relation.description || sessionTitle(session) : sessionTitle(session);
+    : session.relation?.kind === "subagent" ? subagentTitle(session) : sessionTitle(session);
 }
 
 export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, runningSessionIds, onSelectSession, openSubagentTabIds, onToggleSubagentTab, onNewSideChat, onDeleteSideChat }: Props) {

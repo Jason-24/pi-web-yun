@@ -1,4 +1,5 @@
 // All APIs are fixtures: never write real agent templates or start an agent.
+import { toolSettingsFixture } from "./tool-settings-fixture.mjs";
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -55,6 +56,7 @@ try {
       if (path === "/api/home") return reply({ home: "C:/Users/test" });
       if (path === "/api/cwd/validate") return reply({ valid: true, cwd, projectRoot: cwd, projectKey: cwd });
       if (path === "/api/web-auth") return reply({ enabled: false });
+      if (path === "/api/tools/settings") return reply(toolSettingsFixture);
       return reply({});
     });
     try {
