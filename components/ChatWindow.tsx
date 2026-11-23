@@ -9,11 +9,12 @@ import { splitNoticeLinks, splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { collapsesProcessDetails, countToolCallBlocks, getDisplayableAssistantBlocks, getTurnAnchors, hasAssistantAnswer, hasTurnRef, isHiddenCustomMessage, splitFinalAssistantBlocks, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, sumCost } from "@/lib/message-display";
+import { subagentAvatarStyle } from "@/lib/theme";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
 import { getFinalAnswerViews, keepWrittenFiles, type FinalAnswerViews } from "@/lib/turn-views";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
 import { dropMentionText, splitDroppedItems, uploadFiles, type DroppedItem } from "@/lib/file-upload-client";
-import { MessageView } from "./MessageView";
+import { AssistantReplyGroup, MessageView } from "./MessageView";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, getUserMessageDraftImages, getUserMessageText, type ChatInputHandle } from "./ChatInput";
 import { WelcomeMark } from "./WelcomeMark";
@@ -31,6 +32,7 @@ import type { StreamingStore } from "@/lib/streaming-message";
 import { streamRateKey } from "@/lib/stream-token-rate";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useTheme } from "@/hooks/useTheme";
 import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { useSkipOffscreenRows } from "@/hooks/useSkipOffscreenRows";
 import type { SessionStatsInfo } from "@/lib/pi-types";
@@ -156,7 +158,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cost, ca
   const cacheMissText = cacheMisses && !(expanded || reveal) ? cacheMissSummaryText(t, cacheMisses) : undefined;
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="process-details-group" style={{ marginBottom: 14 }}>
       <button
         type="button"
         className="process-details-toggle"
@@ -191,7 +193,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cost, ca
         </span>
       </button>
       <Disclosure open={expanded || reveal}>
-        <div style={{ marginTop: 8 }}>
+        <div className="process-details-content" style={{ marginTop: 8 }}>
           {children}
         </div>
       </Disclosure>
@@ -201,6 +203,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationMs, cost, ca
 
 export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, newSessionContextBar, newSessionProjectName, onChooseNewSessionProject, initialNewSessionChoices, onNewSessionChoicesChange, onAgentEnd, onSessionEnded, onToolEnd, onAttentionNeeded, onSessionCreated, onSessionForked, panel = false, onSideSession, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onDebugSnapshotReaderChange, onSessionStatsChange, onSessionStatsPanelOpen, sessionStatsControl, onOpenSettings, onContextUsageChange, onOpenFile, onFilesUploaded, onOpenSubagent, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio, holdAudio }: Props) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = !isHiddenRelation(session?.relation);
 
@@ -899,7 +902,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   return (
     <div
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      style={{
+        paddingBottom: "env(safe-area-inset-bottom)",
+        ...(session?.relation?.kind === "subagent" ? subagentAvatarStyle(session.id) : undefined),
+      }}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -999,7 +1005,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 if (idx === lastUserIdx) { (lastUserMsgRef as { current: HTMLDivElement | null }).current = el; }
               };
 
-              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; recoverTruncation?: boolean; turnDurationMs?: number; withNotices?: boolean } = {}): ReactNode => {
+              const renderMessage = (idx: number, options: { attachRef?: boolean; keyPrefix?: string; messageOverride?: AgentMessage; hideAssistantHeader?: boolean; showTimestamp?: boolean; writtenFiles?: WrittenFile[]; recoverTruncation?: boolean; turnDurationMs?: number; withNotices?: boolean } = {}): ReactNode => {
                 const msg = options.messageOverride ?? messages[idx];
                 if (msg.role === "custom" && msg.customType === SIDE_BOUNDARY_MESSAGE_TYPE) return <SideChatDivider key="side-chat-divider" />;
                 if (isHiddenCustomMessage(msg)) return null;
@@ -1044,6 +1050,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     onEditContent={sessionBusy ? undefined : handleEditContent}
                     onCancelEdit={cancelEdit}
                     isEditing={editEntryId === entryIds[idx]}
+                    hideAssistantHeader={options.hideAssistantHeader}
                     showTimestamp={showTimestamp}
                     prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
                     sessionId={session?.id ?? sessionIdRef.current ?? undefined}
@@ -1083,17 +1090,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 while (endIdx < messages.length && !turnAnchors[endIdx]) endIdx += 1;
 
                 const finalAssistantIdx = findFinalAssistantIndex(messages, userIdx, endIdx);
-
-                if (finalAssistantIdx === -1) {
-                  for (let renderIdx = groupStartIdx; renderIdx < endIdx; renderIdx++) {
-                    rendered.push(renderMessage(renderIdx));
-                  }
-                  idx = endIdx;
-                  continue;
-                }
-
                 const isLiveTail = (sessionBusy || isStreaming) && endIdx === messages.length && userIdx === lastAnchorIdx;
-                if (isLiveTail) {
+                if (finalAssistantIdx === -1 || isLiveTail) {
                   for (let renderIdx = groupStartIdx; renderIdx < endIdx; renderIdx++) {
                     rendered.push(renderMessage(renderIdx));
                   }
@@ -1110,6 +1108,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
                 const finalViews = getFinalAnswerViews(finalAnswerViewCache, messages[finalAssistantIdx] as AssistantMessage);
                 const finalAnswerMessage = finalViews.answer;
+                const answered = collapsesProcessDetails(finalAnswerMessage);
+                const groupAssistantReply = theme === "sunbeam" && answered;
 
                 const processViews: ReactNode[] = [];
                 // processViews also holds the notice lines of steps that show nothing else.
@@ -1146,18 +1146,19 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     attachRef: false,
                     keyPrefix: "process",
                     messageOverride: message,
+                    hideAssistantHeader: groupAssistantReply && message.provider === finalAnswerMessage?.provider && message.model === finalAnswerMessage?.model,
                     showTimestamp: false,
                     withNotices,
                   }));
                 }
 
+                let processGroup: ReactNode = null;
                 // Only notice lines, from steps that show nothing else: no fold for them.
                 if (processMessageCount === 0) rendered.push(...processViews);
                 else if (processViews.length > 0) {
-                  const answered = collapsesProcessDetails(finalAnswerMessage);
                   // The steps inside the fold: the final message's own notices and usage go under its answer.
                   const foldedMessages = messages.slice(userIdx + 1, finalAnswerMessage ? finalAssistantIdx : finalAssistantIdx + 1);
-                  rendered.push(
+                  processGroup = (
                     <div
                       key={`process-group-${messageKeys[groupStartIdx]}`}
                       ref={processRefIdx === undefined ? undefined : (el) => { messageRefs.current[processRefIdx] = el; }}
@@ -1170,9 +1171,11 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                       <ProcessDetailsGroup key={answered ? "answered" : "unanswered"} messageCount={processMessageCount} toolCallCount={processToolCount} durationMs={turnDurationMs} cost={sumCost(foldedMessages)} cacheMisses={summarizeCacheMisses(foldedMessages)} defaultExpanded={!answered} reveal={revealProcess} t={t}>
                         {processViews}
                       </ProcessDetailsGroup>
-                    </div>,
+                    </div>
                   );
+                  if (!groupAssistantReply) rendered.push(processGroup);
                 }
+                const showGroupedReply = groupAssistantReply && processGroup !== null;
 
                 if (finalAnswerMessage) {
                   // Each tool call is stored as its own assistant entry, so the
@@ -1187,13 +1190,20 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     }
                   }
                   const writtenFiles = keepWrittenFiles(finalViews, extractTurnWrittenFiles(turnContent, toolResultsMap, messageCwd));
-                  rendered.push(renderMessage(finalAssistantIdx, {
+                  const reply = renderMessage(finalAssistantIdx, {
                     messageOverride: finalAnswerMessage,
+                    hideAssistantHeader: showGroupedReply,
                     writtenFiles,
                     // Without process details the turn's time goes under the answer.
                     turnDurationMs: processViews.length === 0 ? turnDurationMs : undefined,
                     recoverTruncation: endIdx === messages.length && !isStreaming && !hasAssistantAnswer(finalAnswerMessage),
-                  }));
+                  });
+                  rendered.push(showGroupedReply ? (
+                    <AssistantReplyGroup key={`assistant-reply-${messageKeys[groupStartIdx]}`} message={finalAnswerMessage} modelNames={modelNames}>
+                      {processGroup}
+                      {reply}
+                    </AssistantReplyGroup>
+                  ) : reply);
                 }
                 for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
                   rendered.push(renderMessage(renderIdx));

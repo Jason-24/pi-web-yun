@@ -3,9 +3,9 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useHorizontalStrip } from "@/hooks/useHorizontalStrip";
 import { useI18n } from "@/hooks/useI18n";
-import { sideChatTitle } from "@/lib/session-family";
+import { sideChatTitle, subagentTitle } from "@/lib/session-family";
 import type { SessionInfo } from "@/lib/types";
-import { AgentKindIcon, subagentTitle } from "./AgentSessionPanel";
+import { AgentKindIcon } from "./AgentSessionPanel";
 import { StatusIcon } from "./AgentStatus";
 import { LockToggle } from "./LockToggle";
 

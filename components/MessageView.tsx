@@ -8,9 +8,10 @@ import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
+import { robotAvatarStyle, subagentAvatarStyle } from "@/lib/theme";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
-import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantAborted, isAssistantTruncated, isEmptyThinkingBlock, splitThinkingPieces } from "@/lib/message-display";
+import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantAborted, isAssistantTruncated, isEmptyThinkingBlock, isSubagentToolDetails, splitThinkingPieces } from "@/lib/message-display";
 import { stripAnsi } from "@/lib/ansi";
 import { formatTurnDuration } from "@/lib/turn-duration";
 import { toolClockMs, type ToolClock, type ToolClocks } from "@/lib/tool-clock";
@@ -23,7 +24,6 @@ import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thin
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
 import { skillExpansionContent, skillExpansionToCommand } from "@/lib/slash-display";
-import type { SubagentToolDetails } from "@/lib/subagent-extension";
 import { CODEMODE_TOOL_NAME, codemodeCalls, codemodeScript, codemodeScriptPreview, stripCodemodeHeader } from "@/lib/codemode-view";
 import { CodemodeCallList } from "./CodemodeToolView";
 import { toolFieldsOfInput, toolInputPreview, type ToolField } from "@/lib/tool-fields";
@@ -213,6 +213,7 @@ interface Props {
   onEditContent?: (message: UserMessage, entryId: string) => void;
   onCancelEdit?: () => void;
   isEditing?: boolean;
+  hideAssistantHeader?: boolean;
   showTimestamp?: boolean;
   prevTimestamp?: number;
   sessionId?: string;
@@ -297,12 +298,12 @@ function haveSameRelevantToolEntries<T>(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, toolClocks, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forkEntryId, forking, onEditContent, onCancelEdit, isEditing, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, onCompact, isCompacting, compactError }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, toolClocks, modelNames, cwd, onOpenFile, onOpenSubagent, entryId, searchBlock, onFork, forkEntryId, forking, onEditContent, onCancelEdit, isEditing, hideAssistantHeader, showTimestamp, prevTimestamp, sessionId, writtenFiles, turnDurationMs, onCompact, isCompacting, compactError }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forkEntryId={entryId ?? forkEntryId} forking={forking} onEditContent={onEditContent} onCancelEdit={onCancelEdit} isEditing={isEditing} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} toolClocks={toolClocks} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} toolClocks={toolClocks} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} onOpenSubagent={onOpenSubagent} hideAssistantHeader={hideAssistantHeader} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} turnDurationMs={turnDurationMs} onCompact={onCompact} isCompacting={isCompacting} compactError={compactError} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -335,6 +336,7 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     && prev.onEditContent === next.onEditContent
     && prev.onCancelEdit === next.onCancelEdit
     && prev.isEditing === next.isEditing
+    && prev.hideAssistantHeader === next.hideAssistantHeader
     && prev.showTimestamp === next.showTimestamp
     && prev.prevTimestamp === next.prevTimestamp
     && prev.writtenFiles === next.writtenFiles
@@ -680,6 +682,20 @@ export function AssistantMessageHeader({ modelName, estimatedTokens = 0, tps = n
   );
 }
 
+export function AssistantReplyGroup({ message, modelNames, children }: {
+  message: AssistantMessage;
+  modelNames: Record<string, string>;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="assistant-reply-group" style={robotAvatarStyle(`${message.provider ?? ""}/${message.model ?? ""}`)}>
+      <AssistantMessageHeader modelName={message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : t("session.assistant")} />
+      {children}
+    </div>
+  );
+}
+
 function AssistantMessageView({
   message,
   isStreaming,
@@ -689,6 +705,7 @@ function AssistantMessageView({
   cwd,
   onOpenFile,
   onOpenSubagent,
+  hideAssistantHeader,
   showTimestamp,
   prevTimestamp,
   sessionId,
@@ -708,6 +725,7 @@ function AssistantMessageView({
   cwd?: string;
   onOpenFile?: (filePath: string, page?: number) => void;
   onOpenSubagent?: (sessionId: string, label: string) => void;
+  hideAssistantHeader?: boolean;
   showTimestamp?: boolean;
   prevTimestamp?: number;
   sessionId?: string;
@@ -721,6 +739,7 @@ function AssistantMessageView({
 }) {
   const { t } = useI18n();
   const time = showTimestamp ? formatTime(message.timestamp) : null;
+  const avatarStyle = useMemo(() => robotAvatarStyle(`${message.provider ?? ""}/${message.model ?? ""}`), [message.provider, message.model]);
   const blockItems = useMemo(() => (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
     .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming })), [message.content, isStreaming]);
@@ -867,15 +886,15 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 16 }}
+      style={{ marginBottom: 16, ...avatarStyle }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <AssistantMessageHeader
+      {!hideAssistantHeader && <AssistantMessageHeader
         modelName={message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : undefined}
         estimatedTokens={isStreaming ? Math.round(estimatedTokens) : 0}
         tps={isStreaming ? tps : null}
-      />
+      />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {/* Not keyed by the entry id: a message of this run gets one when the file is
@@ -1108,11 +1127,8 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
   }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
 
   return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0,
+    <div className="thinking-step" style={{
       border: "1px solid var(--border)",
-      borderRadius: 7,
-      padding: "6px 10px",
       background: "var(--bg)",
       fontFamily: "var(--font-mono)",
       fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
@@ -1123,15 +1139,9 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
         aria-expanded={expanded}
         aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
         title={t("i18n.thinking")}
+        className="thinking-step-toggle"
         onClick={() => setExpanded((v) => !v)}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          width: expanded ? 14 : "100%",
-          flexShrink: expanded ? 0 : 1,
-          minWidth: 0,
-          minHeight: "1.5em",
           padding: 0,
           background: "transparent",
           border: "none",
@@ -1142,6 +1152,16 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
         }}
       >
         <ThinkingIcon active={expanded} />
+        <svg className="thinking-pixel-icon" width="36" height="24" viewBox="0 0 24 24" shapeRendering="crispEdges" aria-hidden="true">
+          <path fill="#453627" d="M2 0h20v2h2v20h-2v2H2v-2H0V2h2z" />
+          <path fill="#d39c50" d="M2 1h20v1h1v20h-1v1H2v-1H1V2h1z" />
+          <path fill="#f7e5b5" d="M2 2h20v19H2z" />
+          <path fill="#c08337" d="M11 3h2v2h-2zM4 6h2v2H4zm14 0h2v2h-2zM3 11h2v1H3zm16 0h2v1h-2z" />
+          <path fill="#453627" d="M9 6h6v1h2v2h1v4h-1v2h-2v4H9v-4H7v-2H6V9h1V7h2zm1 14h4v2h-4z" />
+          <path fill="#ffc649" d="M9 7h6v1h1v1h1v4h-1v1h-2v2h-4v-2H8v-1H7V9h1V8h1z" />
+          <path fill="#fff6d6" d="M9 9h3v1h-2v2H9z" />
+          <path fill="#d6964b" d="M10 17h4v1h-4z" />
+        </svg>
         {!expanded && (
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
@@ -1149,7 +1169,7 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
         )}
       </button>
       {expanded && (
-        <div
+        <div className="thinking-step-text"
           style={{
             flex: 1,
             minWidth: 0,
@@ -1162,16 +1182,10 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
         </div>
       )}
       {duration !== undefined && (
-        <span style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+        <span className="thinking-step-time" style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
       )}
     </div>
   );
-}
-
-function isSubagentToolDetails(value: unknown): value is SubagentToolDetails {
-  if (!value || typeof value !== "object") return false;
-  const details = value as Partial<SubagentToolDetails>;
-  return details.kind === "pi-web-subagent" && typeof details.sessionId === "string";
 }
 
 /** A duration pi recorded on a message, or undefined when there is none to trust. */
@@ -1266,6 +1280,8 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
   const isError = (result?.isError ?? false)
     || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  const subagentTask = block.toolName === "Agent" && typeof subagent?.description === "string" ? subagent.description.trim() : "";
+  const headerPreview = subagentTask || (patchLabel ?? (codemode ? codemodeScriptPreview(codemode.code) : toolInputPreview(block.input, resultPatchPath, block.toolName)));
   const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
 
   return (
@@ -1280,6 +1296,18 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
     >
       {/* ── Tool call header ── */}
       <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
+        {subagent && onOpenSubagent && (
+          <button
+            type="button"
+            className="tool-call-subagent-open"
+            onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
+            title={t("subagent.openTab")}
+            aria-label={t("subagent.openTab")}
+            style={subagentAvatarStyle(subagent.sessionId)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" /></svg>
+          </button>
+        )}
         <button
           type="button"
           className="tool-call-toggle"
@@ -1291,7 +1319,8 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
             gap: 7,
             flex: 1,
             minWidth: 0,
-            padding: "6px 10px",
+            paddingBlock: "var(--tool-call-block-padding, 6px)",
+            paddingInline: "var(--tool-call-start-padding, 10px) 10px",
             background: "none",
             border: "none",
             color: "var(--text-muted)",
@@ -1300,6 +1329,15 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
             textAlign: "left",
           }}
         >
+          {(block.toolName === "bash" || block.toolName === "bash (local)") && (
+            <svg className="tool-call-bash-icon" width="36" height="22" viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true">
+              <path fill="#262d28" d="M1 1h14v1h1v12h-1v1H1v-1H0V2h1z" />
+              <path fill="#9ca892" d="M1 2h14v12H1z" />
+              <path fill="#26352e" d="M2 5h12v8H2z" />
+              <path fill="#e6f0d0" d="M2 3h2v1H2zm3 0h1v1H5z" />
+              <path fill="#b4e378" d="M3 6h1v1h1v1h1v1H5v1H4v1H3V9h1V8H3zm4 4h4v1H7z" />
+            </svg>
+          )}
           <span
             title={mcpLabel ? block.toolName : undefined}
             style={{ color: isError ? "#f87171" : "color-mix(in srgb, #16a34a 72%, var(--text))", fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 11, flexShrink: 0 }}
@@ -1311,10 +1349,8 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
               </>
             ) : block.toolName}
           </span>
-          <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
-            {isStreamingInput
-              ? t("chat.generatingToolInput")
-              : (patchLabel ?? (codemode ? codemodeScriptPreview(codemode.code) : toolInputPreview(block.input, resultPatchPath, block.toolName)))}
+          <span title={subagentTask || undefined} style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+            {isStreamingInput ? t("chat.generatingToolInput") : headerPreview}
           </span>
           {codemodeCallCount > 0 && (
             <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
@@ -1331,17 +1367,6 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
             <polyline points="2 3.5 5 6.5 8 3.5" />
           </svg>
         </button>
-        {subagent && onOpenSubagent && (
-          <button
-            type="button"
-            onClick={() => onOpenSubagent(subagent.sessionId, subagent.description || subagent.profile)}
-            title={t("subagent.openTab")}
-            aria-label={t("subagent.openTab")}
-            style={{ width: 32, display: "grid", placeItems: "center", border: "none", borderLeft: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", flexShrink: 0 }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" /></svg>
-          </button>
-        )}
       </div>
 
       <Disclosure open={expanded}>

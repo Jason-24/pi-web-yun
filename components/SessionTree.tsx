@@ -14,7 +14,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import type { SessionFamily } from "@/lib/session-family";
+import { subagentTitle, type SessionFamily } from "@/lib/session-family";
 import { splitForkSuffix } from "@/lib/session-fork-name";
 import { MAX_PROJECT_NAME_LENGTH, type ProjectMovePosition } from "@/lib/session-ui-state-shared";
 import {
@@ -29,6 +29,7 @@ import {
   type SidebarRow,
 } from "@/lib/session-tree";
 import type { SessionInfo } from "@/lib/types";
+import { subagentAvatarStyle } from "@/lib/theme";
 import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
 import { formatRelativeTime, formatShortRelativeTime } from "@/lib/i18n/format";
 import { skillExpansionToCommand } from "@/lib/slash-display";
@@ -38,11 +39,13 @@ import { useScrollbarVisibility } from "@/hooks/useScrollbarVisibility";
 import { useTreeMotion } from "@/hooks/useTreeMotion";
 import type { SidebarMenuAnchor } from "./SidebarMenu";
 import {
+  AgentsIcon,
   ArchiveIcon,
   BranchIcon,
   ChevronIcon,
   FolderIcon,
   FolderPlusIcon,
+  HistoryIcon,
   MoreIcon,
   PlusIcon,
   RestoreIcon,
@@ -111,6 +114,7 @@ export interface SessionTreeProps {
   /** Row whose menu is open: kept mounted, its ⋯ shown pressed. A group row's key works too. */
   activeMenuRowKey: string | null;
   onSelectFamily(family: SessionFamily): void;
+  onSelectSubagent?(session: SessionInfo): void;
   /** `all` (Alt+click): every group follows this one. */
   onToggleGroup(projectKey: string, all: boolean): void;
   /** Reveal SHOW_MORE_STEP more families; key is a projectKey or PINNED_MORE_KEY. */
@@ -119,6 +123,7 @@ export interface SessionTreeProps {
   onShowLess(key: string): void;
   onTogglePinned(): void;
   onToggleRecents?(): void;
+  onToggleSubagents?(): void;
   onArchiveFamily(family: SessionFamily): void;
   onRestoreFamily(family: SessionFamily): void;
   onOpenRowMenu(row: SessionRow, anchor: SidebarMenuAnchor, opener: HTMLElement | null): void;
@@ -400,7 +405,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
     }
   }, [visibleIndices]);
 
-  const hasTreeRows = rows.some((row) => row.kind === "session" || row.kind === "group" || row.kind === "archive-group");
+  const hasTreeRows = rows.some((row) => row.kind === "session" || row.kind === "group" || row.kind === "archive-group" || row.kind === "subagent");
   const showEmpty = !loading && !error && emptyLabel !== null && !hasTreeRows;
   // While dragging: the group's block is dimmed in place (groups never fold
   // up under the pointer), a line marks the drop, and a pill with the
@@ -1007,11 +1012,16 @@ const PlainRowView = memo(function PlainRowView({
   switch (row.kind) {
     case "section":
       return <div className={`session-tree-row session-tree-section${row.label === "projects" ? " is-projects" : ""}`} style={style} data-row-key={row.key}
-        role={row.label === "recents" ? "heading" : undefined} aria-level={row.label === "recents" ? 2 : undefined}>
-        {row.label === "recents" ? <button type="button" className="session-tree-recents-toggle"
-          aria-expanded={!row.collapsed} onClick={() => handlers.current.onToggleRecents?.()}>
-          <ChevronIcon size={12} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />
-          <span>{t("sidebar.recents")}</span>
+        role={row.label !== "projects" ? "heading" : undefined} aria-level={row.label !== "projects" ? 2 : undefined}>
+        {row.label !== "projects" ? <button type="button" className={`session-tree-section-toggle${row.label === "recents" ? " session-tree-recents-toggle" : ""}`}
+          disabled={row.count === 0} aria-expanded={row.count > 0 ? !row.collapsed : undefined} onClick={() => {
+            if (row.label === "recents") handlers.current.onToggleRecents?.();
+            else handlers.current.onToggleSubagents?.();
+          }}>
+          {row.label === "recents" ? <HistoryIcon size={12} strokeWidth={2} /> : <AgentsIcon size={12} strokeWidth={2} />}
+          <span>{row.label === "recents" ? t("sidebar.recents") : t("sidebar.subagents")}</span>
+          <span className="session-tree-section-count">{row.count}</span>
+          {row.count > 0 && <ChevronIcon size={12} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />}
         </button> : <>
           <span role="heading" aria-level={2}>{t("sidebar.projects")}</span>
           <button type="button" className="session-tree-section-action" aria-label={t("projectCreate.title")}
@@ -1021,17 +1031,26 @@ const PlainRowView = memo(function PlainRowView({
           </button>
         </>}
       </div>;
-    case "recent": {
-      const title = sessionRowTitle(row.family.root);
-      return <div className={`session-tree-row session-tree-recent${row.status.selected ? " is-selected" : ""}`} style={style} data-row-key={row.key}>
-        <a className="session-tree-main" href={sessionDeepLink(row.family.root.id)}
+    case "recent":
+    case "subagent": {
+      const subagent = row.kind === "subagent";
+      const session = subagent ? row.session : row.family.root;
+      const title = subagent ? subagentTitle(session) : sessionRowTitle(session);
+      return <div className={`session-tree-row session-tree-${row.kind}${row.status.selected ? " is-selected" : ""}`} style={style} data-row-key={row.key}>
+        <a className="session-tree-main" href={sessionDeepLink(session.id)}
           title={`${title} · ${row.project.name}`} aria-current={row.status.selected ? "page" : undefined}
           onClick={(event) => {
             if (!isPlainActivation(event)) return;
-            event.preventDefault(); handlers.current.onSelectFamily(row.family);
+            if (subagent && !handlers.current.onSelectSubagent) return;
+            event.preventDefault();
+            if (subagent) handlers.current.onSelectSubagent?.(row.session);
+            else handlers.current.onSelectFamily(row.family);
           }}>
+          {subagent && <span className="session-tree-subagent-avatar" aria-hidden="true" style={subagentAvatarStyle(session.id)}>
+            <AgentsIcon size={15} />
+          </span>}
           <span className="session-tree-title">{title}</span>
-          {(row.status.running || row.status.unread) && <ActivitySummary running={row.status.running ? 1 : 0} unread={row.status.unread ? 1 : 0} t={t} />}
+          <ActivitySummary running={Number(row.status.running)} awaiting={subagent ? Number(row.status.awaiting) : 0} unread={Number(row.status.unread)} t={t} />
         </a>
       </div>;
     }

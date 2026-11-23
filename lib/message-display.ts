@@ -1,5 +1,6 @@
 import { stripAnsi } from "./ansi";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, ThinkingContent, ToolCallContent } from "./types";
+import type { SubagentToolDetails } from "./subagent-extension";
 
 interface DisplayOptions {
   isStreaming?: boolean;
@@ -242,6 +243,12 @@ export function splitFinalAssistantBlocks(
 
 export function countToolCallBlocks(blocks: AssistantContentBlock[]): number {
   return blocks.filter((block): block is ToolCallContent => block.type === "toolCall").length;
+}
+
+export function isSubagentToolDetails(value: unknown): value is SubagentToolDetails {
+  if (!value || typeof value !== "object") return false;
+  const details = value as Partial<SubagentToolDetails>;
+  return details.kind === "pi-web-subagent" && typeof details.sessionId === "string" && details.sessionId.length > 0;
 }
 
 /**

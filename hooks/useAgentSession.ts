@@ -34,7 +34,7 @@ import { formatSessionSummary } from "@/lib/session-stats-format";
 import { userMessageKey } from "@/lib/prompt-recovery";
 import { carryMessageKeys, messageRenderKeys, withLiveUserEntryId, type DeliveredUserMessage } from "@/lib/message-keys";
 import { createIdleMessageReads, entriesAfter } from "@/lib/idle-message-read";
-import { isHiddenCustomMessage } from "@/lib/message-display";
+import { isHiddenCustomMessage, isSubagentToolDetails } from "@/lib/message-display";
 import {
   AgentEventConnection,
   canReleaseHiddenEventStream,
@@ -2187,8 +2187,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const name = event.toolName as string;
         const partialResult = event.partialResult as Partial<ToolResultMessage> | undefined;
         const content = partialResult?.content;
-        // Live output for shells; for codemode, the calls its script has made so far.
-        if ((name === "bash" || name === "powershell" || name === CODEMODE_TOOL_NAME) && Array.isArray(content)) {
+        const subagentStarted = name === "Agent" && isSubagentToolDetails(partialResult?.details);
+        // Keep live shell output, Code mode steps and links to children as soon as they dispatch.
+        if ((name === "bash" || name === "powershell" || name === CODEMODE_TOOL_NAME || subagentStarted) && Array.isArray(content)) {
           setActiveToolResults((prev) => {
             const next = new Map(prev);
             next.set(id, {

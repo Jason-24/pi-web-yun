@@ -480,7 +480,7 @@ test("a long or multi-line value stays inside the card", (t) => {
   assert.ok(textOf(html).includes("line 39"));
 });
 
-test("renders subagents as standard tool calls with only an extra side-panel button", () => {
+test("shows the task name and side-panel button in the subagent tool call", () => {
   const block = {
     type: "toolCall",
     toolCallId: "call-agent-1",
@@ -517,10 +517,10 @@ test("renders subagents as standard tool calls with only an extra side-panel but
 
   assert.match(html, /class="tool-call-toggle" aria-expanded="false"/);
   assert.match(html, />Agent</);
-  assert.match(html, />Explore</);
+  assert.match(html, />Find parser</);
   assert.match(html, /aria-label="View sub-agent work in side panel"/);
+  assert.match(html, /class="tool-call-subagent-open"[^>]*style="--chat-subagent-avatar-position:(?:25|50|75|100)%"/);
   assert.doesNotMatch(html, />completed</);
-  assert.doesNotMatch(html, />Find parser</);
 
   const ordinaryHtml = renderMessage({
     role: "assistant",

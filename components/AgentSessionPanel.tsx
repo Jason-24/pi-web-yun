@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { sideChatTitle } from "@/lib/session-family";
+import { sideChatTitle, subagentTitle } from "@/lib/session-family";
 import { MAX_SESSION_STATS_IDS, type SessionUsageSummary } from "@/lib/session-stats";
 import { formatActiveDuration, formatCompactCount, formatCostShort } from "@/lib/session-stats-format";
 import type { SessionInfo } from "@/lib/types";
@@ -141,15 +141,6 @@ function hasUsage(usage: SessionUsageSummary | undefined): usage is SessionUsage
 
 export function sessionTitle(session: SessionInfo): string {
   return session.name || session.firstMessage || session.id.slice(0, 12);
-}
-
-/**
- * A subagent row's first line: the session's name, which a spawn sets to the task's description
- * and a resume with a new description renames (#1735), else that first description.
- */
-export function subagentTitle(session: SessionInfo): string {
-  const relation = session.relation?.kind === "subagent" ? session.relation : null;
-  return session.name || relation?.description || sessionTitle(session);
 }
 
 /** A row's icon: a person for the main agent, a bubble for a side chat, a robot for a subagent. */

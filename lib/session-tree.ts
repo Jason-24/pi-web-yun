@@ -25,7 +25,7 @@ import { workspaceKeyOf } from "./workspace-memory";
 export type SidebarLayout = "desktop" | "mobile";
 export type SidebarRowKind =
   | "pinned-header" | "session" | "pinned-more" | "group" | "group-more" | "group-empty"
-  | "spacer" | "footer-open" | "footer-archived" | "archive-group" | "section" | "recent";
+  | "spacer" | "footer-open" | "footer-archived" | "archive-group" | "section" | "recent" | "subagent";
 
 /**
  * Per-kind row heights: one rhythm. Session rows, the section headers (a
@@ -36,8 +36,8 @@ export type SidebarRowKind =
  * group from the next and the groups from the footer.
  */
 export const SIDEBAR_ROW_HEIGHTS: Record<SidebarLayout, Record<SidebarRowKind, number>> = {
-  desktop: { section: 38, recent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 },
-  mobile: { section: 44, recent: 44, "pinned-header": 44, session: 44, "pinned-more": 36, group: 44, "group-more": 36, "group-empty": 44, spacer: 8, "footer-open": 44, "footer-archived": 44, "archive-group": 44 },
+  desktop: { section: 38, recent: 30, subagent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 },
+  mobile: { section: 44, recent: 44, subagent: 44, "pinned-header": 44, session: 44, "pinned-more": 36, group: 44, "group-more": 36, "group-empty": 44, spacer: 8, "footer-open": 44, "footer-archived": 44, "archive-group": 44 },
 };
 export const GROUP_VISIBLE_LIMIT = 6;
 export const PINNED_VISIBLE_LIMIT = 8;
@@ -56,8 +56,10 @@ export interface SidebarFamilyStatus { running: boolean; awaiting: boolean; unre
 // A folded header's counts follow its rows' right column: a family awaiting
 // input counts as awaiting, not running.
 export type SidebarRow =
-  | { kind: "section"; key: "section-projects" | "section-recents"; label: "projects" | "recents"; collapsed?: boolean }
+  | { kind: "section"; key: "section-projects"; label: "projects" }
+  | { kind: "section"; key: "section-recents" | "section-subagents"; label: "recents" | "subagents"; collapsed: boolean; count: number }
   | { kind: "recent"; key: string; family: SessionFamily; project: SidebarProject; status: SidebarFamilyStatus }
+  | { kind: "subagent"; key: string; session: SessionInfo; project: SidebarProject; status: Omit<SidebarFamilyStatus, "transient"> }
   | { kind: "pinned-header"; key: "pinned-header"; count: number; collapsed: boolean; running: number; awaiting: number; unread: number }
   | { kind: "session"; key: string; family: SessionFamily; context: "pinned" | "group" | "archive"; project: SidebarProject; status: SidebarFamilyStatus }
   | { kind: "pinned-more"; key: "pinned-more"; hidden: number; canShowLess: boolean; nextShown: number }
@@ -70,10 +72,11 @@ export type SidebarRow =
   | { kind: "archive-group"; key: string; project: SidebarProject; count: number; expanded: boolean };
 
 export interface SessionTreeInput {
-  /** Show labelled project groups and a separate recent-conversation list. */
+  /** Show labelled project groups and the separate subagent and recent sections. */
   sections?: boolean;
   /** Hide recent shortcuts while keeping their section's disclosure visible. */
   recentsCollapsed?: boolean;
+  subagentsCollapsed?: boolean;
   /** The full catalog (allSessions), subagents included. */
   sessions: readonly SessionInfo[];
   uiState: SessionUiState;
@@ -270,6 +273,10 @@ function activityCounts(
 
 function familyProjectKey(family: SessionFamily): string {
   return workspaceKeyOf(family.root);
+}
+
+function isSavedSubagent(session: SessionInfo): boolean {
+  return session.relation?.kind === "subagent" && !session.transient;
 }
 
 function familyProjectRoot(family: SessionFamily): string {
@@ -554,11 +561,32 @@ export function buildSessionTree(input: SessionTreeInput): SessionTreeModel {
   // Sectioned navigation opens projects from its header's plus button.
   if (!input.sections) rows.push({ kind: "footer-open", key: "footer-open" });
   if (input.sections) {
+    const selectedFamily = input.selectedSessionId ? families.find(family => isMember(family, input.selectedSessionId)) : undefined;
+    const subagents = selectedFamily?.subagents.filter(isSavedSubagent) ?? [];
+    rows.push({ kind: "section", key: "section-subagents", label: "subagents", collapsed: !!input.subagentsCollapsed, count: subagents.length });
+    if (selectedFamily && subagents.length > 0 && !input.subagentsCollapsed) {
+      resolver.noteFamily(selectedFamily);
+      const project = resolver.get(familyProjectKey(selectedFamily));
+      subagents.sort((a, b) => compareDesc(timeOf(a.modified), timeOf(b.modified)) || a.id.localeCompare(b.id));
+      for (const session of subagents) {
+        const awaiting = input.awaitingIds?.has(session.id) ?? false;
+        rows.push({ kind: "subagent", key: `subagent:${session.id}`, session, project, status: {
+          running: runningIds.has(session.id) && !awaiting,
+          awaiting,
+          unread: input.unreadIds.has(session.id),
+          selected: session.id === input.selectedSessionId,
+        } });
+      }
+    }
     const recent = families.filter((family) => !family.root.transient && !isFamilyArchived(family, uiState, runningIds)).slice(0, 10);
-    if (recent.length > 0) {
-      rows.push({ kind: "section", key: "section-recents", label: "recents", collapsed: !!input.recentsCollapsed });
-      if (!input.recentsCollapsed) for (const family of recent) rows.push({ kind: "recent", key: `recent:${family.root.id}`, family,
-        project: resolver.get(familyProjectKey(family)), status: familyStatus(family, input) });
+    rows.push({ kind: "section", key: "section-recents", label: "recents", collapsed: !!input.recentsCollapsed, count: recent.length });
+    if (!input.recentsCollapsed) for (const family of recent) rows.push({ kind: "recent", key: `recent:${family.root.id}`, family,
+      project: resolver.get(familyProjectKey(family)), status: familyStatus(family, input) });
+  }
+  if (rows.some((row) => row.kind === "subagent" && row.status.selected)) {
+    // Keep family selection for sorting and archive rules. Highlight the child in the tree.
+    for (const row of rows) {
+      if ((row.kind === "session" || row.kind === "recent") && row.status.selected) row.status.selected = false;
     }
   }
   if (archivedCount > 0) rows.push({ kind: "footer-archived", key: "footer-archived", count: archivedCount });
@@ -968,19 +996,23 @@ export interface SessionRowLocation {
 /**
  * Where the main tree shows a session's row: its family's row in the pinned
  * section or in its project's group, keyed as `buildSessionTree()` keys it
- * (a subagent or a side chat is its root's row), and what hides it now: the
+ * (a subagent can have a shortcut in its open section), and what hides it now: the
  * pinned section folded, or the group folded on purpose. A group closed
  * only because its project is not the current one needs nothing: opening
  * a session makes its project current. Null when the main tree has no row
  * for it: not in the list (a fresh session not saved yet) or archived.
  */
 export function locateSessionRow(
-  input: Pick<SessionTreeInput, "sessions" | "uiState" | "runningIds" | "groupExpansion" | "pinnedCollapsed">,
+  input: Pick<SessionTreeInput, "sessions" | "uiState" | "runningIds" | "groupExpansion" | "pinnedCollapsed" | "sections" | "subagentsCollapsed">,
   sessionId: string,
 ): SessionRowLocation | null {
   const family = getSessionFamily(input.sessions, sessionId);
-  if (!family || isFamilyArchived(family, input.uiState, input.runningIds)) return null;
+  if (!family) return null;
   const projectKey = familyProjectKey(family);
+  if (input.sections && !input.subagentsCollapsed && family.subagents.some((session) => session.id === sessionId && isSavedSubagent(session))) {
+    return { rowKey: `subagent:${sessionId}`, projectKey, unfoldPinned: false, unfoldGroup: false };
+  }
+  if (isFamilyArchived(family, input.uiState, input.runningIds)) return null;
   if (isFamilyPinned(family, input.uiState, input.runningIds)) {
     return { rowKey: `session:pinned:${family.root.id}`, projectKey, unfoldPinned: input.pinnedCollapsed, unfoldGroup: false };
   }

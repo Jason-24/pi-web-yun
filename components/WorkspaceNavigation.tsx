@@ -2,7 +2,7 @@
 
 import type { ReactNode, Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { AgentsIcon } from "./SidebarIcons";
+import { AgentsIcon, HistoryIcon } from "./SidebarIcons";
 import { PetWidget, type PetWidgetProps } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
 
@@ -17,6 +17,7 @@ export const WORKSPACE_VIEW_LABELS: Record<WorkspaceView, string> = {
 
 function ViewIcon({ view }: { view: WorkspaceView }) {
   if (view === "agents") return <AgentsIcon size={20} strokeWidth={1.7} />;
+  if (view === "history") return <HistoryIcon size={20} />;
   let shape: ReactNode;
   switch (view) {
     case "home":
@@ -24,9 +25,6 @@ function ViewIcon({ view }: { view: WorkspaceView }) {
       break;
     case "chat":
       shape = <path d="M5 4.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 3v-14a2 2 0 0 1 1-2Z" />;
-      break;
-    case "history":
-      shape = <><path d="M4 8a8.5 8.5 0 1 1-1 4" /><path d="M4 3.5V8h4.5M12 7.5v5l3.5 2" /></>;
       break;
     case "system":
       shape = <><path d="M6 3.5h8l4 4v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path d="M14 3.5v4h4M8 11l2 2-2 2m4 0h3" /></>;

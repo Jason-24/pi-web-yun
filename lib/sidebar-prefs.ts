@@ -9,6 +9,8 @@
  * quota errors fall back to defaults.
  */
 
+import { loadBrowserFlag, saveBrowserFlag } from "./browser-flag";
+
 const SIDEBAR_TAB_STORAGE_KEY = "pi-web:sidebar-tab";
 const GROUP_EXPANSION_STORAGE_KEY = "pi-web:sidebar-groups-v2";
 /**
@@ -21,6 +23,7 @@ const LEGACY_GROUP_EXPANSION_STORAGE_KEY = "pi-web:sidebar-groups";
 const ARCHIVE_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-archive-collapsed";
 const PINNED_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-pins-collapsed";
 const RECENTS_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-recents-collapsed";
+const SUBAGENTS_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-subagents-collapsed";
 const SHOW_IGNORED_FILES_STORAGE_KEY = "pi-web:sidebar-files-show-ignored";
 const FILES_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-files-collapsed";
 const CHANGES_VIEW_MODE_STORAGE_KEY = "pi-web:sidebar-changes-view-mode";
@@ -207,6 +210,14 @@ export function saveRecentsCollapsed(
   } catch {
     // Persistence is best-effort.
   }
+}
+
+export function loadSubagentsCollapsed(): boolean {
+  return loadBrowserFlag(SUBAGENTS_COLLAPSED_STORAGE_KEY);
+}
+
+export function saveSubagentsCollapsed(collapsed: boolean): void {
+  saveBrowserFlag(SUBAGENTS_COLLAPSED_STORAGE_KEY, collapsed);
 }
 
 /** The files tab's (or section's) ignored-files switch; off unless the browser saved it on. */

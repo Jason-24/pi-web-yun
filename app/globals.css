@@ -95,6 +95,38 @@ html.dark,
   --workspace-shadow: 0 2px 8px rgb(30 68 51 / 0.025), 0 12px 40px -24px rgb(30 68 51 / 0.14);
 }
 
+[data-theme="sunbeam"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-panel: #fbf7ed;
+  --bg-hover: #f4eddd;
+  --bg-selected: #ffe8a4;
+  --border: #dcd2bf;
+  --text: #211d16;
+  --text-muted: #554d3c;
+  --text-dim: #645a45;
+  --accent: #483300;
+  --accent-hover: #332400;
+  --accent-contrast: #fff6d7;
+  --user-bg: #fff6db;
+  --assistant-bg: var(--bg);
+  --tool-bg: #faf7ef;
+  --bg-subtle: rgb(88 63 18 / .045);
+  --workspace-backdrop: var(--bg-panel);
+  --workspace-sidebar: var(--bg-panel);
+  --workspace-chrome: #ffd34e;
+  --workspace-outline: #806a45;
+  --workspace-radius: 0;
+  --workspace-shadow: none;
+  --sunbeam-avatar-sprite: url("/icons/sunbeam-avatars.png");
+}
+
+[data-sunbeam-avatar="fox"] { --sunbeam-user-avatar-position: 0%; }
+[data-sunbeam-avatar="radio"] { --sunbeam-user-avatar-position: 25%; }
+[data-sunbeam-avatar="sprout"] { --sunbeam-user-avatar-position: 50%; }
+[data-sunbeam-avatar="orbital"] { --sunbeam-user-avatar-position: 75%; }
+[data-sunbeam-avatar="coral"] { --sunbeam-user-avatar-position: 100%; }
+
 [data-theme="mist"] {
   color-scheme: light;
   --bg: #f4f8f7;

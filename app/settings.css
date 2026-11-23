@@ -1853,7 +1853,7 @@
   margin: 12px 0 0;
 }
 
-/* Fifteen columns: System and Breeze each span a row; then five light themes and five dark ones
+/* Fifteen columns: System, Breeze and Sunbeam each span a row; then five light themes and five dark ones
    (three columns each), and a row of three wide tiles (five columns each). */
 .settings-theme-options {
   display: grid;
@@ -1873,7 +1873,7 @@
 }
 
 .settings-theme-option[data-system],
-.settings-theme-option:has(input[value="breeze"]) {
+.settings-theme-option:has(input:is([value="breeze"], [value="sunbeam"])) {
   grid-column: 1 / -1;
 }
 
@@ -1900,6 +1900,12 @@
 
 .settings-theme-fill[data-theme="breeze"] {
   background: var(--workspace-backdrop);
+}
+
+.settings-theme-fill[data-theme="sunbeam"] {
+  background-image:
+    linear-gradient(var(--workspace-chrome) 25%, transparent 25%),
+    linear-gradient(90deg, var(--workspace-chrome) 13%, var(--workspace-sidebar) 13% 36%, var(--bg) 36%);
 }
 
 .settings-theme-name {
@@ -1960,6 +1966,49 @@
 .settings-theme-option:has(input:focus-visible) {
   outline: 2px dashed var(--accent);
   outline-offset: 6px;
+}
+
+.settings-avatar-picker {
+  min-inline-size: 0;
+  margin: 16px 0 0;
+  padding: 0 4px;
+  border: 0;
+}
+
+.settings-avatar-picker legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-avatar-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-avatar-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.settings-avatar-option:hover { background: var(--bg-hover); }
+.settings-avatar-option:has(input:checked) { border-color: var(--workspace-outline); background: var(--bg-selected); }
+.settings-avatar-option:has(input:focus-visible) { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+.settings-avatar-preview {
+  width: 32px;
+  height: 32px;
+  background: var(--sunbeam-avatar-sprite) var(--sunbeam-user-avatar-position) center / 500% 100% no-repeat;
+  image-rendering: pixelated;
 }
 
 .settings-font-rows {

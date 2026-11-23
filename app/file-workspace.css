@@ -190,7 +190,7 @@
 }
 .workspace-unified-bar {
   position: absolute; inset: 0 0 auto; height: var(--workspace-header-height);
-  background: var(--bg); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: var(--workspace-chrome, var(--bg)); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   pointer-events: none;
 }
 .has-unified-header:not(.is-files-open) > .workspace-unified-bar { border-bottom: 0; }
@@ -217,6 +217,22 @@
 .has-unified-header.is-panel-resizing .workspace-chat-header,
 .workspace-shell .has-unified-header.is-panel-resizing #file-panel > .file-panel-header { transition: none; }
 .has-unified-header .right-panel-closed > .file-panel-header { display: none !important; }
+
+@media (min-width: 641px) {
+  [data-theme="sunbeam"] .workspace-shell #file-panel > .file-panel-header { min-height: 0; }
+  [data-theme="sunbeam"] .workspace-main:not(.has-unified-header) #file-panel > .file-panel-header {
+    height: var(--sunbeam-header-height) !important;
+    background: var(--workspace-chrome) !important;
+    border-bottom-color: var(--sunbeam-rule) !important;
+  }
+  [data-theme="sunbeam"] .has-unified-header.is-files-open .workspace-chat-header::after {
+    top: calc(11px + env(safe-area-inset-top));
+    bottom: 11px;
+  }
+  [data-theme="sunbeam"] .file-tab-strip { padding-block: 5px; }
+  [data-theme="sunbeam"] .file-tab { border-radius: 6px; }
+}
+
 /* Expanded panes share the main content area while their header entries remain
    available. Keep both content trees mounted, at the same full-area geometry. */
 .is-files-docked #file-panel.right-panel-open.right-panel-reading-expanded {

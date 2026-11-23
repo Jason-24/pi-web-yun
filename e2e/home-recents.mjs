@@ -55,9 +55,13 @@ try {
   assert.deepEqual(await home.locator(".home-session-title").allTextContents(), sessions.slice(0, 8).map(item => item.name));
 
   const toggle = page.locator(".session-tree-recents-toggle");
+  const subagents = page.locator('[data-row-key="section-subagents"] .session-tree-section-toggle');
   await toggle.scrollIntoViewIfNeeded();
   assert.equal(await toggle.getAttribute("aria-expanded"), "true");
-  assert.equal(await toggle.evaluate(el => el.firstElementChild.tagName.toLowerCase()), "svg");
+  assert.equal(await toggle.locator(".session-tree-section-count").textContent(), "10");
+  assert.equal(await subagents.locator(".session-tree-section-count").textContent(), "0");
+  assert.equal(await subagents.isDisabled(), true);
+  assert.equal(await toggle.evaluate(el => el.lastElementChild.classList.contains("session-tree-chevron")), true);
   await toggle.hover();
   assert.notEqual(await toggle.evaluate(el => getComputedStyle(el).backgroundColor), "rgba(0, 0, 0, 0)");
   await toggle.click({ position: { x: 200, y: 12 } });
@@ -101,6 +105,8 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await home.locator(".home-empty").waitFor();
   assert.equal(await home.locator(".home-recent-more").count(), 0);
+  assert.equal(await toggle.locator(".session-tree-section-count").textContent(), "0");
+  assert.equal(await toggle.isDisabled(), true);
   assert.equal(commands.some(type => type === "prompt" || type === "abort"), false);
   assert.deepEqual(errors, []);
   console.log("PASS: full-row hover/disclosure, keyboard and persisted collapse; 8/16/17 recent tasks, stable focus, session links, short/empty lists and mobile/dark; no prompts/aborts or browser errors.");

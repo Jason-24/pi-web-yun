@@ -23,6 +23,13 @@ export function AgentsIcon({ strokeWidth = 1.7, ...props }: SidebarIconProps & {
   </SidebarIcon>;
 }
 
+export function HistoryIcon({ strokeWidth = 1.7, ...props }: SidebarIconProps & { strokeWidth?: number }) {
+  return <SidebarIcon {...props} strokeWidth={strokeWidth}>
+    <path d="M4 8a8.5 8.5 0 1 1-1 4" />
+    <path d="M4 3.5V8h4.5M12 7.5v5l3.5 2" />
+  </SidebarIcon>;
+}
+
 function SidebarIcon({ size = 13, className, label, strokeWidth = 2, children }: SidebarIconProps & { strokeWidth?: number; children: ReactNode }) {
   return (
     <svg

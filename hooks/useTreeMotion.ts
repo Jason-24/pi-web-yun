@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, type MouseEvent, type RefObject } from "react";
 
-const FOLD_CONTROLS = ".session-tree-group-toggle, .session-tree-pinned-toggle, .session-tree-recents-toggle";
+const FOLD_CONTROLS = ".session-tree-group-toggle, .session-tree-pinned-toggle, .session-tree-recents-toggle, .session-tree-section-toggle";
 
 /** Animate only the mounted rows affected by an explicit fold; never a poll or scroll. */
 export function useTreeMotion(ref: RefObject<HTMLDivElement | null>, dragging: boolean) {

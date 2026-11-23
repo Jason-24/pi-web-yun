@@ -6,7 +6,7 @@ import { AgentsIcon } from "./SidebarIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 import { useTheme } from "@/hooks/useTheme";
-import { THEME_OPTIONS } from "@/lib/theme";
+import { isSunbeamAvatar, SUNBEAM_AVATARS, SUNBEAM_AVATAR_STORAGE_KEY, THEME_OPTIONS, type SunbeamAvatar } from "@/lib/theme";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -80,6 +80,46 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
   if (section === "agents") return <AgentsIcon size={size} strokeWidth={strokeWidth} className="settings-section-icon is-agent" />;
   if (section === "mcp") return <svg {...common}><rect x="3" y="3" width="18" height="7" rx="2" /><rect x="3" y="14" width="18" height="7" rx="2" /><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" /></svg>;
   return <svg {...common}><path d="M9 7V2M15 7V2M6 13V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a6 6 0 0 1-12 0ZM12 19v3" /></svg>;
+}
+
+function SunbeamAvatarPicker() {
+  const { t } = useI18n();
+  const [selected, setSelected] = useState<SunbeamAvatar>(() => {
+    const applied = typeof document === "undefined" ? undefined : document.documentElement.dataset.sunbeamAvatar;
+    return isSunbeamAvatar(applied) ? applied : SUNBEAM_AVATARS[0].id;
+  });
+
+  const selectAvatar = (avatar: SunbeamAvatar) => {
+    document.documentElement.dataset.sunbeamAvatar = avatar;
+    setSelected(avatar);
+    try {
+      localStorage.setItem(SUNBEAM_AVATAR_STORAGE_KEY, avatar);
+    } catch {
+      // Blocked storage still allows changing the avatar for this page.
+    }
+  };
+
+  return (
+    <fieldset className="settings-avatar-picker">
+      <legend>{t("settings.chatAvatar")}</legend>
+      <div className="settings-avatar-options">
+        {SUNBEAM_AVATARS.map(({ id, label }) => (
+          <label key={id} className="settings-avatar-option" title={t(label)}>
+            <input
+              type="radio"
+              name="sunbeam-avatar"
+              value={id}
+              checked={selected === id}
+              aria-label={t(label)}
+              onChange={() => selectAvatar(id)}
+              className="sr-only"
+            />
+            <span className="settings-avatar-preview" data-sunbeam-avatar={id} aria-hidden="true" />
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange }: Pick<Props, "sessionId" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange">) {
@@ -279,6 +319,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
             );
           })}
         </div>
+        {preference === "sunbeam" && <SunbeamAvatarPicker />}
       </section>
 
       <section className="settings-general-section">

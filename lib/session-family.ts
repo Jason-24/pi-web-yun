@@ -30,12 +30,18 @@ export function sideChatTitle(session: Pick<SessionInfo, "id" | "name">, untitle
   return index < 0 ? untitled : `${untitled} ${index + 1}`;
 }
 
-/** Relation kinds that hide a session as a family member instead of a sidebar row. */
+/** Relation kinds grouped under a parent instead of listed as project sessions. */
 export type HiddenRelationKind = "subagent" | "side";
 export type HiddenRelation = Extract<SessionInfo["relation"], { kind: HiddenRelationKind }>;
 
 export function isHiddenRelation(relation: SessionInfo["relation"]): relation is HiddenRelation {
   return relation?.kind === "subagent" || relation?.kind === "side";
+}
+
+/** A renamed subagent uses its current title, followed by the original dispatch information as a fallback. */
+export function subagentTitle(session: SessionInfo): string {
+  const relation = session.relation?.kind === "subagent" ? session.relation : null;
+  return session.name || relation?.description || session.firstMessage || session.id.slice(0, 12);
 }
 
 export interface SessionFamily {
