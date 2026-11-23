@@ -188,7 +188,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await view("home").hover();
     await peek.waitFor();
     assert.equal(new URL(page.url()).searchParams.get("session"), session.id, "hovering Home keeps the current conversation");
-    await peek.getByRole("heading", { name: "最近会话", exact: true }).waitFor();
+    await peek.getByRole("heading", { name: "最近会话 2", exact: true }).waitFor();
     assert.equal(await sidebar.evaluate(el => getComputedStyle(el).position), "absolute", "the collapsed preview floats over the conversation");
     const previewConversation = await page.locator(".workspace-conversation").boundingBox();
     assert.equal(previewConversation.x, collapsedConversation.x);
@@ -240,7 +240,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await restoreEdge.press("Enter");
     await page.waitForFunction(width => Math.abs(document.querySelector("#session-sidebar").getBoundingClientRect().width - width) < 1, resizedWidth);
     await sidebar.getByRole("heading", { name: "项目", exact: true }).waitFor();
-    await sidebar.getByRole("heading", { name: "最近会话", exact: true }).waitFor();
+    await sidebar.getByRole("heading", { name: "最近会话 2", exact: true }).waitFor();
     const header = sidebar.locator(".sidebar-header");
     const brandBox = await header.locator(".sidebar-brand").boundingBox();
     const newBox = await header.getByRole("button", { name: "新建会话", exact: true }).boundingBox();
