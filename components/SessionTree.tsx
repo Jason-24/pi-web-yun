@@ -954,11 +954,11 @@ const GroupRowView = memo(function GroupRowView({
         title={project.root}
         onClick={(event) => handlers.current.onToggleGroup(project.key, event.altKey)}
       >
-        {/* The chevron and folder identify the project; session titles
-            below align with the project name. Icons are decorative. */}
+        {/* Both project and recent disclosures use an icon, label and trailing chevron. */}
         <FolderIcon size={14} open={expanded} className={`session-tree-group-icon${expanded ? " is-open" : ""}`} />
         <span className="session-tree-group-name">{project.name}</span>
         {!expanded && <ActivitySummary running={row.running} awaiting={row.awaiting} unread={row.unread} t={t} />}
+        <ChevronIcon size={12} className={`session-tree-chevron session-tree-disclosure-chevron${expanded ? " is-open" : ""}`} />
       </button>
       <span className="session-tree-group-actions">
         <button
@@ -1018,10 +1018,10 @@ const PlainRowView = memo(function PlainRowView({
             if (row.label === "recents") handlers.current.onToggleRecents?.();
             else handlers.current.onToggleSubagents?.();
           }}>
-          {row.label === "recents" ? <HistoryIcon size={12} strokeWidth={2} /> : <AgentsIcon size={12} strokeWidth={2} />}
-          <span>{row.label === "recents" ? t("sidebar.recents") : t("sidebar.subagents")}</span>
+          {row.label === "recents" ? <HistoryIcon size={14} strokeWidth={2} className="session-tree-section-icon" /> : <AgentsIcon size={14} strokeWidth={2} className="session-tree-section-icon" />}
+          <span className="session-tree-section-label">{row.label === "recents" ? t("sidebar.recents") : t("sidebar.subagents")}</span>
           <span className="session-tree-section-count">{row.count}</span>
-          {row.count > 0 && <ChevronIcon size={12} className={`session-tree-chevron${row.collapsed ? "" : " is-open"}`} />}
+          {row.count > 0 && <ChevronIcon size={12} className={`session-tree-chevron session-tree-disclosure-chevron${row.collapsed ? "" : " is-open"}`} />}
         </button> : <>
           <span role="heading" aria-level={2}>{t("sidebar.projects")}</span>
           <button type="button" className="session-tree-section-action" aria-label={t("projectCreate.title")}

@@ -1,0 +1,26 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+:global([data-theme="sunbeam"]) .avatar {
+  width: 32px;
+  height: 32px;
+  background-image: var(--sunbeam-avatar-sprite);
+  background-size: 500% 100%;
+  background-position: var(--chat-avatar-position, 25%) center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+:global([data-theme="sunbeam"]) .avatar[data-agent-avatar="subagent"] {
+  background-position: var(--chat-subagent-avatar-position, 25%) center;
+}
+
+:global([data-theme="sunbeam"]) .avatar > svg {
+  display: none;
+}

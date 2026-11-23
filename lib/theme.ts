@@ -1,12 +1,9 @@
 import type { CSSProperties } from "react";
 
-// Settings shows System, Breeze and Sunbeam as full-width swatches, then the light row, dark row and a row of three:
-// the high-contrast pair and Zenburn.
+// Settings shows System above three rows of equal-sized palette swatches.
 // The rows line up by hue: each light theme sits above its dark counterpart; Rose and Slate have none.
 export const THEME_OPTIONS = [
   { id: "auto", label: "settings.themeSystem", scheme: null },
-  { id: "breeze", label: "settings.themeBreeze", scheme: "light" },
-  { id: "sunbeam", label: "settings.themeSunbeam", scheme: "light" },
   { id: "light", label: "settings.themeLight", scheme: "light" },
   { id: "mist", label: "settings.themeMist", scheme: "light" },
   { id: "lilac", label: "settings.themeLilac", scheme: "light" },
@@ -20,6 +17,8 @@ export const THEME_OPTIONS = [
   { id: "contrast-light", label: "settings.themeContrastLight", scheme: "light" },
   { id: "contrast-dark", label: "settings.themeContrastDark", scheme: "dark" },
   { id: "zenburn", label: "settings.themeZenburn", scheme: "dark" },
+  { id: "breeze", label: "settings.themeBreeze", scheme: "light" },
+  { id: "sunbeam", label: "settings.themeSunbeam", scheme: "light" },
 ] as const;
 
 export type ThemePreference = (typeof THEME_OPTIONS)[number]["id"];

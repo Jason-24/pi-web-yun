@@ -62,8 +62,27 @@ try {
   assert.equal(await subagents.locator(".session-tree-section-count").textContent(), "0");
   assert.equal(await subagents.isDisabled(), true);
   assert.equal(await toggle.evaluate(el => el.lastElementChild.classList.contains("session-tree-chevron")), true);
+  assert.equal(await toggle.evaluate(el => el.firstElementChild.tagName.toLowerCase()), "svg");
+  assert.equal(await toggle.locator(".session-tree-section-count").innerText(), "10");
+  const projectToggle = page.locator(".session-tree-group > .session-tree-group-toggle").first();
+  const columns = async button => button.evaluate(el => {
+    const icon = el.firstElementChild.getBoundingClientRect();
+    const label = el.querySelector(".session-tree-group-name, .session-tree-section-label").getBoundingClientRect();
+    const arrow = el.querySelector(".session-tree-disclosure-chevron")?.getBoundingClientRect();
+    return { icon: icon.x, label: label.x, arrow: arrow?.x };
+  });
+  assert.deepEqual(await columns(projectToggle), await columns(toggle), "project and recent icon, label and arrow columns align");
+  assert.deepEqual(await columns(subagents), { ...await columns(toggle), arrow: undefined }, "empty subagent heading keeps the same icon and text columns");
+  const projectArrow = (await columns(projectToggle)).arrow;
+  await projectToggle.hover();
+  assert.equal((await columns(projectToggle)).arrow, projectArrow, "project actions do not move its arrow");
+  const initialProjectExpanded = await projectToggle.getAttribute("aria-expanded");
+  await projectToggle.press("Enter");
+  assert.equal(await projectToggle.getAttribute("aria-expanded"), initialProjectExpanded === "true" ? "false" : "true");
+  await projectToggle.press("Space");
+  assert.equal(await projectToggle.getAttribute("aria-expanded"), initialProjectExpanded);
   await toggle.hover();
-  assert.notEqual(await toggle.evaluate(el => getComputedStyle(el).backgroundColor), "rgba(0, 0, 0, 0)");
+  await page.waitForFunction(() => getComputedStyle(document.querySelector(".session-tree-recents-toggle")).backgroundColor !== "rgba(0, 0, 0, 0)");
   await toggle.click({ position: { x: 200, y: 12 } });
   assert.equal(await toggle.getAttribute("aria-expanded"), "false");
   assert.equal(await page.evaluate(() => localStorage.getItem("pi-web:sidebar-recents-collapsed")), "true");
@@ -75,6 +94,9 @@ try {
   assert.equal(await toggle.getAttribute("aria-expanded"), "false");
   await toggle.press("Enter");
   await page.screenshot({ path: resolve(artifacts, "desktop.png") });
+  await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam"; });
+  assert.deepEqual(await columns(projectToggle), await columns(toggle), "Sunbeam disclosure columns align");
+  await page.screenshot({ path: resolve(artifacts, "desktop-sunbeam.png"), animations: "disabled" });
 
   const more = home.getByRole("button", { name: "查看更多", exact: true });
   await more.press("Enter");
@@ -89,6 +111,12 @@ try {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  await page.locator(".workspace-sidebar-toggle").click();
+  await toggle.waitFor({ state: "visible" });
+  await page.screenshot({ path: resolve(artifacts, "mobile-sidebar-dark.png"), animations: "disabled" });
+  assert.deepEqual(await columns(projectToggle), await columns(toggle), "mobile disclosure columns align");
+  assert.ok((await toggle.boundingBox()).x >= 0, "mobile disclosure stays inside the viewport");
+  await page.locator(".sidebar-overlay-backdrop").click({ position: { x: 380, y: 450 } });
   await more.click();
   assert.equal(await home.locator(".home-session").count(), 16);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

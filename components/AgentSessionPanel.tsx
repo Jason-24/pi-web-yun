@@ -10,6 +10,7 @@ import type { SessionInfo } from "@/lib/types";
 import { DeleteConfirm } from "./SessionTree";
 import { StatusIcon, statusColor } from "./AgentStatus";
 import { TrashIcon } from "./SidebarIcons";
+import { AgentAvatar } from "./AgentAvatar";
 import { SidebarMenu, type SidebarMenuAnchor } from "./SidebarMenu";
 import styles from "./AgentSessionPanel.module.css";
 
@@ -171,12 +172,12 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(elapsedHours / 24), "day");
 }
 
-function SessionIcon({ kind }: { kind: "main" | "side" | "subagent" }) {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {kind === "main" ? <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>
-      : kind === "side" ? <path d="M21 12a8 8 0 0 1-8 8H5.5a2 2 0 0 1-1.4-3.4A8 8 0 1 1 21 12z" />
-        : <><rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" /></>}
-  </svg>;
+function SessionIcon({ session, model }: { session: SessionInfo; model?: SessionUsageSummary["model"] }) {
+  if (session.relation?.kind === "side") return <AgentKindIcon kind="side" size={18} />;
+  const subagent = session.relation?.kind === "subagent";
+  return <AgentAvatar subagent={subagent}
+    fallback={<AgentKindIcon kind={subagent ? "subagent" : "main"} size={18} />}
+    identity={subagent ? session.id : model ? `${model.provider}/${model.modelId}` : session.id} />;
 }
 
 function memberTitle(session: SessionInfo, t: (key: string) => string, family: readonly SessionInfo[]): string {
@@ -221,7 +222,6 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
   const current = inspected.id === selectedSessionId;
   const running = runningSessionIds.has(inspected.id);
   const status = running ? "running" : relation?.status;
-  const kind = main ? "main" : side ? "side" : "subagent";
   const title = memberTitle(inspected, t, subagents);
   const typeLabel = t(main ? "collaboration.mainSession" : side ? "agentSwitcher.sideChat" : "agentSwitcher.subagent");
   const familyIds = useMemo(() => [rootSession.id, ...subagents.map(session => session.id)], [rootSession.id, subagents]);
@@ -273,7 +273,6 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
     <h2>{label}<span>{count}</span></h2>
     {members.map(session => {
       const isMain = session.id === rootSession.id;
-      const isSide = session.relation?.kind === "side";
       const child = session.relation?.kind === "subagent" ? session.relation : null;
       const active = runningSessionIds.has(session.id);
       const model = usage[session.id]?.model;
@@ -282,7 +281,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
       return <button key={session.id} type="button" data-collaboration-session={session.id}
         className={styles.member} aria-pressed={inspected.id === session.id} aria-controls="collaboration-detail"
         onClick={() => inspect(session.id)} title={[memberTitle(session, t, subagents), model ? `${model.provider}/${model.modelId}` : "", metadata].filter(Boolean).join("\n")}>
-        <span className={styles.memberIcon}><SessionIcon kind={isMain ? "main" : isSide ? "side" : "subagent"} /></span>
+        <span className={styles.memberIcon}><SessionIcon session={session} model={model} /></span>
         <span className={styles.memberCopy}><strong>{memberTitle(session, t, subagents)}</strong>
           <span>{isMain ? t(session.id === selectedSessionId ? "collaboration.currentChat" : "agentSwitcher.main")
             : metadata || formatRelativeTime(session.modified, locale)}</span>
@@ -329,7 +328,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
         {normalizedQuery && !visible.length && <p className={styles.empty}>{t("agentSwitcher.noMatches")}</p>}
       </nav>
       <section id="collaboration-detail" className={styles.detail} aria-label={t("collaboration.details")}>
-        <header className={styles.detailHeader}><SessionIcon kind={kind} /><div><h2>{title}</h2>
+        <header className={styles.detailHeader}><SessionIcon session={inspected} model={detailUsage?.model} /><div><h2>{title}</h2>
           <p>{typeLabel}{current && <span className={styles.current}>{t("collaboration.currentChat")}</span>}</p></div></header>
         <dl className={styles.fields}>
           <dt>{t("collaboration.status")}</dt><dd className={styles.status}>

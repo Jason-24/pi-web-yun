@@ -38,6 +38,13 @@
 [data-theme="sunbeam"] .workbench-settings-navigation .workbench-view-button > svg { stroke-width: 1.65; }
 .workbench-settings-label { display: none; }
 .workbench-rail-divider { width: 20px; height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
+:is([data-theme="breeze"], [data-theme="sunbeam"]) .workbench-rail-divider {
+  width: 18px;
+  height: 1px;
+  margin-block: 6px;
+  background: linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--text) 32%, transparent) 25% 75%, transparent);
+}
 .workbench-session-actions { gap: 8px; }
 .workbench-settings-navigation .workbench-session-actions > button {
   width: 36px !important;
@@ -60,7 +67,6 @@
 [data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button { width: 38px; height: 38px; }
 [data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button > svg { width: 23px; height: 23px; }
 [data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > [data-workspace-view="chat"] { margin-bottom: 0; }
-[data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-rail-divider { margin-block: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .workbench-settings-navigation button { transition: none; }

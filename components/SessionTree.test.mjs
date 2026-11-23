@@ -161,11 +161,12 @@ test("a collapsed group shows its running and unread counts and labelled actions
   assert.match(html, /^<div class="session-tree-row session-tree-group" style="top:0;height:28px"/);
   assert.match(html, /<button type="button" class="session-tree-group-toggle" aria-expanded="false" title="\/work\/app">/);
   // The folder leads, hidden from the accessible name; the whole header
-  // still toggles without an expansion arrow.
+  // still toggles with its expansion arrow at the end.
   assert.match(html, /title="\/work\/app"><svg width="14" height="14"[^>]*class="session-tree-group-icon" aria-hidden="true">[\s\S]*?<\/svg><span class="session-tree-group-name">app<\/span>/, "only the decorative folder precedes the name");
   assert.match(html, /<span class="session-tree-group-name">app<\/span><span class="session-tree-summary">/);
   // Project decoration must not change the toggle's accessible name.
   assert.match(html, /class="session-tree-group-icon" aria-hidden="true"/);
+  assert.match(html, /class="session-tree-chevron session-tree-disclosure-chevron" aria-hidden="true"/);
   assert.doesNotMatch(html, /session-tree-group-pin/);
   assert.match(html, /aria-label="Agent running… \(2\)"/);
   assert.match(html, /aria-label="New session activity \(1\)"/);
@@ -176,6 +177,7 @@ test("a collapsed group shows its running and unread counts and labelled actions
   assert.match(expanded, /session-tree-group is-current/);
   assert.match(expanded, /aria-expanded="true" title="\/work\/app"/);
   assert.match(expanded, /class="session-tree-group-icon is-open" aria-hidden="true"/);
+  assert.match(expanded, /class="session-tree-chevron session-tree-disclosure-chevron is-open" aria-hidden="true"/);
   assert.doesNotMatch(expanded, /session-tree-summary/);
   assert.doesNotMatch(expanded, /session-tree-group-pin/);
 });

@@ -17,6 +17,7 @@
 .member:hover { background: var(--bg-hover); }
 .member[aria-pressed="true"] { background: var(--bg-selected); }
 .memberIcon { display: grid; place-items: center; flex: 0 0 22px; height: 22px; color: var(--text-muted); }
+:global([data-theme="sunbeam"]) .memberIcon { flex-basis: 32px; height: 32px; }
 .memberCopy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .memberCopy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
 .memberCopy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }
@@ -24,7 +25,7 @@
 .empty { margin: 8px 12px; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
 .detail { position: sticky; top: 24px; min-width: 0; padding-left: 28px; border-left: 1px solid var(--border); }
 .detailHeader { display: flex; gap: 12px; align-items: flex-start; }
-.detailHeader > svg { flex: none; margin-top: 3px; color: var(--text-muted); }
+.detailHeader > :first-child { flex: none; margin-top: 3px; color: var(--text-muted); }
 .detailHeader > div { min-width: 0; }
 .detailHeader h2 { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
 .detailHeader p { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 5px 0 0; color: var(--text-muted); font-size: 12px; }

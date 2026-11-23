@@ -1853,11 +1853,10 @@
   margin: 12px 0 0;
 }
 
-/* Fifteen columns: System, Breeze and Sunbeam each span a row; then five light themes and five dark ones
-   (three columns each), and a row of three wide tiles (five columns each). */
+/* System stays above equal-sized palettes; Breeze and Sunbeam join the last row. */
 .settings-theme-options {
   display: grid;
-  grid-template-columns: repeat(15, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-auto-rows: 40px;
   gap: 10px;
   padding: 4px;
@@ -1866,19 +1865,18 @@
 .settings-theme-option {
   position: relative;
   display: flex;
-  grid-column: span 3;
+  grid-column: span 1;
   min-width: 0;
   border-radius: 9px;
   cursor: pointer;
 }
 
-.settings-theme-option[data-system],
-.settings-theme-option:has(input:is([value="breeze"], [value="sunbeam"])) {
+.settings-theme-option[data-system] {
   grid-column: 1 / -1;
 }
 
-.settings-theme-option[data-wide] {
-  grid-column: span 5;
+@container (max-width: 380px) {
+  .settings-theme-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .settings-theme-swatch {
@@ -1924,7 +1922,7 @@
   white-space: nowrap;
 }
 
-/* "High contrast light" outgrows a third of the row on a phone: let the wide names take two lines. */
+/* Longer palette names wrap inside the same tile size. */
 .settings-theme-option[data-wide] .settings-theme-name {
   font-size: 11px;
   line-height: 1.2;
