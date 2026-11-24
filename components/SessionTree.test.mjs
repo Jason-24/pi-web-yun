@@ -196,10 +196,10 @@ test("an idle session row shows its short time, branch and both actions", () => 
   const root = session("idle", { isWorktree: true, branch: "feat/rows" });
   const html = rowMarkup(render({ rows: [sessionRow(root)] }), "session:group:idle");
   assert.match(html, /^<div class="session-tree-row session-tree-session" style="top:0;height:28px" data-row-key="session:group:idle">/);
-  // Nothing before the title: it gets the room; the time sits at the right.
+  // The decorative avatar uses the title's existing inset in Pixel.
   // A saved session's title is a real link to it (middle-click, Ctrl/Cmd-click).
   // The branch keeps the upstream icon and type; the tooltip keeps the ⑂ glyph.
-  assert.match(html, /<a class="session-tree-main" href="\?session=idle" title="[^"]*"><span class="session-tree-title">first idle<\/span><span class="session-tree-branch"><svg width="10" height="10"[^>]*class="session-tree-branch-icon" aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><span class="session-tree-meta">5m<\/span><\/a>/);
+  assert.match(html, /<a class="session-tree-main" href="\?session=idle" title="[^"]*"><span class="session-tree-session-avatar" aria-hidden="true" style="--chat-avatar-position:\d+%"><\/span><span class="session-tree-title">first idle<\/span><span class="session-tree-branch"><svg width="10" height="10"[^>]*class="session-tree-branch-icon" aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><span class="session-tree-meta">5m<\/span><\/a>/);
   assert.match(html, /title="first idle\n3 msgs · 5 minutes ago · ⑂ feat\/rows"/);
   assert.match(html, /class="session-tree-action session-tree-quick-action" aria-label="Archive" title="Archive"/);
   assert.match(html, /class="session-tree-action session-tree-more-action" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
@@ -274,7 +274,7 @@ test("a transient row offers no actions at all", () => {
   assert.doesNotMatch(html, /aria-label="Archive"/);
   assert.match(html, /session-tree-title">first tmp</);
   // No file yet, so no link another tab could not load: still a button.
-  assert.match(html, /<button type="button" class="session-tree-main" title="[^"]*"><span class="session-tree-title">first tmp<\/span>/);
+  assert.match(html, /<button type="button" class="session-tree-main" title="[^"]*"><span class="session-tree-session-avatar"[^>]*><\/span><span class="session-tree-title">first tmp<\/span>/);
   assert.doesNotMatch(html, /<a |href=/);
   const selected = rowMarkup(render({ rows: [sessionRow(session("tmp"), { status: { transient: true, selected: true } })] }), "session:group:tmp");
   assert.match(selected, /<button type="button" class="session-tree-main" title="[^"]*" aria-current="true">/);
@@ -296,14 +296,14 @@ test("every saved row's title links to its session, encoded, in every context an
     assert.match(link, /^<a class="session-tree-main" href=/, row.key);
     // Never target: a plain click would leave this tab too.
     assert.doesNotMatch(link, /target=|rel=/, row.key);
-    // The link holds the title, branch and meta only; the row's buttons stay outside it.
+    // The row's buttons stay outside its link.
     const inside = html.slice(html.indexOf(link), html.indexOf("</a>"));
     assert.doesNotMatch(inside, /<button|<a [\s\S]*<a /, `${row.key}: no control nested in the link`);
     assert.match(html, /<\/a>(<span class="session-tree-actions">|<\/div>)/, row.key);
   }
   // A fork's two-span title sits inside the link the same way.
   const fork = rowMarkup(render({ rows: [sessionRow(session("copy", { name: "Plan · 3f9a", relation: { kind: "fork", originSessionId: "src" } }))] }), "session:group:copy");
-  assert.match(fork, /<a class="session-tree-main" href="\?session=copy" title="[^"]*"><span class="session-tree-title has-fork-suffix">/);
+  assert.match(fork, /<a class="session-tree-main" href="\?session=copy" title="[^"]*"><span class="session-tree-session-avatar"[^>]*><\/span><span class="session-tree-title has-fork-suffix">/);
   // Rename and delete-confirm rows have no link.
   assert.doesNotMatch(rowMarkup(render({ rows: [sessionRow(session("r"))], renamingRootId: "r" }), "session:group:r"), /<a /);
   assert.doesNotMatch(rowMarkup(render({ rows: [sessionRow(session("d"))], confirmDeleteRootId: "d" }), "session:group:d"), /<a /);
@@ -586,9 +586,9 @@ test("project names and sessions share a content column, with section labels bef
   // One rhythm: session rows, every header (a project's, the pinned
   // section's, the archive's projects), the empty note and the footer are
   // one height, 28px (44px on a phone); only "show more" is shorter.
-  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { section: 38, recent: 30, subagent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 });
+  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { section: 38, recent: 28, subagent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 });
   for (const [layout, height] of [["desktop", 28], ["mobile", 44]]) {
-    for (const kind of ["session", "group", "pinned-header", "group-empty", "footer-open", "footer-archived", "archive-group"]) {
+    for (const kind of ["session", "recent", "group", "pinned-header", "group-empty", "footer-open", "footer-archived", "archive-group"]) {
       assert.equal(SIDEBAR_ROW_HEIGHTS[layout][kind], height, `${layout} ${kind}`);
     }
   }

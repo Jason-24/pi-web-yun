@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-// Settings shows System above three rows of equal-sized palette swatches.
+// Settings shows System above compact palette swatches, with the Pixel pair together.
 // The rows line up by hue: each light theme sits above its dark counterpart; Rose and Slate have none.
 export const THEME_OPTIONS = [
   { id: "auto", label: "settings.themeSystem", scheme: null },
@@ -19,10 +19,15 @@ export const THEME_OPTIONS = [
   { id: "zenburn", label: "settings.themeZenburn", scheme: "dark" },
   { id: "breeze", label: "settings.themeBreeze", scheme: "light" },
   { id: "sunbeam", label: "settings.themeSunbeam", scheme: "light" },
+  { id: "sunbeam-pink", label: "settings.themeSunbeamPink", scheme: "light" },
 ] as const;
 
 export type ThemePreference = (typeof THEME_OPTIONS)[number]["id"];
 export type ResolvedTheme = Exclude<ThemePreference, "auto">;
+
+export function isPixelTheme(theme: ThemePreference): boolean {
+  return theme === "sunbeam" || theme === "sunbeam-pink";
+}
 
 export const SUNBEAM_AVATARS = [
   { id: "fox", label: "settings.avatarFox" },

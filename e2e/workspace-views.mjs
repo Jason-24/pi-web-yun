@@ -247,9 +247,12 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     assert.ok(newBox.y >= brandBox.y + brandBox.height, "New chat has its own row below the brand");
     assert.ok(newBox.width >= (await header.boundingBox()).width - 20, "New chat fills the sidebar action row");
     const projectToggle = sidebar.locator(".session-tree-group-toggle").first();
-    assert.equal(await projectToggle.locator(".session-tree-chevron").count(), 0, "project toggles have no expansion arrow");
+    const projectChevron = projectToggle.locator(":scope > .session-tree-disclosure-chevron");
+    await projectChevron.waitFor({ state: "visible" });
+    assert.equal(await projectChevron.getAttribute("aria-hidden"), "true");
     if (await projectToggle.getAttribute("aria-expanded") === "true") await projectToggle.click();
     assert.equal(await projectToggle.getAttribute("aria-expanded"), "false");
+    assert.equal(await projectChevron.evaluate(chevron => chevron.classList.contains("is-open")), false);
     await sidebar.locator(`[data-row-key="recent:${other.id}"] a`).click();
     await page.waitForURL(`**/?session=${other.id}`);
     await sidebar.locator(`[data-row-key="recent:${session.id}"] a`).click();
@@ -257,6 +260,7 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await input.waitFor();
     if (await projectToggle.getAttribute("aria-expanded") === "false") await projectToggle.click();
     await sidebar.locator(".session-tree-session").filter({ hasText: session.name }).waitFor();
+    assert.equal(await projectChevron.evaluate(chevron => chevron.classList.contains("is-open")), true);
     await page.screenshot({ path: resolve(artifacts, "workspace-sidebar-sections.png") });
     await input.fill("切换视图后仍然保留的草稿");
     await input.evaluate(element => { element.dataset.instance = "original"; });

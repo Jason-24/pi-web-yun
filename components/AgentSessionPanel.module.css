@@ -17,7 +17,7 @@
 .member:hover { background: var(--bg-hover); }
 .member[aria-pressed="true"] { background: var(--bg-selected); }
 .memberIcon { display: grid; place-items: center; flex: 0 0 22px; height: 22px; color: var(--text-muted); }
-:global([data-theme="sunbeam"]) .memberIcon { flex-basis: 32px; height: 32px; }
+:global([data-theme^="sunbeam"]) .memberIcon { flex-basis: 32px; height: 32px; }
 .memberCopy { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .memberCopy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
 .memberCopy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }

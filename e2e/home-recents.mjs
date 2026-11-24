@@ -65,11 +65,41 @@ try {
   assert.equal(await toggle.evaluate(el => el.firstElementChild.tagName.toLowerCase()), "svg");
   assert.equal(await toggle.locator(".session-tree-section-count").innerText(), "10");
   const projectToggle = page.locator(".session-tree-group > .session-tree-group-toggle").first();
+  const projectRow = page.locator(`[data-row-key="session:group:${sessions[0].id}"]`);
+  const recentRow = page.locator(`[data-row-key="recent:${sessions[0].id}"]`);
+  const sessionColumns = row => row.evaluate(el => {
+    const box = el.getBoundingClientRect();
+    const avatar = el.querySelector(".session-tree-session-avatar");
+    const avatarStyle = getComputedStyle(avatar);
+    const meta = el.querySelector(".session-tree-meta");
+    const actionWidth = el.querySelector(".session-tree-actions")?.getBoundingClientRect().width ?? 0;
+    return {
+      left: box.left,
+      width: box.width,
+      height: box.height,
+      title: el.querySelector(".session-tree-title").getBoundingClientRect().left,
+      time: meta.textContent,
+      trailingEdge: meta.getBoundingClientRect().right + actionWidth,
+      avatar: avatar.getBoundingClientRect().left,
+      avatarWidth: avatar.getBoundingClientRect().width,
+      image: avatarStyle.backgroundImage,
+      frame: avatarStyle.backgroundPosition,
+    };
+  });
+  const checkSessionColumns = async (pixels) => {
+    if (await projectToggle.getAttribute("aria-expanded") === "false") await projectToggle.click();
+    await page.mouse.move(0, 0);
+    const project = await sessionColumns(projectRow);
+    assert.deepEqual(await sessionColumns(recentRow), project, "project and recent rows share the title, avatar and time columns");
+    assert.equal(project.avatarWidth, pixels ? 16 : 0);
+    if (pixels) assert.match(project.image, /sunbeam-avatars\.png/);
+    assert.equal(await recentRow.locator(".session-tree-actions").count(), 0, "the shortcut keeps its single session link");
+  };
   const columns = async button => button.evaluate(el => {
     const icon = el.firstElementChild.getBoundingClientRect();
     const label = el.querySelector(".session-tree-group-name, .session-tree-section-label").getBoundingClientRect();
     const arrow = el.querySelector(".session-tree-disclosure-chevron")?.getBoundingClientRect();
-    return { icon: icon.x, label: label.x, arrow: arrow?.x };
+    return { icon: Math.round(icon.x), label: Math.round(label.x), arrow: arrow && Math.round(arrow.x) };
   });
   assert.deepEqual(await columns(projectToggle), await columns(toggle), "project and recent icon, label and arrow columns align");
   assert.deepEqual(await columns(subagents), { ...await columns(toggle), arrow: undefined }, "empty subagent heading keeps the same icon and text columns");
@@ -93,9 +123,11 @@ try {
   await toggle.press("Space");
   assert.equal(await toggle.getAttribute("aria-expanded"), "false");
   await toggle.press("Enter");
+  await checkSessionColumns(false);
   await page.screenshot({ path: resolve(artifacts, "desktop.png") });
   await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam"; });
-  assert.deepEqual(await columns(projectToggle), await columns(toggle), "Sunbeam disclosure columns align");
+  assert.deepEqual(await columns(projectToggle), await columns(toggle), "Pixel disclosure columns align");
+  await checkSessionColumns(true);
   await page.screenshot({ path: resolve(artifacts, "desktop-sunbeam.png"), animations: "disabled" });
 
   const more = home.getByRole("button", { name: "查看更多", exact: true });
@@ -116,6 +148,11 @@ try {
   await page.screenshot({ path: resolve(artifacts, "mobile-sidebar-dark.png"), animations: "disabled" });
   assert.deepEqual(await columns(projectToggle), await columns(toggle), "mobile disclosure columns align");
   assert.ok((await toggle.boundingBox()).x >= 0, "mobile disclosure stays inside the viewport");
+  await checkSessionColumns(false);
+  await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam-pink"; });
+  await checkSessionColumns(true);
+  await page.screenshot({ path: resolve(artifacts, "mobile-sidebar-pixel.png"), animations: "disabled" });
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
   await page.locator(".sidebar-overlay-backdrop").click({ position: { x: 380, y: 450 } });
   await more.click();
   assert.equal(await home.locator(".home-session").count(), 16);

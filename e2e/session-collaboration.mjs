@@ -144,6 +144,8 @@ try {
   const workerAvatar = inspect(worker.id).locator('[data-agent-avatar="subagent"]');
   const sidebarAvatar = page.locator(`[data-row-key="subagent:${worker.id}"] .session-tree-subagent-avatar`);
   await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam"; });
+  const mainSidebarAvatar = page.locator(`[data-row-key="session:group:${root.id}"] .session-tree-session-avatar`);
+  assert.equal((await avatarAppearance(mainAvatar)).position, (await avatarAppearance(mainSidebarAvatar)).position, "main avatar matches the sidebar");
   const workerAppearance = await avatarAppearance(workerAvatar);
   assert.match(workerAppearance.image, /sunbeam-avatars\.png/);
   assert.equal(workerAppearance.rendering, "pixelated");
@@ -152,11 +154,11 @@ try {
   assert.equal(await railButton.locator('svg').isVisible(), true);
   assert.equal((await avatarAppearance(sidebarAvatar)).position, workerAppearance.position, "child avatar matches the sidebar");
   await page.screenshot({ path: resolve(artifacts, "desktop-sunbeam-avatars.png"), animations: "disabled" });
-  for (const theme of ["light", "dark", "breeze", "sunbeam"]) {
+  for (const theme of ["light", "dark", "breeze", "sunbeam", "sunbeam-pink"]) {
     await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
-    const pixel = theme === "sunbeam";
+    const pixel = theme === "sunbeam" || theme === "sunbeam-pink";
     for (const avatar of [mainAvatar, workerAvatar, detail.locator('[data-agent-avatar="subagent"]')]) {
-      assert.equal((await avatarAppearance(avatar)).image !== "none", pixel, `${theme}: pixel avatars only in Sunbeam`);
+      assert.equal((await avatarAppearance(avatar)).image !== "none", pixel, `${theme}: pixel avatar follows the palette`);
       assert.equal(await avatar.locator("svg").isVisible(), !pixel, `${theme}: original line icon restored`);
       assert.equal((await avatar.boundingBox()).width, pixel ? 32 : 18);
     }

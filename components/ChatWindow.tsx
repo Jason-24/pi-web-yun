@@ -9,7 +9,7 @@ import { splitNoticeLinks, splitNoticeText } from "@/lib/notice-text";
 import { EXTENSION_DIALOG_BASE_WIDTH, fitExtensionDialogWidth } from "@/lib/extension-dialog-fit";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { collapsesProcessDetails, countToolCallBlocks, getDisplayableAssistantBlocks, getTurnAnchors, hasAssistantAnswer, hasTurnRef, isHiddenCustomMessage, splitFinalAssistantBlocks, liveOutputPreview, LIVE_OUTPUT_PREVIEW_LINES, sumCost } from "@/lib/message-display";
-import { subagentAvatarStyle } from "@/lib/theme";
+import { isPixelTheme, robotAvatarStyle, subagentAvatarStyle } from "@/lib/theme";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
 import { getFinalAnswerViews, keepWrittenFiles, type FinalAnswerViews } from "@/lib/turn-views";
 import { formatTurnDuration, getTurnDurationMs } from "@/lib/turn-duration";
@@ -904,7 +904,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
       style={{
         paddingBottom: "env(safe-area-inset-bottom)",
-        ...(session?.relation?.kind === "subagent" ? subagentAvatarStyle(session.id) : undefined),
+        ...(session?.relation?.kind === "subagent"
+          ? subagentAvatarStyle(session.id)
+          : robotAvatarStyle(session?.id ?? sessionIdRef.current ?? "")),
       }}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -1106,10 +1108,11 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 // the run brings the session file's entry (the only kind with an entry id).
                 const turnDurationMs = hasAnchor && entryIds[userIdx] ? getTurnDurationMs(messages, userIdx, endIdx) : undefined;
 
-                const finalViews = getFinalAnswerViews(finalAnswerViewCache, messages[finalAssistantIdx] as AssistantMessage);
+                const finalMessage = messages[finalAssistantIdx] as AssistantMessage;
+                const finalViews = getFinalAnswerViews(finalAnswerViewCache, finalMessage);
                 const finalAnswerMessage = finalViews.answer;
                 const answered = collapsesProcessDetails(finalAnswerMessage);
-                const groupAssistantReply = theme === "sunbeam" && answered;
+                const groupAssistantReply = isPixelTheme(theme);
 
                 const processViews: ReactNode[] = [];
                 // processViews also holds the notice lines of steps that show nothing else.
@@ -1146,7 +1149,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     attachRef: false,
                     keyPrefix: "process",
                     messageOverride: message,
-                    hideAssistantHeader: groupAssistantReply && message.provider === finalAnswerMessage?.provider && message.model === finalAnswerMessage?.model,
+                    hideAssistantHeader: groupAssistantReply && message.provider === finalMessage.provider && message.model === finalMessage.model,
                     showTimestamp: false,
                     withNotices,
                   }));
@@ -1177,6 +1180,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 }
                 const showGroupedReply = groupAssistantReply && processGroup !== null;
 
+                let reply: ReactNode = null;
                 if (finalAnswerMessage) {
                   // Each tool call is stored as its own assistant entry, so the
                   // final answer alone carries no record of what the turn wrote.
@@ -1190,7 +1194,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     }
                   }
                   const writtenFiles = keepWrittenFiles(finalViews, extractTurnWrittenFiles(turnContent, toolResultsMap, messageCwd));
-                  const reply = renderMessage(finalAssistantIdx, {
+                  reply = renderMessage(finalAssistantIdx, {
                     messageOverride: finalAnswerMessage,
                     hideAssistantHeader: showGroupedReply,
                     writtenFiles,
@@ -1198,12 +1202,16 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     turnDurationMs: processViews.length === 0 ? turnDurationMs : undefined,
                     recoverTruncation: endIdx === messages.length && !isStreaming && !hasAssistantAnswer(finalAnswerMessage),
                   });
-                  rendered.push(showGroupedReply ? (
-                    <AssistantReplyGroup key={`assistant-reply-${messageKeys[groupStartIdx]}`} message={finalAnswerMessage} modelNames={modelNames}>
+                }
+                if (showGroupedReply) {
+                  rendered.push(
+                    <AssistantReplyGroup key={`assistant-reply-${messageKeys[groupStartIdx]}`} message={finalMessage} modelNames={modelNames}>
                       {processGroup}
                       {reply}
-                    </AssistantReplyGroup>
-                  ) : reply);
+                    </AssistantReplyGroup>,
+                  );
+                } else if (reply) {
+                  rendered.push(reply);
                 }
                 for (let renderIdx = finalAssistantIdx + 1; renderIdx < endIdx; renderIdx++) {
                   rendered.push(renderMessage(renderIdx));

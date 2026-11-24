@@ -8,7 +8,7 @@ import { ImagePreview } from "./ImagePreview";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
-import { robotAvatarStyle, subagentAvatarStyle } from "@/lib/theme";
+import { subagentAvatarStyle } from "@/lib/theme";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, hasAssistantAnswer, isAssistantAborted, isAssistantTruncated, isEmptyThinkingBlock, isSubagentToolDetails, splitThinkingPieces } from "@/lib/message-display";
@@ -689,7 +689,7 @@ export function AssistantReplyGroup({ message, modelNames, children }: {
 }) {
   const { t } = useI18n();
   return (
-    <div className="assistant-reply-group" style={robotAvatarStyle(`${message.provider ?? ""}/${message.model ?? ""}`)}>
+    <div className="assistant-reply-group">
       <AssistantMessageHeader modelName={message.provider ? getModelDisplayName(message.provider, message.model, modelNames) : t("session.assistant")} />
       {children}
     </div>
@@ -739,7 +739,6 @@ function AssistantMessageView({
 }) {
   const { t } = useI18n();
   const time = showTimestamp ? formatTime(message.timestamp) : null;
-  const avatarStyle = useMemo(() => robotAvatarStyle(`${message.provider ?? ""}/${message.model ?? ""}`), [message.provider, message.model]);
   const blockItems = useMemo(() => (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
     .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming })), [message.content, isStreaming]);
@@ -886,7 +885,7 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 16, ...avatarStyle }}
+      style={{ marginBottom: 16 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -1225,6 +1224,22 @@ function ToolClockTime({ clock }: { clock: ToolClock }) {
   return <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{formatToolDuration(ms)}</span>;
 }
 
+function toolPixelIcon(name: string): "terminal" | "search" | "toolbox" {
+  switch (name.toLowerCase()) {
+    case "bash":
+    case "bash (local)":
+    case "powershell":
+      return "terminal";
+    case "web_search":
+    case "tool_search":
+    case "grep":
+    case "find":
+      return "search";
+    default:
+      return "toolbox";
+  }
+}
+
 // `resultFooter` is drawn under the result, so only while the card is expanded:
 // what it offers acts on the result the reader is looking at.
 // `notRun`: the message ended aborted or in an error, so pi ran none of its
@@ -1280,6 +1295,7 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
   const isError = (result?.isError ?? false)
     || (isApplyPatchToolName(block.toolName) && applyPatchResultHasFailures(result?.details));
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  const canOpenSubagent = subagent !== null && onOpenSubagent !== undefined;
   const subagentTask = block.toolName === "Agent" && typeof subagent?.description === "string" ? subagent.description.trim() : "";
   const headerPreview = subagentTask || (patchLabel ?? (codemode ? codemodeScriptPreview(codemode.code) : toolInputPreview(block.input, resultPatchPath, block.toolName)));
   const codemodeCallCount = codemode ? codemode.calls.length + codemode.omitted : 0;
@@ -1296,7 +1312,7 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
     >
       {/* ── Tool call header ── */}
       <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
-        {subagent && onOpenSubagent && (
+        {canOpenSubagent && (
           <button
             type="button"
             className="tool-call-subagent-open"
@@ -1329,16 +1345,11 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
             textAlign: "left",
           }}
         >
-          {(block.toolName === "bash" || block.toolName === "bash (local)") && (
-            <svg className="tool-call-bash-icon" width="36" height="22" viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true">
-              <path fill="#262d28" d="M1 1h14v1h1v12h-1v1H1v-1H0V2h1z" />
-              <path fill="#9ca892" d="M1 2h14v12H1z" />
-              <path fill="#26352e" d="M2 5h12v8H2z" />
-              <path fill="#e6f0d0" d="M2 3h2v1H2zm3 0h1v1H5z" />
-              <path fill="#b4e378" d="M3 6h1v1h1v1h1v1H5v1H4v1H3V9h1V8H3zm4 4h4v1H7z" />
-            </svg>
+          {!canOpenSubagent && (
+            <span className="tool-call-pixel-icon" data-tool-icon={toolPixelIcon(mcpLabel?.tool ?? block.toolName)} aria-hidden="true" />
           )}
           <span
+            className="tool-call-name"
             title={mcpLabel ? block.toolName : undefined}
             style={{ color: isError ? "#f87171" : "color-mix(in srgb, #16a34a 72%, var(--text))", fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 11, flexShrink: 0 }}
           >

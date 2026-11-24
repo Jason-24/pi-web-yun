@@ -29,7 +29,7 @@ import {
   type SidebarRow,
 } from "@/lib/session-tree";
 import type { SessionInfo } from "@/lib/types";
-import { subagentAvatarStyle } from "@/lib/theme";
+import { robotAvatarStyle, subagentAvatarStyle } from "@/lib/theme";
 import { isPlainActivation, sessionDeepLink } from "@/lib/session-links";
 import { formatRelativeTime, formatShortRelativeTime } from "@/lib/i18n/format";
 import { skillExpansionToCommand } from "@/lib/slash-display";
@@ -444,7 +444,7 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
               const top = offsets[index];
               const height = offsets[index + 1] - top;
               const menuOpen = row.key === activeMenuRowKey;
-              if (row.kind === "session") {
+              if (row.kind === "session" || row.kind === "recent") {
                 return (
                   <SessionRowView
                     key={row.key}
@@ -453,8 +453,8 @@ export function SessionTree(props: SessionTreeProps): ReactNode {
                     top={top}
                     height={height}
                     now={now}
-                    renaming={row.family.root.id === renamingRootId}
-                    confirming={row.family.root.id === confirmDeleteRootId}
+                    renaming={row.kind === "session" && row.family.root.id === renamingRootId}
+                    confirming={row.kind === "session" && row.family.root.id === confirmDeleteRootId}
                     menuOpen={menuOpen}
                     handlers={handlersRef}
                   />
@@ -521,7 +521,7 @@ const SessionRowView = memo(function SessionRowView({
   menuOpen,
   handlers,
 }: {
-  row: SessionRow;
+  row: SessionRow | Extract<SidebarRow, { kind: "recent" }>;
   layout: SidebarLayout;
   top: number;
   height: number;
@@ -532,12 +532,13 @@ const SessionRowView = memo(function SessionRowView({
   handlers: Handlers;
 }) {
   const { locale, t } = useI18n();
-  const { family, context, status } = row;
+  const { family, status } = row;
+  const context = row.kind === "session" ? row.context : "recent";
   const root = family.root;
   const title = sessionRowTitle(root);
   const nowDate = new Date(now);
   const className = [
-    "session-tree-row session-tree-session",
+    row.kind === "recent" ? "session-tree-row session-tree-recent" : "session-tree-row session-tree-session",
     status.selected ? "is-selected" : "",
     status.running ? "is-running" : "",
     context === "archive" ? "is-archived" : "",
@@ -595,13 +596,14 @@ const SessionRowView = memo(function SessionRowView({
   // the suffix that tells it from its source, never the suffix.
   const forkTitle = root.name && root.relation?.kind === "fork" ? splitForkSuffix(root.name) : null;
   const details = root.detailsPending ? "…" : t("sidebar.messagesCount", { count: root.messageCount });
-  const tooltip = `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
+  const tooltip = row.kind === "recent"
+    ? `${title} · ${row.project.name}`
+    : `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
 
   // The right column says the one thing worth knowing: awaiting input, else
   // running, else unread, else when (a pinned row names its project instead).
   // An archived row shows its family's time like every row, never the archive
   // time: an old session archived today read as "just now" (#1351).
-  // Nothing sits before the title, so it gets the room.
   let meta: ReactNode;
   let metaState = "";
   let metaTitle: string | undefined;
@@ -632,6 +634,7 @@ const SessionRowView = memo(function SessionRowView({
 
   const mainContent = (
     <>
+      <span className="session-tree-session-avatar" aria-hidden="true" style={robotAvatarStyle(root.id)} />
       {forkTitle ? (
         <span className="session-tree-title has-fork-suffix">
           <span className="session-tree-title-base">{forkTitle.base}</span>
@@ -656,7 +659,7 @@ const SessionRowView = memo(function SessionRowView({
       style={rowStyle(top, height)}
       data-row-key={row.key}
       onClick={() => handlers.current.onSelectFamily(family)}
-      onContextMenu={(event) => handlers.current.onRowContextMenu(row, event)}
+      onContextMenu={row.kind === "session" ? (event) => handlers.current.onRowContextMenu(row, event) : undefined}
     >
       {status.transient ? (
         // No file yet: a link would open a session no other tab can load.
@@ -672,7 +675,7 @@ const SessionRowView = memo(function SessionRowView({
           className="session-tree-main"
           href={sessionDeepLink(root.id)}
           title={tooltip}
-          aria-current={status.selected ? "true" : undefined}
+          aria-current={status.selected ? (row.kind === "recent" ? "page" : "true") : undefined}
           onClick={(event) => {
             // The row's handler must not select it again, nor on a modified click.
             event.stopPropagation();
@@ -684,7 +687,7 @@ const SessionRowView = memo(function SessionRowView({
           {mainContent}
         </a>
       )}
-      {!status.transient && (
+      {row.kind === "session" && !status.transient && (
         <span className="session-tree-actions">
           {quickAction && (context === "archive" ? (
             <button
@@ -1000,7 +1003,7 @@ const PlainRowView = memo(function PlainRowView({
   handlers,
   onMoreAction,
 }: {
-  row: Exclude<SidebarRow, { kind: "session" | "group" | "archive-group" | "spacer" }>;
+  row: Exclude<SidebarRow, { kind: "session" | "recent" | "group" | "archive-group" | "spacer" }>;
   top: number;
   height: number;
   handlers: Handlers;
@@ -1031,26 +1034,22 @@ const PlainRowView = memo(function PlainRowView({
           </button>
         </>}
       </div>;
-    case "recent":
     case "subagent": {
-      const subagent = row.kind === "subagent";
-      const session = subagent ? row.session : row.family.root;
-      const title = subagent ? subagentTitle(session) : sessionRowTitle(session);
-      return <div className={`session-tree-row session-tree-${row.kind}${row.status.selected ? " is-selected" : ""}`} style={style} data-row-key={row.key}>
+      const { session, status } = row;
+      const title = subagentTitle(session);
+      return <div className={`session-tree-row session-tree-subagent${status.selected ? " is-selected" : ""}`} style={style} data-row-key={row.key}>
         <a className="session-tree-main" href={sessionDeepLink(session.id)}
-          title={`${title} · ${row.project.name}`} aria-current={row.status.selected ? "page" : undefined}
+          title={`${title} · ${row.project.name}`} aria-current={status.selected ? "page" : undefined}
           onClick={(event) => {
-            if (!isPlainActivation(event)) return;
-            if (subagent && !handlers.current.onSelectSubagent) return;
+            if (!isPlainActivation(event) || !handlers.current.onSelectSubagent) return;
             event.preventDefault();
-            if (subagent) handlers.current.onSelectSubagent?.(row.session);
-            else handlers.current.onSelectFamily(row.family);
+            handlers.current.onSelectSubagent(session);
           }}>
-          {subagent && <span className="session-tree-subagent-avatar" aria-hidden="true" style={subagentAvatarStyle(session.id)}>
+          <span className="session-tree-subagent-avatar" aria-hidden="true" style={subagentAvatarStyle(session.id)}>
             <AgentsIcon size={15} />
-          </span>}
+          </span>
           <span className="session-tree-title">{title}</span>
-          <ActivitySummary running={Number(row.status.running)} awaiting={subagent ? Number(row.status.awaiting) : 0} unread={Number(row.status.unread)} t={t} />
+          <ActivitySummary running={Number(status.running)} awaiting={Number(status.awaiting)} unread={Number(status.unread)} t={t} />
         </a>
       </div>;
     }

@@ -1,7 +1,11 @@
 // Run against the existing dev server; every API is an isolated browser fixture.
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { showSidebarFiles } from "./sidebar.mjs";
+import { closeSettings, openSettings } from "./settings.mjs";
+import { toolSettingsFixture } from "./tool-settings-fixture.mjs";
 
 const browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL || "chrome" });
 const base = process.env.E2E_BASE_URL || "http://127.0.0.1:30141";
@@ -23,10 +27,29 @@ const messages = [
     content: [{ type: "text", text: "Retain tool output while closing.\n".repeat(5) },
       { type: "image", mimeType: "image/png", data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=" }] },
 ];
+const pixelModel = { role: "assistant", provider: "fixture", model: "pixel-model", durationMs: 1000 };
+const pixelSteps = [{ type: "thinking", thinking: "Look up the forecast." }];
+const pixelTools = [
+  { type: "toolCall", toolCallId: "pixel-search", toolName: "web_search", input: { queries: ["Shenzhen weather"] } },
+  { type: "toolCall", toolCallId: "pixel-terminal", toolName: "bash", input: { command: "printf 'Forecast ready'" } },
+  { type: "toolCall", toolCallId: "pixel-toolbox", toolName: "extension_tool_with_a_long_name", input: { location: "Shenzhen" } },
+];
+const pixelTurns = [
+  { role: "user", content: "Stop this turn", timestamp: 1793491200000 },
+  { ...pixelModel, content: [...pixelSteps, ...pixelTools], timestamp: 1793491201000 },
+  { ...pixelModel, content: [], stopReason: "aborted", timestamp: 1793491202000 },
+  { role: "user", content: "Finish this turn", timestamp: 1793491203000 },
+  { ...pixelModel, model: "pixel-model-v2", content: [...pixelSteps, { type: "text", text: "Finished reply." }], stopReason: "stop", timestamp: 1793491204000 },
+  { role: "user", content: "Show only the process", timestamp: 1793491205000 },
+  { ...pixelModel, content: pixelSteps, timestamp: 1793491206000 },
+  { role: "user", content: "Reply directly", timestamp: 1793491207000 },
+  { ...pixelModel, model: "pixel-model-v2", content: [{ type: "text", text: "Direct reply." }], stopReason: "stop", timestamp: 1793491208000 },
+];
 try {
   for (const width of [1440, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "no-preference" });
     const page = await context.newPage();
+    let transcript = messages;
     const errors = [];
     page.on("pageerror", error => errors.push(error.stack));
     await context.addInitScript(() => localStorage.setItem("pi-locale", "en"));
@@ -49,8 +72,9 @@ try {
       if (path === "/api/home") return reply({ home: "C:/Users/test" });
       if (path === "/api/worktrees") return reply({ projectRoot: cwd, projectKey: cwd, isGit: false, worktrees: [] });
       if (path === "/api/project-trust") return reply({ requiresTrust: false, trusted: true, mcpServers: [] });
+      if (path === "/api/tools/settings") return reply(toolSettingsFixture);
       if (path === `/api/sessions/${session.id}`) return reply({ sessionId: session.id, info: session, tree: [], leafId: null,
-        context: { messages, entryIds: messages.map((_, i) => `entry-${i}`), hasMore: false, model: null, thinkingLevel: "off" } });
+        context: { messages: transcript, entryIds: transcript.map((_, i) => `entry-${i}`), hasMore: false, model: null, thinkingLevel: "off" } });
       if (path.startsWith("/api/files/") && url.searchParams.get("type") === "list") return reply({ entries:
         path.endsWith("folder") ? Array.from({ length: 8 }, (_, i) => ({ name: `file-${i}.txt`, isDir: false, size: 1 })) : [{ name: "folder", isDir: true }] });
       if (path.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: 'data: {"type":"connected","isStreaming":false}\n\n' });
@@ -122,6 +146,7 @@ try {
     if (await process.count() && await process.getAttribute("aria-expanded") === "false") await process.click();
     const toolToggle = page.locator(".tool-call-toggle");
     await toolToggle.scrollIntoViewIfNeeded();
+    assert.equal(await toolToggle.locator(".tool-call-pixel-icon").isVisible(), false);
     const card = toolToggle.locator("../..");
     const toolBodies = card.locator(":scope > .ui-disclosure");
     assert.equal(await card.locator("img").count(), 1, "result image remains visible while folded");
@@ -148,8 +173,86 @@ try {
       await folder.click();
       await page.getByTitle(`${cwd}/folder/file-0.txt`, { exact: true }).waitFor({ state: "hidden" });
     }
+
+    transcript = pixelTurns;
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.evaluate(() => localStorage.setItem("pi-theme", "sunbeam"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.querySelectorAll(".assistant-reply-group").length === 3);
+    const settings = await openSettings(page);
+    const yellow = settings.getByRole("radio", { name: "Pixel.Yellow", exact: true });
+    const pink = settings.getByRole("radio", { name: "Pixel.Pink", exact: true });
+    assert.equal(await yellow.isChecked(), true, "the saved Pixel palette becomes Pixel.Yellow");
+    assert.equal((await yellow.locator("..").boundingBox()).y, (await pink.locator("..").boundingBox()).y);
+    const avatar = settings.getByRole("radio", { name: "Radio bot", exact: true });
+    await avatar.locator("..").click();
+    await pink.locator("..").click();
+    assert.equal(await pink.isChecked(), true);
+    assert.equal(await avatar.isChecked(), true);
+    await closeSettings(page);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.querySelectorAll(".assistant-reply-group").length === 3);
+    assert.deepEqual(await page.locator("html").evaluate(root => {
+      const style = getComputedStyle(root);
+      return [root.dataset.theme, root.dataset.sunbeamAvatar, style.getPropertyValue("--workspace-chrome").trim(), style.getPropertyValue("--bg-panel").trim()];
+    }), ["sunbeam-pink", "radio", "#fcc6da", "#fff7fa"]);
+
+    if (width < 640) await page.locator(".workspace-sidebar-toggle").click();
+    const sidebarAvatar = page.locator(`[data-row-key="session:group:${session.id}"] .session-tree-session-avatar`);
+    await sidebarAvatar.waitFor({ state: "visible" });
+    const sidebarFrame = await sidebarAvatar.evaluate(el => getComputedStyle(el).backgroundPositionX);
+    if (width < 640) await page.locator(".sidebar-overlay-backdrop").click({ position: { x: 380, y: 450 } });
+
+    const groups = page.locator(".assistant-reply-group");
+    for (const [index, expanded] of [true, false, true].entries()) {
+      const group = groups.nth(index);
+      const header = group.locator(":scope > :first-child");
+      const details = group.getByRole("button", { name: /^Process details/ });
+      const modelName = index === 1 ? "fixture/pixel-model-v2" : "fixture/pixel-model";
+      assert.equal(await header.innerText(), modelName);
+      assert.equal(await group.getByText(modelName, { exact: true }).count(), 1);
+      assert.equal(await group.evaluate(el => getComputedStyle(el, "::before").backgroundPositionX), sidebarFrame);
+      assert.equal(await details.getAttribute("aria-expanded"), String(expanded));
+      assert.ok((await header.boundingBox()).y < (await details.boundingBox()).y);
+      assert.equal(await details.evaluate(el => getComputedStyle(el).borderTopWidth), "1px");
+    }
+    const directReply = page.locator('[data-message-role="assistant"]').filter({ hasText: "Direct reply." });
+    assert.equal(await directReply.evaluate(el => getComputedStyle(el, "::before").backgroundPositionX), sidebarFrame);
+    const stopped = groups.first();
+    const stoppedDetails = stopped.getByRole("button", { name: /^Process details/ });
+    const toolHeaders = stopped.locator(".tool-call-toggle");
+    const iconFrames = ["50%", "0%", "100%"];
+    assert.deepEqual(await toolHeaders.locator(".tool-call-pixel-icon").evaluateAll(icons => icons.map(icon => {
+      const glyph = getComputedStyle(icon, "::before");
+      return [icon.dataset.toolIcon, glyph.backgroundPositionX, glyph.width, glyph.height];
+    })), ["search", "terminal", "toolbox"].map((kind, index) => [kind, iconFrames[index], "24px", "24px"]));
+    const thinking = await stopped.locator(".thinking-step-toggle > span").boundingBox();
+    for (const header of await toolHeaders.all()) {
+      const name = await header.locator(".tool-call-name").boundingBox();
+      const chevron = await header.locator("svg").boundingBox();
+      const row = await header.boundingBox();
+      assert.ok(Math.abs(name.x - thinking.x) < 1, "thinking and tool labels align");
+      assert.ok(chevron.x + chevron.width <= row.x + row.width, "the chevron stays inside its header");
+    }
+    assert.deepEqual(await page.evaluate(async () => {
+      const sprite = new Image();
+      sprite.src = "/icons/pixel-tools.png";
+      await sprite.decode();
+      return [sprite.naturalWidth, sprite.naturalHeight];
+    }), [72, 24]);
+    if (width === 1440) {
+      const artifacts = resolve("test-results/disclosure-motion");
+      await mkdir(artifacts, { recursive: true });
+      await stopped.screenshot({ path: resolve(artifacts, "pixel-tool-icons.png"), animations: "disabled" });
+      await page.screenshot({ path: resolve(artifacts, "pixel-pink-desktop.png"), animations: "disabled" });
+    }
+    await stoppedDetails.click();
+    assert.equal(await stoppedDetails.getAttribute("aria-expanded"), "false");
+    await stopped.getByText("Stopped", { exact: true }).waitFor();
+    await groups.nth(1).getByText("Finished reply.", { exact: true }).waitFor();
+
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${width}px virtual row motion, reduced motion, disclosures, reversal, custom details, tool images, cleanup and drafts`);
+    console.log(`PASS: ${width}px virtual row motion, disclosures, tool images, drafts, and Pixel palette switching, reply layout, avatars and icons`);
     await context.close();
   }
 } finally { await browser.close(); }

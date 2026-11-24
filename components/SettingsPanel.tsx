@@ -6,7 +6,7 @@ import { AgentsIcon } from "./SidebarIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useSurfaceTransition } from "@/hooks/useSurfaceTransition";
 import { useTheme } from "@/hooks/useTheme";
-import { isSunbeamAvatar, SUNBEAM_AVATARS, SUNBEAM_AVATAR_STORAGE_KEY, THEME_OPTIONS, type SunbeamAvatar } from "@/lib/theme";
+import { isPixelTheme, isSunbeamAvatar, SUNBEAM_AVATARS, SUNBEAM_AVATAR_STORAGE_KEY, THEME_OPTIONS, type SunbeamAvatar } from "@/lib/theme";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -319,7 +319,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
             );
           })}
         </div>
-        {preference === "sunbeam" && <SunbeamAvatarPicker />}
+        {isPixelTheme(preference) && <SunbeamAvatarPicker />}
       </section>
 
       <section className="settings-general-section">

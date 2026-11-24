@@ -1853,7 +1853,7 @@
   margin: 12px 0 0;
 }
 
-/* System stays above equal-sized palettes; Breeze and Sunbeam join the last row. */
+/* System stays above equal-sized palettes. The Pixel pair starts its own row. */
 .settings-theme-options {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1873,6 +1873,10 @@
 
 .settings-theme-option[data-system] {
   grid-column: 1 / -1;
+}
+
+.settings-theme-option:has(> input[value="sunbeam"]) {
+  grid-column: 1;
 }
 
 @container (max-width: 380px) {
@@ -1900,7 +1904,7 @@
   background: var(--workspace-backdrop);
 }
 
-.settings-theme-fill[data-theme="sunbeam"] {
+.settings-theme-fill[data-theme^="sunbeam"] {
   background-image:
     linear-gradient(var(--workspace-chrome) 25%, transparent 25%),
     linear-gradient(90deg, var(--workspace-chrome) 13%, var(--workspace-sidebar) 13% 36%, var(--bg) 36%);

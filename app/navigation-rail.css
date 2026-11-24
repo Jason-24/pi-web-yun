@@ -34,11 +34,11 @@
 .workbench-settings-navigation button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); }
 .workbench-settings-navigation .workbench-home-button { margin-bottom: 8px; }
 .workbench-settings-navigation .workbench-home-button[aria-current="page"] { color: var(--text); background: var(--bg-selected); }
-:where([data-theme="sunbeam"]) .workbench-settings-navigation .workbench-view-button { color: var(--text); }
-[data-theme="sunbeam"] .workbench-settings-navigation .workbench-view-button > svg { stroke-width: 1.65; }
+:where([data-theme^="sunbeam"]) .workbench-settings-navigation .workbench-view-button { color: var(--text); }
+[data-theme^="sunbeam"] .workbench-settings-navigation .workbench-view-button > svg { stroke-width: 1.65; }
 .workbench-settings-label { display: none; }
 .workbench-rail-divider { width: 20px; height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
-:is([data-theme="breeze"], [data-theme="sunbeam"]) .workbench-rail-divider {
+:is([data-theme="breeze"], [data-theme^="sunbeam"]) .workbench-rail-divider {
   width: 18px;
   height: 1px;
   margin-block: 6px;
@@ -63,10 +63,10 @@
 .workbench-settings-navigation.is-mobile .workbench-home-button { margin-bottom: 0; }
 .workbench-settings-navigation.is-mobile .workbench-settings-label { display: inline; }
 
-[data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) { gap: 2px; }
-[data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button { width: 38px; height: 38px; }
-[data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button > svg { width: 23px; height: 23px; }
-[data-theme="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > [data-workspace-view="chat"] { margin-bottom: 0; }
+[data-theme^="sunbeam"] .workbench-settings-navigation:not(.is-mobile) { gap: 2px; }
+[data-theme^="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button { width: 38px; height: 38px; }
+[data-theme^="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > .workbench-view-button > svg { width: 23px; height: 23px; }
+[data-theme^="sunbeam"] .workbench-settings-navigation:not(.is-mobile) > [data-workspace-view="chat"] { margin-bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .workbench-settings-navigation button { transition: none; }

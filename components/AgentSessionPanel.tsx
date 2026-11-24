@@ -172,12 +172,12 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(elapsedHours / 24), "day");
 }
 
-function SessionIcon({ session, model }: { session: SessionInfo; model?: SessionUsageSummary["model"] }) {
+function SessionIcon({ session }: { session: SessionInfo }) {
   if (session.relation?.kind === "side") return <AgentKindIcon kind="side" size={18} />;
   const subagent = session.relation?.kind === "subagent";
   return <AgentAvatar subagent={subagent}
     fallback={<AgentKindIcon kind={subagent ? "subagent" : "main"} size={18} />}
-    identity={subagent ? session.id : model ? `${model.provider}/${model.modelId}` : session.id} />;
+    identity={session.id} />;
 }
 
 function memberTitle(session: SessionInfo, t: (key: string) => string, family: readonly SessionInfo[]): string {
@@ -281,7 +281,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
       return <button key={session.id} type="button" data-collaboration-session={session.id}
         className={styles.member} aria-pressed={inspected.id === session.id} aria-controls="collaboration-detail"
         onClick={() => inspect(session.id)} title={[memberTitle(session, t, subagents), model ? `${model.provider}/${model.modelId}` : "", metadata].filter(Boolean).join("\n")}>
-        <span className={styles.memberIcon}><SessionIcon session={session} model={model} /></span>
+        <span className={styles.memberIcon}><SessionIcon session={session} /></span>
         <span className={styles.memberCopy}><strong>{memberTitle(session, t, subagents)}</strong>
           <span>{isMain ? t(session.id === selectedSessionId ? "collaboration.currentChat" : "agentSwitcher.main")
             : metadata || formatRelativeTime(session.modified, locale)}</span>
@@ -328,7 +328,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
         {normalizedQuery && !visible.length && <p className={styles.empty}>{t("agentSwitcher.noMatches")}</p>}
       </nav>
       <section id="collaboration-detail" className={styles.detail} aria-label={t("collaboration.details")}>
-        <header className={styles.detailHeader}><SessionIcon session={inspected} model={detailUsage?.model} /><div><h2>{title}</h2>
+        <header className={styles.detailHeader}><SessionIcon session={inspected} /><div><h2>{title}</h2>
           <p>{typeLabel}{current && <span className={styles.current}>{t("collaboration.currentChat")}</span>}</p></div></header>
         <dl className={styles.fields}>
           <dt>{t("collaboration.status")}</dt><dd className={styles.status}>
