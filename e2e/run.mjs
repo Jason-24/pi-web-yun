@@ -45,12 +45,13 @@ const largeStorageFile = join(project, "large-storage.html");
 writeFileSync(largeStorageFile, largeStorageFixture);
 mkdirSync(sessionDir, { recursive: true });
 const timestamp = "2026-08-23T00:00:00.000Z";
-const LONG = "e2e-long-session";
-const BRANCH = "e2e-branch-session";
-const RICH = "e2e-rich-session";
-const COMPACTED = "e2e-compacted-session";
-const APPEND = "e2e-external-append-session";
-const CODE_BACKGROUND = "e2e-code-background";
+// Use the same UUID format as saved Pi sessions so the real sources route accepts these fixtures.
+const LONG = "00000000-0000-4000-8000-000000000005";
+const BRANCH = "00000000-0000-4000-8000-000000000001";
+const RICH = "00000000-0000-4000-8000-000000000006";
+const COMPACTED = "00000000-0000-4000-8000-000000000003";
+const APPEND = "00000000-0000-4000-8000-000000000004";
+const CODE_BACKGROUND = "00000000-0000-4000-8000-000000000002";
 const text = (i) => `E2E message ${String(i).padStart(4, "0")}`;
 const ids = (start, end) => Array.from({ length: end - start }, (_, i) => `e${start + i}`);
 
@@ -499,7 +500,11 @@ try {
         const pendingHistory = page.waitForRequest((request) => request.url().includes(`/api/sessions/${LONG}/context?`) && new URL(request.url()).searchParams.has("before"));
         await clickSessionRow(text(0));
         await pendingHistory;
-        await page.getByRole("button", { name: "Conversation overview", exact: true }).click();
+        const [sources] = await Promise.all([
+          page.waitForResponse((response) => new URL(response.url()).pathname === `/api/sessions/${LONG}/sources`),
+          page.getByRole("button", { name: "Conversation overview", exact: true }).click(),
+        ]);
+        assert.equal(sources.status(), 200, "The overview loads sources for the long session");
         await page.getByRole("dialog", { name: "Conversation overview", exact: true }).getByRole("button", { name: "Branches", exact: true }).click();
         await page.getByText("E2E alternate history branch", { exact: true }).click();
         await page.locator("[data-entry-id='alternate']:not([data-message-role])").waitFor({ state: "visible" });
