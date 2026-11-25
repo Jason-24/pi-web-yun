@@ -1,0 +1,35 @@
+.container {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+.card {
+  width: 100%;
+  padding: 0 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.card:hover { background: var(--bg-hover); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.heading { display: block; margin-bottom: 8px; color: var(--text); font-size: 13px; font-weight: 550; }
+.row { display: flex; align-items: center; gap: 10px; }
+.avatars { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.avatars > span { display: flex; }
+.flower { flex-shrink: 0; }
+.status { display: flex; flex-wrap: wrap; gap: 2px 4px; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.status > span { white-space: nowrap; }
+.status > span:not(:last-child)::after { content: " ·"; }
+.chevron { flex-shrink: 0; margin-left: auto; color: var(--text-dim); }
+.running { animation: subagent-flower-spin 5s linear infinite; }
+@keyframes subagent-flower-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .running { animation: none; }
+  .card { transition: none; }
+}

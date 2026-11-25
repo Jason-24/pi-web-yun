@@ -55,12 +55,9 @@ try {
   assert.deepEqual(await home.locator(".home-session-title").allTextContents(), sessions.slice(0, 8).map(item => item.name));
 
   const toggle = page.locator(".session-tree-recents-toggle");
-  const subagents = page.locator('[data-row-key="section-subagents"] .session-tree-section-toggle');
   await toggle.scrollIntoViewIfNeeded();
   assert.equal(await toggle.getAttribute("aria-expanded"), "true");
   assert.equal(await toggle.locator(".session-tree-section-count").textContent(), "10");
-  assert.equal(await subagents.locator(".session-tree-section-count").textContent(), "0");
-  assert.equal(await subagents.isDisabled(), true);
   assert.equal(await toggle.evaluate(el => el.lastElementChild.classList.contains("session-tree-chevron")), true);
   assert.equal(await toggle.evaluate(el => el.firstElementChild.tagName.toLowerCase()), "svg");
   assert.equal(await toggle.locator(".session-tree-section-count").innerText(), "10");
@@ -99,7 +96,7 @@ try {
     assert.equal(archiveCount.x + archiveCount.width, project.trailingEdge, "archive counts and session metadata share a trailing edge");
     assert.equal(project.avatarWidth, pixels ? 16 : 0);
     if (pixels) assert.match(project.image, /sunbeam-avatars\.png/);
-    for (const section of [projectToggle, subagents, toggle]) {
+    for (const section of [projectToggle, toggle]) {
       const visible = await section.locator("svg").first().evaluate(svg => ({
         pixel: getComputedStyle(svg.querySelector(".sidebar-icon-pixel")).display !== "none",
         stroke: getComputedStyle(svg.firstElementChild).display !== "none",
@@ -120,7 +117,6 @@ try {
   };
   assert.deepEqual(await columns(projectToggle), await columns(toggle), "project and recent icon, label and arrow columns align");
   await checkCreateProjectColumn();
-  assert.deepEqual(await columns(subagents), { ...await columns(toggle), arrow: undefined }, "empty subagent heading keeps the same icon and text columns");
   const projectArrow = (await columns(projectToggle)).arrow;
   await projectToggle.hover();
   assert.equal((await columns(projectToggle)).arrow, projectArrow, "project actions do not move its arrow");

@@ -4,7 +4,7 @@ export const PANEL_CHANGES_ID = "tool:changes";
 export type PanelTool = "files" | "changes" | "terminal" | "side";
 
 export function isFileWorkspaceTab(id: string | null): boolean {
-  return Boolean(id?.startsWith("file:") || id === PANEL_FILES_ID || id === PANEL_CHANGES_ID);
+  return Boolean(id?.startsWith("file:") || id?.startsWith("subagents:") || id === PANEL_FILES_ID || id === PANEL_CHANGES_ID);
 }
 
 export function panelToolShortcut(event: {

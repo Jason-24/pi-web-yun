@@ -72,10 +72,15 @@ const inspect = id => panel.locator(`[data-collaboration-session="${id}"]`);
 const detail = panel.getByRole("region", { name: "会话详情", exact: true });
 const open = async () => {
   await page.getByRole("button", { name: "会话概览", exact: true }).click();
-  const entry = page.getByRole("dialog", { name: "会话概览", exact: true }).getByRole("button", { name: "会话协作", exact: true });
-  assert.equal(await entry.locator('[data-agent-avatar]').count(), 0);
-  assert.equal(await entry.locator('svg').isVisible(), true);
+  const overview = page.getByRole("dialog", { name: "会话概览", exact: true });
+  const entry = overview.locator('[data-subagent-summary] button');
+  await entry.waitFor();
+  assert.match(await entry.innerText(), /1 运行中/);
+  assert.match(await entry.innerText(), /1 失败/);
+  assert.equal(await overview.getByRole('button', { name: '会话协作', exact: true }).count(), 0);
+  assert.equal(await page.locator('[data-row-key="section-subagents"]').count(), 0);
   await entry.click();
+  await page.locator("#file-panel [data-subagent-list]").getByRole("button", { name: "会话协作", exact: true }).click();
 };
 
 try {
@@ -145,7 +150,6 @@ try {
   await detail.getByRole("heading", { name: worker.name, exact: true }).waitFor();
   assert.match(await inspect(worker.id).innerText(), new RegExp(worker.name));
   const workerAvatar = inspect(worker.id).locator('[data-agent-avatar="subagent"]');
-  const sidebarAvatar = page.locator(`[data-row-key="subagent:${worker.id}"] .session-tree-subagent-avatar`);
   await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam"; });
   const mainSidebarAvatar = page.locator(`[data-row-key="session:group:${root.id}"] .session-tree-session-avatar`);
   assert.equal((await avatarAppearance(mainAvatar)).position, (await avatarAppearance(mainSidebarAvatar)).position, "main avatar matches the sidebar");
@@ -154,7 +158,6 @@ try {
   assert.equal(workerAppearance.rendering, "pixelated");
   assert.deepEqual(workerAppearance, await avatarAppearance(detail.locator('[data-agent-avatar="subagent"]')));
   assert.equal(await workerAvatar.locator("svg").isVisible(), false);
-  assert.equal((await avatarAppearance(sidebarAvatar)).position, workerAppearance.position, "child avatar matches the sidebar");
   await page.screenshot({ path: resolve(artifacts, "desktop-sunbeam-avatars.png"), animations: "disabled" });
   for (const theme of ["light", "dark", "breeze", "sunbeam", "sunbeam-pink"]) {
     await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);

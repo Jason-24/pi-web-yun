@@ -11,6 +11,8 @@ import { placeSidebarMenu } from "./SidebarMenu";
 import { ImagePreview } from "./ImagePreview";
 import { getFileIcon } from "./FileIcons";
 import { AgentsIcon, ConversationBranchesIcon, HistoryIcon } from "./SidebarIcons";
+import type { SessionInfo } from "@/lib/types";
+import { SubagentSummary } from "./SubagentSummary";
 import styles from "./SessionOverview.module.css";
 
 const shortcuts = [
@@ -27,15 +29,18 @@ interface Props {
   covered?: boolean;
   refreshKey: string;
   terminals: TerminalTab[];
+  subagents: readonly SessionInfo[];
+  runningSessionIds: ReadonlySet<string>;
   onOpenView(view: typeof shortcuts[number]["view"]): void;
   onOpenFile(path: string, diff?: boolean): void;
   onOpenTerminal(id: string): void;
+  onOpenSubagents(): void;
 }
 type Remote<T> = { data: T | null; loading: boolean; error: boolean; url?: string };
 const initial = { data: null, loading: true, error: false };
 const PREVIEW_LIMIT = 3;
 
-export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refreshKey, terminals, onOpenView, onOpenFile, onOpenTerminal }: Props) {
+export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refreshKey, terminals, subagents, runningSessionIds, onOpenView, onOpenFile, onOpenTerminal, onOpenSubagents }: Props) {
   const { t } = useI18n();
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -144,11 +149,13 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
           <button ref={closeButton} type="button" className={styles.icon} onClick={() => close()} aria-label={t("overview.close")} title={t("overview.close")}>×</button>
         </header>
         {sessionId && <div className={styles.shortcuts}>
-          {shortcuts.map(({ view, label, Icon }) => <button key={view} type="button" className={styles.shortcut}
+          {shortcuts.filter(({ view }) => view !== "agents" || !subagents.some(session => session.relation?.kind === "subagent")).map(({ view, label, Icon }) => <button key={view} type="button" className={styles.shortcut}
             onClick={() => { close(false); onOpenView(view); }}>
             <Icon size={16} /><span>{t(label)}</span>
           </button>)}
         </div>}
+        {sessionId && <SubagentSummary subagents={subagents} runningSessionIds={runningSessionIds}
+          onOpen={() => { close(false); onOpenSubagents(); }} />}
         <section className={styles.section} aria-label={t("overview.changes")}>
           <div className={styles.heading}><h3>{t("overview.changes")}</h3>{git.data?.isGitRepository && <span className={styles.counts}><span>+{git.data.additions}</span><span>−{git.data.deletions}</span></span>}</div>
           <p className={styles.hint}>{t("overview.changesHint")}</p>

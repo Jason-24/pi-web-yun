@@ -28,6 +28,7 @@ import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
 import { AgentMiniStrip } from "./AgentMiniStrip";
+import { SubagentList } from "./SubagentList";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { DebugPanel, DebugPanelBoundary } from "./DebugPanel";
 import { SessionOverview } from "./SessionOverview";
@@ -705,7 +706,8 @@ export function AppShell() {
   const [panelTabOrder, setPanelTabOrder] = useState<string[]>([]);
   const panelTabs: Tab[] = orderPanelTabs([
     ...fileTabs.map(tab => tab.kind === "files" ? { ...tab, label: translate("workbench.openFile") }
-      : tab.kind === "changes" ? { ...tab, label: translate("panel.changes") } : tab),
+      : tab.kind === "changes" ? { ...tab, label: translate("panel.changes") }
+      : tab.kind === "subagents" ? { ...tab, label: translate("agentSummary.title") } : tab),
     ...terminalTabs.map((tab) => ({
       id: tab.id,
       label: getFileName(tab.cwd) || tab.cwd,
@@ -1787,6 +1789,8 @@ export function AppShell() {
   }, [projectTrustCwd]);
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
+  const subagentListFamily = activeFileTab?.kind === "subagents"
+    ? getSessionFamily(sessionsWithSelection, activeFileTab.sourceSessionId) : null;
   const panelLauncherActive = !activeFileTabId || activeFileTabId === PANEL_LAUNCHER_ID;
   const fileTreeApplicable = filePickerActive || activeFileTab?.kind === "changes" || Boolean(activeFileTab?.filePath);
   const effectiveFileTreeHidden = fileTreeHidden || !fileTreeApplicable;
@@ -2480,6 +2484,7 @@ export function AppShell() {
     key={`${selectedSession?.id ?? "new"}:${selectedSession?.cwd ?? effectiveNewSessionCwd ?? ""}`}
     cwd={selectedSession?.cwd ?? effectiveNewSessionCwd}
     sessionId={selectedSession?.id ?? null} leafId={branchActiveLeafId}
+    subagents={activeSessionFamily?.subagents ?? []} runningSessionIds={runningSessionIds}
     mobile={mobile} covered={mobile && isNarrowMobile && mobileToolbarMoreOpen} refreshKey={`${refreshKey}:${explorerRefreshKey}`} terminals={terminalTabs}
     onOpenView={view => {
       navigateWorkspace(view);
@@ -2487,6 +2492,15 @@ export function AppShell() {
     }}
     onOpenFile={(path, diff) => handleOpenFile(path, getFileName(path), { sourceSessionId: selectedSession?.id ?? null, modeHint: diff ? "diff" : undefined })}
     onOpenTerminal={id => { setExpandedPane("file"); setActiveFileTabId(id); setRightPanelOpen(true); if (isMobile) setSidebarOpen(false); }}
+    onOpenSubagents={() => {
+      if (!activeSessionFamily) return;
+      const id = `subagents:${activeSessionFamily.root.id}`;
+      setFileTabs(tabs => tabs.some(tab => tab.id === id) ? tabs : [...tabs, {
+        id, label: translate("agentSummary.title"), filePath: "", kind: "subagents", sourceSessionId: activeSessionFamily.root.id,
+      }]);
+      selectPanelTab(id);
+      requestAnimationFrame(() => filePanelRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true }));
+    }}
   />;
 
   const renderMainFileToggle = (mobile: boolean) => {
@@ -3262,6 +3276,9 @@ export function AppShell() {
           {panelLauncherActive ? <PanelToolLauncher key={`${selectedSession?.id ?? "new"}:${activeCwd ?? ""}`}
             cwd={selectedSession?.cwd ?? effectiveNewSessionCwd ?? activeCwd} sideDisabled={sideToolDisabled}
             onOpen={openPanelTool} />
+          : activeFileTab?.kind === "subagents" ? <SubagentList subagents={subagentListFamily?.subagents ?? []}
+              runningSessionIds={runningSessionIds} sessionId={selectedSession?.id ?? null}
+              onOpen={handleOpenSubagentTab} onOpenCollaboration={() => { setRightPanelOpen(false); navigateWorkspace("agents"); }} />
           : activeFileTab?.kind === "changes" && activeCwd ? <PanelChanges cwd={activeCwd} refreshKey={explorerRefreshKey}
             onOpenFile={path => handleOpenFile(path, getFileName(path), { modeHint: "diff", sourceSessionId: selectedSession?.id })} />
           : activeFileTab?.filePath ? (

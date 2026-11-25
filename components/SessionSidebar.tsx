@@ -40,7 +40,6 @@ import {
   loadNonGitCwds,
   loadPinnedCollapsed,
   loadRecentsCollapsed,
-  loadSubagentsCollapsed,
   loadShowIgnoredFiles,
   loadSidebarTab,
   rememberCwdGitStatus,
@@ -49,7 +48,6 @@ import {
   saveGroupExpansion,
   savePinnedCollapsed,
   saveRecentsCollapsed,
-  saveSubagentsCollapsed,
   saveShowIgnoredFiles,
   saveSidebarTab,
   type SidebarTab,
@@ -643,7 +641,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   const [moreShown, setMoreShown] = useState<Readonly<Record<string, number>>>({});
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
   const [recentsCollapsed, setRecentsCollapsed] = useState(false);
-  const [subagentsCollapsed, setSubagentsCollapsed] = useState(false);
   // True once the mount effect below has put the browser's folds back: set
   // in the same batch, so a render that has it has them too.
   const [sidebarPrefsRestored, setSidebarPrefsRestored] = useState(false);
@@ -873,7 +870,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     if (Object.keys(groups).length > 0) setGroupExpansion(groups);
     if (loadPinnedCollapsed()) setPinnedCollapsed(true);
     if (loadRecentsCollapsed()) setRecentsCollapsed(true);
-    if (loadSubagentsCollapsed()) setSubagentsCollapsed(true);
     const archiveFolds = loadArchiveCollapsed();
     if (archiveFolds.length > 0) setArchiveCollapsed(archiveFolds);
     if (loadFilesCollapsed()) setFilesCollapsed(true);
@@ -1665,7 +1661,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
   const model = useMemo(() => buildSessionTree({
     sections: true,
     recentsCollapsed,
-    subagentsCollapsed,
     sessions: allSessions,
     uiState,
     runningIds: runningSessionIds,
@@ -1676,7 +1671,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     groupExpansion: shownGroupExpansion,
     moreShown,
     pinnedCollapsed,
-  }), [allSessions, uiState, runningSessionIds, awaitingInputSessionIds, unreadSessionIds, selectedSessionId, currentProject, shownGroupExpansion, moreShown, pinnedCollapsed, recentsCollapsed, subagentsCollapsed]);
+  }), [allSessions, uiState, runningSessionIds, awaitingInputSessionIds, unreadSessionIds, selectedSessionId, currentProject, shownGroupExpansion, moreShown, pinnedCollapsed, recentsCollapsed]);
   const mainRows = useMemo(() => onOpenArchive ? model.rows.filter((row) => row.kind !== "footer-archived") : model.rows, [model.rows, onOpenArchive]);
   // Built while the archive view is rendered, its way out included: it
   // leaves as it was, not empty.
@@ -2186,7 +2181,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     openRevealFocusRef.current = null;
     const location = locateSessionRow({
       sections: true,
-      subagentsCollapsed,
       sessions: allSessions,
       uiState,
       runningIds: runningSessionIds,
@@ -2213,7 +2207,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
       block: "nearest",
       ...(focus?.sessionId === sessionId ? { takeFocusFrom: focus.takeFocusFrom } : {}),
     });
-  }, [selectedSessionId, allSessions, uiState, runningSessionIds, shownGroupExpansion, groupExpansion, pinnedCollapsed, subagentsCollapsed, loading, uiStateLoaded, sidebarPrefsRestored, mainTreeShown, saveGroupChoices]);
+  }, [selectedSessionId, allSessions, uiState, runningSessionIds, shownGroupExpansion, groupExpansion, pinnedCollapsed, loading, uiStateLoaded, sidebarPrefsRestored, mainTreeShown, saveGroupChoices]);
 
   // Fork (the row menu's F): the server copies the family's current branch
   // into a new session beside it (POST /api/sessions/[id]/fork) and leaves
@@ -2607,12 +2601,6 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     saveRecentsCollapsed(next);
   };
 
-  const handleToggleSubagents = () => {
-    const next = !subagentsCollapsed;
-    setSubagentsCollapsed(next);
-    saveSubagentsCollapsed(next);
-  };
-
   // Everything that goes to the files goes through here: the files tab, or
   // the files section below the sessions, opened (and saved so) if folded.
   // The focus follows once they show.
@@ -2968,13 +2956,11 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
     confirmDeleteRootId,
     activeMenuRowKey,
     onSelectFamily: handleSelectFamily,
-    onSelectSubagent: handleSelectSessionFromList,
     onToggleGroup: handleToggleGroup,
     onShowMore: handleShowMore,
     onShowLess: handleShowLess,
     onTogglePinned: handleTogglePinned,
     onToggleRecents: handleToggleRecents,
-    onToggleSubagents: handleToggleSubagents,
     onArchiveFamily: archiveFamily,
     onRestoreFamily: restoreFamily,
     onOpenRowMenu: openRowMenu,
