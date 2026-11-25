@@ -3380,7 +3380,7 @@ export function SessionSidebar({ onOpenArchive, archiveActive = false, onArchive
         {onOpenArchive && <button type="button" className="sidebar-archive-entry" data-archive-entry=""
           aria-label={t("sidebar.archivedCount", { count: archivedCount })} aria-current={archiveActive ? "page" : undefined}
           onClick={() => openArchiveView()}>
-          <ArchiveIcon size={15} /><span>{t("sidebar.archived")}</span><span className="sidebar-archive-entry-count" aria-hidden="true">{archivedCount}</span>
+          <ArchiveIcon size={14} /><span>{t("sidebar.archived")}</span><span className="sidebar-archive-entry-count" aria-hidden="true">{archivedCount}</span>
         </button>}
       </div>
 

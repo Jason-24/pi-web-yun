@@ -2481,6 +2481,10 @@ export function AppShell() {
     cwd={selectedSession?.cwd ?? effectiveNewSessionCwd}
     sessionId={selectedSession?.id ?? null} leafId={branchActiveLeafId}
     mobile={mobile} covered={mobile && isNarrowMobile && mobileToolbarMoreOpen} refreshKey={`${refreshKey}:${explorerRefreshKey}`} terminals={terminalTabs}
+    onOpenView={view => {
+      navigateWorkspace(view);
+      requestAnimationFrame(() => focusIfLost(document, workspacePanelRef.current));
+    }}
     onOpenFile={(path, diff) => handleOpenFile(path, getFileName(path), { sourceSessionId: selectedSession?.id ?? null, modeHint: diff ? "diff" : undefined })}
     onOpenTerminal={id => { setExpandedPane("file"); setActiveFileTabId(id); setRightPanelOpen(true); if (isMobile) setSidebarOpen(false); }}
   />;
@@ -2750,7 +2754,7 @@ export function AppShell() {
             <>
               {renderProjectTrustWarning(false)}
               {currentView === "chat" && renderDebugButton(false)}
-              {currentView === "chat" && renderSessionOverview(false)}
+              {(currentView === "chat" || selectedSession) && renderSessionOverview(false)}
             </>
           )}
           {!isMobile && renderMainFileToggle(false)}

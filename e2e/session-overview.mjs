@@ -137,6 +137,18 @@ try {
       assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
       assert.equal(await input.inputValue(), "Preserve this draft");
 
+      for (const [view, name] of [["agents", "Session collaboration"], ["branches", "Branches"], ["history", "Full history"]]) {
+        await open();
+        await panel.getByRole("button", { name, exact: true }).press("Enter");
+        await panel.waitFor({ state: "hidden" });
+        const destination = page.locator(`[data-workspace-page="${view}"]`);
+        await destination.waitFor();
+        await page.waitForFunction(view => document.activeElement?.getAttribute("data-workspace-page") === view, view);
+        await page.keyboard.press("Escape");
+        await destination.waitFor({ state: "hidden" });
+        assert.equal(await input.inputValue(), "Preserve this draft");
+      }
+
       await open();
       await panel.getByRole("button", { name: /change-0\.ts/ }).click();
       await page.locator("#file-panel").getByRole("tab", { name: "change-0.ts", exact: true }).waitFor();

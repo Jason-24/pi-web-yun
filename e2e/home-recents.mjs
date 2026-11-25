@@ -67,6 +67,8 @@ try {
   const projectToggle = page.locator(".session-tree-group > .session-tree-group-toggle").first();
   const projectRow = page.locator(`[data-row-key="session:group:${sessions[0].id}"]`);
   const recentRow = page.locator(`[data-row-key="recent:${sessions[0].id}"]`);
+  const createProject = page.locator(".session-tree-section-action");
+  const archiveEntry = page.locator(".sidebar-archive-entry");
   const sessionColumns = row => row.evaluate(el => {
     const box = el.getBoundingClientRect();
     const avatar = el.querySelector(".session-tree-session-avatar");
@@ -91,17 +93,33 @@ try {
     await page.mouse.move(0, 0);
     const project = await sessionColumns(projectRow);
     assert.deepEqual(await sessionColumns(recentRow), project, "project and recent rows share the title, avatar and time columns");
+    const projectLabel = await projectToggle.locator(".session-tree-group-name").boundingBox();
+    assert.ok(project.title > projectLabel.x, "session titles are indented under their project");
+    const archiveCount = await archiveEntry.locator(".sidebar-archive-entry-count").boundingBox();
+    assert.equal(archiveCount.x + archiveCount.width, project.trailingEdge, "archive counts and session metadata share a trailing edge");
     assert.equal(project.avatarWidth, pixels ? 16 : 0);
     if (pixels) assert.match(project.image, /sunbeam-avatars\.png/);
+    for (const section of [projectToggle, subagents, toggle]) {
+      const visible = await section.locator("svg").first().evaluate(svg => ({
+        pixel: getComputedStyle(svg.querySelector(".sidebar-icon-pixel")).display !== "none",
+        stroke: getComputedStyle(svg.firstElementChild).display !== "none",
+      }));
+      assert.deepEqual(visible, { pixel: pixels, stroke: !pixels }, "section icons follow the active palette");
+    }
     assert.equal(await recentRow.locator(".session-tree-actions").count(), 0, "the shortcut keeps its single session link");
   };
   const columns = async button => button.evaluate(el => {
     const icon = el.firstElementChild.getBoundingClientRect();
     const label = el.querySelector(".session-tree-group-name, .session-tree-section-label").getBoundingClientRect();
     const arrow = el.querySelector(".session-tree-disclosure-chevron")?.getBoundingClientRect();
-    return { icon: Math.round(icon.x), label: Math.round(label.x), arrow: arrow && Math.round(arrow.x) };
+    return { icon: Math.round(icon.x), label: Math.round(label.x), arrow: arrow && Math.round(arrow.x + arrow.width / 2) };
   });
+  const checkCreateProjectColumn = async () => {
+    const create = await createProject.boundingBox();
+    assert.equal(Math.round(create.x + create.width / 2), (await columns(projectToggle)).arrow, "create button and disclosure chevrons share a column");
+  };
   assert.deepEqual(await columns(projectToggle), await columns(toggle), "project and recent icon, label and arrow columns align");
+  await checkCreateProjectColumn();
   assert.deepEqual(await columns(subagents), { ...await columns(toggle), arrow: undefined }, "empty subagent heading keeps the same icon and text columns");
   const projectArrow = (await columns(projectToggle)).arrow;
   await projectToggle.hover();
@@ -147,6 +165,7 @@ try {
   await toggle.waitFor({ state: "visible" });
   await page.screenshot({ path: resolve(artifacts, "mobile-sidebar-dark.png"), animations: "disabled" });
   assert.deepEqual(await columns(projectToggle), await columns(toggle), "mobile disclosure columns align");
+  await checkCreateProjectColumn();
   assert.ok((await toggle.boundingBox()).x >= 0, "mobile disclosure stays inside the viewport");
   await checkSessionColumns(false);
   await page.evaluate(() => { document.documentElement.dataset.theme = "sunbeam-pink"; });

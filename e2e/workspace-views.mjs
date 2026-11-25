@@ -126,6 +126,11 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
       return page.locator('[data-resize-handle="sidebar"]').dblclick();
     };
     const view = id => nav.locator(`[data-workspace-view="${id}"]`);
+    const sessionViews = { agents: "会话协作", branches: "分支", history: "完整历史" };
+    const openSessionView = async id => {
+      await page.getByRole("button", { name: "会话概览", exact: true }).click();
+      await page.getByRole("dialog", { name: "会话概览", exact: true }).getByRole("button", { name: sessionViews[id], exact: true }).click();
+    };
     const input = page.locator(".workspace-chat-view textarea").first();
     await input.waitFor({ timeout: 90000 });
     const costBadge = page.locator(".composer-session-stat-cost");
@@ -268,14 +273,16 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await scroller.evaluate(element => { element.scrollTop = 120; });
     const scrollPosition = await scroller.evaluate(element => element.scrollTop);
     const positions = await nav.locator("button").evaluateAll(elements => elements.map(el => ({ view: el.dataset.workspaceView ?? el.dataset.workspaceAction, y: el.getBoundingClientRect().y })));
-    // Seven view entries, plus the update, companion and Settings controls.
-    assert.equal(positions.length, 10);
+    // Four view entries, plus the update, companion and Settings controls.
+    assert.equal(positions.length, 7);
     const originalReads = sessionReads;
     const checkEmbedded = async id => {
-      await view(id).click();
+      if (Object.hasOwn(sessionViews, id)) await openSessionView(id);
+      else await view(id).click();
       const panel = page.locator(`[data-workspace-page="${id}"]`);
       await panel.waitFor();
-      assert.equal(await view(id).getAttribute("aria-current"), "page");
+      if (Object.hasOwn(sessionViews, id)) assert.equal(await view(id).count(), 0);
+      else assert.equal(await view(id).getAttribute("aria-current"), "page");
       const rects = await panel.evaluate(element => ({ panel: element.getBoundingClientRect().toJSON(), host: element.closest(".workspace-content").getBoundingClientRect().toJSON(), position: getComputedStyle(element).position }));
       assert.equal(rects.position, "static");
       assert.ok(Math.abs(rects.panel.x - rects.host.x) < 1);
@@ -469,22 +476,22 @@ export async function checkWorkspaceViews({ browser, base, artifacts }) {
     await toggleSidebar();
     await view("home").click();
     await page.locator(".home-view").waitFor();
-    assert.equal(await nav.locator("button").count(), 10);
+    assert.equal(await nav.locator("button").count(), 7);
     await view("chat").click();
     await page.waitForURL(`**/?session=${session.id}`);
     await input.waitFor();
-    await view("branches").click();
+    await openSessionView("branches");
     await page.locator(".session-tree-session").filter({ hasText: other.name }).click();
     await page.waitForURL(`**/?session=${other.id}`);
     assert.equal(await view("chat").getAttribute("aria-current"), "page");
-    await view("branches").click();
+    await openSessionView("branches");
     await page.getByText("此会话没有分支", { exact: true }).waitFor();
     await page.getByText("在对话中找到一条你的消息，选择“从此处编辑”并发送修改后的消息，即可创建新的会话分支。", { exact: true }).waitFor();
     await page.screenshot({ path: resolve(artifacts, "workspace-branches-empty.png") });
     await view("home").click();
     await page.locator(".home-view").waitFor();
     await page.waitForURL("**/?home=1");
-    await view("branches").click();
+    await openSessionView("branches");
     await page.waitForURL(`**/?session=${other.id}`);
     await page.getByText("此会话没有分支", { exact: true }).waitFor();
     assert.equal(await input.count(), 1, "opening a session inspector from Home remounts its conversation");

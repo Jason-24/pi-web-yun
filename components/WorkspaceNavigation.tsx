@@ -2,7 +2,7 @@
 
 import type { ReactNode, Ref } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { AgentsIcon, HistoryIcon } from "./SidebarIcons";
+import { HistoryIcon } from "./SidebarIcons";
 import { PetWidget, type PetWidgetProps } from "./PetWidget";
 import { AppUpdateButton } from "./AppUpdateButton";
 
@@ -16,7 +16,6 @@ export const WORKSPACE_VIEW_LABELS: Record<WorkspaceView, string> = {
 };
 
 function ViewIcon({ view }: { view: WorkspaceView }) {
-  if (view === "agents") return <AgentsIcon size={20} strokeWidth={1.7} />;
   if (view === "history") return <HistoryIcon size={20} />;
   let shape: ReactNode;
   switch (view) {
@@ -31,9 +30,6 @@ function ViewIcon({ view }: { view: WorkspaceView }) {
       break;
     case "tools":
       shape = <><rect x="3.5" y="7.5" width="17" height="13" rx="2" /><path d="M9 7.5v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3.5 13h17M10.5 13v1.5h3V13" /></>;
-      break;
-    case "branches":
-      shape = <><path d="M14.5 7V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2v2l2.5-2" /><path d="M11 9h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2v2.5L16.5 18H11a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z" /><path d="M12 13.5h5.5" /></>;
       break;
     case "settings":
       shape = <><path d="M4 7h10M18 7h2M4 17h2m4 0h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>;
@@ -61,15 +57,15 @@ interface Props {
 
 export function WorkspaceNavigation({ petSessions, onPetSelectSession, activeView, conversationAvailable, inspectionAvailable, sessionAvailable, mobile, covered = false, homeButtonRef, onHomeHover, onHomeLeave, onNavigate }: Props) {
   const { t } = useI18n();
-  const items: (WorkspaceView | "pet" | "update" | "project-divider" | "session-divider")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
-    : ["home", "chat", "project-divider", "system", "tools", "session-divider", "agents", "branches", "history", "update", "pet", "settings"];
+  const items: (WorkspaceView | "pet" | "update" | "project-divider")[] = mobile ? ["home", "chat", "history", "update", "pet", "settings"]
+    : ["home", "chat", "project-divider", "system", "tools", "update", "pet", "settings"];
   return <nav className={`workbench-settings-navigation${mobile ? " is-mobile" : ""}`} aria-label={t("navigation.workspace")} inert={covered}>
     {items.map((view) => {
-      if (view === "project-divider" || view === "session-divider") return <div key={view} className="workbench-rail-divider" aria-hidden="true" />;
+      if (view === "project-divider") return <div key={view} className="workbench-rail-divider" aria-hidden="true" />;
       if (view === "update") return <AppUpdateButton key="update" mobile={mobile} />;
       if (view === "pet") return <PetWidget key="pet" sessions={petSessions} onSelectSession={onPetSelectSession} />;
       const disabled = view === "chat" ? !conversationAvailable : view === "system" || view === "tools" ? !inspectionAvailable
-        : view === "history" || view === "agents" || view === "branches" ? !sessionAvailable : false;
+        : view === "history" && !sessionAvailable;
       const label = t(WORKSPACE_VIEW_LABELS[view]);
       return <button key={view} type="button" className={`workbench-view-button${view === "home" ? " workbench-home-button" : ""}`}
         ref={view === "home" ? homeButtonRef : undefined}

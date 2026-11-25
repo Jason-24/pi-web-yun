@@ -45,9 +45,26 @@ const pixelTurns = [
   { role: "user", content: "Reply directly", timestamp: 1793491207000 },
   { ...pixelModel, model: "pixel-model-v2", content: [{ type: "text", text: "Direct reply." }], stopReason: "stop", timestamp: 1793491208000 },
 ];
+async function checkPixelHeaderRule(page) {
+  const screenshot = await page.screenshot({ scale: "device" });
+  const { colors, chrome } = await page.evaluate(async (base64) => {
+    const bytes = Uint8Array.from(atob(base64), (byte) => byte.charCodeAt(0));
+    const image = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+    const canvas = new OffscreenCanvas(image.width, image.height).getContext("2d");
+    canvas.drawImage(image, 0, 0);
+    const header = document.querySelector(".workspace-chat-header").getBoundingClientRect();
+    const seam = Math.round(header.left * devicePixelRatio);
+    const ruleY = Math.floor((header.bottom - 1) * devicePixelRatio);
+    const colorAt = (x, y) => Array.from(canvas.getImageData(x, y, 1, 1).data);
+    return { colors: [-8, -1, 0, 8].map((offset) => colorAt(seam + offset, ruleY)), chrome: colorAt(seam + 8, ruleY - 3) };
+  }, screenshot.toString("base64"));
+  assert.notDeepEqual(colors[0], chrome, "the Pixel header has a bottom rule");
+  for (const color of colors) assert.deepEqual(color, colors[0], "the rule meets across the sidebar boundary at fractional display scale");
+}
+
 try {
   for (const width of [1440, 390]) {
-    const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "no-preference" });
+    const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: width > 640 ? 1.25 : 1, reducedMotion: "no-preference" });
     const page = await context.newPage();
     let transcript = messages;
     const errors = [];
@@ -183,11 +200,13 @@ try {
     const yellow = settings.getByRole("radio", { name: "Pixel.Yellow", exact: true });
     const pink = settings.getByRole("radio", { name: "Pixel.Pink", exact: true });
     assert.equal(await yellow.isChecked(), true, "the saved Pixel palette becomes Pixel.Yellow");
+    if (width > 640) await checkPixelHeaderRule(page);
     assert.equal((await yellow.locator("..").boundingBox()).y, (await pink.locator("..").boundingBox()).y);
     const avatar = settings.getByRole("radio", { name: "Radio bot", exact: true });
     await avatar.locator("..").click();
     await pink.locator("..").click();
     assert.equal(await pink.isChecked(), true);
+    if (width > 640) await checkPixelHeaderRule(page);
     assert.equal(await avatar.isChecked(), true);
     await closeSettings(page);
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -220,12 +239,14 @@ try {
     assert.equal(await directReply.evaluate(el => getComputedStyle(el, "::before").backgroundPositionX), sidebarFrame);
     const stopped = groups.first();
     const stoppedDetails = stopped.getByRole("button", { name: /^Process details/ });
+    const thinkingCard = stopped.locator(".thinking-step");
+    assert.equal((await thinkingCard.boundingBox()).x, (await stoppedDetails.boundingBox()).x, "details and cards share the same starting edge");
     const toolHeaders = stopped.locator(".tool-call-toggle");
     const iconFrames = ["50%", "0%", "100%"];
     assert.deepEqual(await toolHeaders.locator(".tool-call-pixel-icon").evaluateAll(icons => icons.map(icon => {
       const glyph = getComputedStyle(icon, "::before");
       return [icon.dataset.toolIcon, glyph.backgroundPositionX, glyph.width, glyph.height];
-    })), ["search", "terminal", "toolbox"].map((kind, index) => [kind, iconFrames[index], "24px", "24px"]));
+    })), ["search", "terminal", "toolbox"].map((kind, index) => [kind, iconFrames[index], "20px", "20px"]));
     const thinking = await stopped.locator(".thinking-step-toggle > span").boundingBox();
     for (const header of await toolHeaders.all()) {
       const name = await header.locator(".tool-call-name").boundingBox();

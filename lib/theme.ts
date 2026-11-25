@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-// Settings shows System above compact palette swatches, with the Pixel pair together.
+// Shared theme order for the toolbar menu. The appearance grid puts Breeze beside System.
 // The rows line up by hue: each light theme sits above its dark counterpart; Rose and Slate have none.
 export const THEME_OPTIONS = [
   { id: "auto", label: "settings.themeSystem", scheme: null },

@@ -122,6 +122,11 @@ function SunbeamAvatarPicker() {
   );
 }
 
+const APPEARANCE_THEME_OPTIONS = [
+  ...THEME_OPTIONS.filter(({ id }) => id === "auto" || id === "breeze"),
+  ...THEME_OPTIONS.filter(({ id }) => id !== "auto" && id !== "breeze"),
+];
+
 function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange }: Pick<Props, "sessionId" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange">) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
@@ -282,7 +287,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
       <section className="settings-general-section">
         <h3 className="settings-general-heading">{t("settings.appearance")}</h3>
         <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
-          {THEME_OPTIONS.map((option) => {
+          {APPEARANCE_THEME_OPTIONS.map((option) => {
             const selected = preference === option.id;
             return (
               <label

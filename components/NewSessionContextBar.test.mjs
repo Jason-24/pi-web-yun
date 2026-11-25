@@ -48,7 +48,7 @@ test("the bar shows the project's name and the worktree's branch as two menu but
   assert.equal((html.match(/New session location/g) ?? []).length, 1);
   // The project: a 12px folder icon, its name in code type, a chevron; the
   // full path is the tooltip (and the menu's rows), never the button's text.
-  assert.match(html, /<button type="button" class="project-picker-button is-project" title="\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg width="12" height="12"[^>]*class="project-picker-icon" aria-hidden="true"><path d="M3 8a2[^"]*"><\/path><\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg width="9" height="9"[^>]*class="project-picker-chevron sidebar-icon-down" aria-hidden="true">/);
+  assert.match(html, /<button type="button" class="project-picker-button is-project" title="\/work\/app" aria-haspopup="menu" aria-expanded="false"><svg width="12" height="12"[^>]*class="project-picker-icon" aria-hidden="true"><path d="M3 8a2[^"]*"><\/path>(?:<path class="sidebar-icon-pixel"[^>]*display="none"><\/path>)?<\/svg><span class="project-picker-name"><span class="project-picker-leaf">app<\/span><\/span><svg width="9" height="9"[^>]*class="project-picker-chevron sidebar-icon-down" aria-hidden="true">/);
   assert.doesNotMatch(html, /project-picker-path"><span>\/work\/app</);
   // The worktree: the branch icon (the accent for a linked checkout), the
   // branch cut at its left, a chevron; no "main" note and no count.

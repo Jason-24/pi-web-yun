@@ -89,7 +89,8 @@ async function check(mobile) {
     await waitValue("/skill:writing 第一段\n请润色  保留结尾");
     assert.equal(await input.evaluate(el => el.value.slice(el.selectionStart)), " 保留结尾");
     if (!mobile) {
-      await page.locator('[data-workspace-view="history"]').click();
+      await page.getByRole("button", { name: "Conversation overview", exact: true }).click();
+      await page.getByRole("dialog", { name: "Conversation overview", exact: true }).getByRole("button", { name: "Full history", exact: true }).click();
       await page.locator('[data-workspace-view="chat"]').click();
     }
     await waitValue("/skill:writing 第一段\n请润色  保留结尾");

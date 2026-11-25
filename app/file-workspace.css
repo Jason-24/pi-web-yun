@@ -232,6 +232,11 @@
   [data-theme^="sunbeam"] .file-tab-strip { padding-block: 5px; }
   [data-theme^="sunbeam"] .file-tab { border-radius: 6px; }
 }
+@media (min-width: 960px) {
+  [data-theme^="sunbeam"] .workspace-main:not(.has-unified-header) #file-panel > .file-panel-header {
+    border-bottom-color: transparent !important;
+  }
+}
 
 /* Expanded panes share the main content area while their header entries remain
    available. Keep both content trees mounted, at the same full-area geometry. */

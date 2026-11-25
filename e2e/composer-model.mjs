@@ -83,13 +83,16 @@ try {
   assert.match(await tools.getAttribute("title"), /默认工具/);
   assert.deepEqual(await tools.evaluate(el => [getComputedStyle(el).borderWidth, getComputedStyle(el).backgroundColor]), ["0px", "rgba(0, 0, 0, 0)"]);
   await page.locator(".chat-composer-card").screenshot({ path: resolve(artifacts, "composer-footer.png") });
-  const agents = page.locator('[data-workspace-view="agents"]');
+  await page.getByRole("button", { name: "会话概览", exact: true }).click();
+  const overview = page.getByRole("dialog", { name: "会话概览", exact: true });
+  const agents = overview.getByRole("button", { name: "会话协作", exact: true });
   assert.equal(await agents.locator("svg circle").count(), 1, "the Agents control shows the shared collaborator icon");
-  assert.equal(await agents.locator("svg path").count(), 1);
-  for (const view of ["tools", "history"]) {
-    assert.equal(await agents.evaluate(el => getComputedStyle(el).color), await page.locator(`[data-workspace-view="${view}"]`).evaluate(el => getComputedStyle(el).color), "rail icons use the same theme color");
+  assert.equal(await agents.locator('svg path:not([display="none"])').count(), 1);
+  for (const name of ["分支", "完整历史"]) {
+    assert.equal(await agents.evaluate(el => getComputedStyle(el).color), await overview.getByRole("button", { name, exact: true }).evaluate(el => getComputedStyle(el).color), "overview shortcuts use the same theme color");
   }
   await agents.screenshot({ path: resolve(artifacts, "agents-icon.png") });
+  await page.keyboard.press("Escape");
   await trigger.click();
   await card.waitFor();
   assert.equal(await slider.getAttribute("max"), "2");

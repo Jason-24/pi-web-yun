@@ -70,7 +70,13 @@ page.on("pageerror", error => errors.push(error.message));
 const panel = page.locator('[data-workspace-page="agents"]');
 const inspect = id => panel.locator(`[data-collaboration-session="${id}"]`);
 const detail = panel.getByRole("region", { name: "会话详情", exact: true });
-const open = () => page.locator('[data-workspace-view="agents"]:visible').click();
+const open = async () => {
+  await page.getByRole("button", { name: "会话概览", exact: true }).click();
+  const entry = page.getByRole("dialog", { name: "会话概览", exact: true }).getByRole("button", { name: "会话协作", exact: true });
+  assert.equal(await entry.locator('[data-agent-avatar]').count(), 0);
+  assert.equal(await entry.locator('svg').isVisible(), true);
+  await entry.click();
+};
 
 try {
   await page.goto(`${base}/?session=${root.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
@@ -83,9 +89,6 @@ try {
     const css = getComputedStyle(el);
     return { image: css.backgroundImage, position: css.backgroundPosition, rendering: css.imageRendering };
   });
-  const railButton = page.locator('[data-workspace-view="agents"]');
-  assert.equal(await railButton.locator('[data-agent-avatar]').count(), 0);
-  assert.equal(await railButton.locator('svg').count(), 1);
   const mainAvatar = inspect(root.id).locator('[data-agent-avatar="main"]');
   assert.deepEqual(await avatarAppearance(mainAvatar), await avatarAppearance(detail.locator('[data-agent-avatar="main"]')));
   assert.equal((await avatarAppearance(mainAvatar)).image, "none");
@@ -151,7 +154,6 @@ try {
   assert.equal(workerAppearance.rendering, "pixelated");
   assert.deepEqual(workerAppearance, await avatarAppearance(detail.locator('[data-agent-avatar="subagent"]')));
   assert.equal(await workerAvatar.locator("svg").isVisible(), false);
-  assert.equal(await railButton.locator('svg').isVisible(), true);
   assert.equal((await avatarAppearance(sidebarAvatar)).position, workerAppearance.position, "child avatar matches the sidebar");
   await page.screenshot({ path: resolve(artifacts, "desktop-sunbeam-avatars.png"), animations: "disabled" });
   for (const theme of ["light", "dark", "breeze", "sunbeam", "sunbeam-pink"]) {
@@ -162,7 +164,6 @@ try {
       assert.equal(await avatar.locator("svg").isVisible(), !pixel, `${theme}: original line icon restored`);
       assert.equal((await avatar.boundingBox()).width, pixel ? 32 : 18);
     }
-    assert.equal(await railButton.locator('[data-agent-avatar]').count(), 0);
   }
   await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
   await page.screenshot({ path: resolve(artifacts, "desktop-light.png") });

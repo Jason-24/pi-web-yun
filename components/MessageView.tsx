@@ -1303,7 +1303,7 @@ function ToolCallBlock({ block, result, notRun, duration, clock, onOpenSubagent,
   return (
     <div
       style={{
-        borderRadius: 9,
+        borderRadius: "var(--step-card-radius, 9px)",
         overflow: "hidden",
         fontSize: 12,
         border: isError ? "1px solid rgba(248,113,113,0.45)" : "1px solid var(--border)",

@@ -59,6 +59,14 @@ try {
       const input = page.locator(".chat-input-textarea");
       await input.fill("接下来，我们从哪里开始？");
       const settings = await openSettings(page);
+      const tile = name => settings.getByRole("radio", { name, exact: true }).locator("..").boundingBox();
+      const [system, breeze, zenburn, yellow, pink] = await Promise.all([
+        tile("System"), tile("Breeze"), tile("Zenburn"), tile("Pixel.Yellow"), tile("Pixel.Pink"),
+      ]);
+      assert.equal(system.y, breeze.y, "System and Breeze share the first row");
+      assert.ok(breeze.x > system.x && breeze.x + breeze.width === pink.x + pink.width);
+      assert.equal(zenburn.y, yellow.y, "the last palette row includes Pixel.Yellow");
+      assert.equal(yellow.y, pink.y, "the Pixel cards stay together");
       const choose = async name => {
         const radio = settings.getByRole("radio", { name, exact: true });
         await radio.locator("..").click();

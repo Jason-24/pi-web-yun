@@ -1853,7 +1853,7 @@
   margin: 12px 0 0;
 }
 
-/* System stays above equal-sized palettes. The Pixel pair starts its own row. */
+/* System shares the first row with Breeze, which takes one column. */
 .settings-theme-options {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1872,11 +1872,7 @@
 }
 
 .settings-theme-option[data-system] {
-  grid-column: 1 / -1;
-}
-
-.settings-theme-option:has(> input[value="sunbeam"]) {
-  grid-column: 1;
+  grid-column: 1 / -2;
 }
 
 @container (max-width: 380px) {

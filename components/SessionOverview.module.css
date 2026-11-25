@@ -11,6 +11,31 @@
 .header span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted); }
 .icon { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font-size: 22px; cursor: pointer; }
 .icon:hover { background: var(--bg-hover); color: var(--text); }
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+.shortcut > svg { flex: none; color: var(--text-muted); }
+.shortcut > span { min-width: 0; overflow-wrap: anywhere; }
+.shortcut:hover { background: var(--bg-hover); }
 .section { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 15px; }
 .heading { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 8px; }
 .heading h3 { margin: 0; color: var(--text); font-size: 13px; font-weight: 550; }
@@ -33,9 +58,10 @@
 .panel[data-sheet] .card { padding: 20px 18px max(20px, env(safe-area-inset-bottom)); }
 .panel[data-sheet] .row { min-height: 44px; font-size: 13px; }
 .panel[data-sheet] .icon { width: 36px; height: 36px; }
+.panel[data-sheet] .shortcut { flex-direction: column; justify-content: flex-start; min-height: 44px; }
 @media (max-width: 640px) { .trigger { height: 40px; flex-basis: 36px; width: 36px; margin: 0; } }
 
-.trigger, .icon, .panel .row, .more {
+.trigger, .icon, .shortcut, .panel .row, .more {
   transition: background-color var(--ui-motion-fast) ease, color var(--ui-motion-fast) ease;
 }
 .panel[open] { animation: overview-enter var(--ui-motion-content) var(--ui-ease-out); }
@@ -47,7 +73,7 @@
 @keyframes overview-backdrop-enter { from { background: transparent; } to { background: rgb(0 0 0 / .22); } }
 @keyframes overview-refresh { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .trigger, .icon, .panel .row, .more { transition: none; }
+  .trigger, .icon, .shortcut, .panel .row, .more { transition: none; }
   .panel[open], .panel[open][data-sheet], .panel[open][data-sheet]::backdrop,
   .icon[aria-busy="true"] > svg { animation: none; }
 }

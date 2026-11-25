@@ -281,24 +281,30 @@
   color: var(--text); font-size: 13px; font-weight: 400;
 }
 .workspace-shell .sidebar-header[data-fit] .sidebar-new-label { display: inline; position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+.workspace-shell .session-tree-scroll {
+  --session-tree-inset-left: 8px;
+  --session-tree-inset-right: max(0px, calc(8px - var(--session-tree-scrollbar, 0px)));
+  --session-tree-action-size: 28px;
+  --session-tree-chevron-inset: calc((var(--session-tree-action-size) - 12px) / 2);
+  --session-tree-child-title-inset: 42px;
+}
 .workspace-shell .session-tree-section {
-  padding: 12px 14px 6px; color: var(--text-dim); font-size: 12px; font-weight: 500;
+  left: var(--session-tree-inset-left); right: var(--session-tree-inset-right);
+  color: var(--text-muted); font-size: 12px; font-weight: 600;
 }
-.workspace-shell .session-tree-section.is-projects { padding: 6px 8px 0 14px; }
-.workspace-shell .session-tree-section:not(.is-projects) {
-  left: var(--session-tree-inset-left); right: var(--session-tree-inset-right); padding: 0;
-}
+.workspace-shell .session-tree-section.is-projects { padding-inline-start: 8px; }
 .session-tree-section-action {
   display: inline-flex; align-items: center; justify-content: center;
-  flex: none; width: 28px; height: 28px; margin-left: auto; padding: 0;
+  flex: none; width: var(--session-tree-action-size, 28px); height: var(--session-tree-action-size, 28px); margin-inline-start: auto; padding: 0;
   border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer;
 }
 .session-tree-section-action:hover { background: var(--bg-hover); color: var(--text); }
 .session-tree-section-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 640px), (pointer: coarse) {
-  .session-tree-section-action { width: 36px; height: 36px; }
+  .workspace-shell .session-tree-scroll { --session-tree-action-size: 36px; }
 }
 .session-tree-section-toggle { display: flex; align-items: center; gap: 8px; width: 100%; height: 100%; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
+.workspace-shell .session-tree-section-toggle { padding-inline-end: var(--session-tree-chevron-inset); }
 .session-tree-section-toggle:disabled { cursor: default; }
 .session-tree-section-toggle:enabled:hover { color: var(--text); background: var(--bg-hover); }
 .session-tree-section-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -306,42 +312,42 @@
 .session-tree-section-toggle > .session-tree-chevron { margin-inline-start: auto; }
 .workspace-shell .session-tree-group-toggle { padding-left: 8px; gap: 8px; font-weight: 400; }
 .workspace-shell .session-tree-group-icon { margin-right: 0; }
-.workspace-shell .session-tree-group:not(.session-tree-archive-group) { padding-right: 28px; }
+.workspace-shell .session-tree-group:not(.session-tree-archive-group) { padding-right: var(--session-tree-action-size); }
 .workspace-shell .session-tree-group:not(.session-tree-archive-group) > .session-tree-group-toggle { padding-right: 0; }
 .session-tree-section-icon { flex: none; color: var(--text-dim); }
 .session-tree-section-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-tree-section-count { flex: none; color: var(--text-dim); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .session-tree-disclosure-chevron { margin-left: auto; }
-.workspace-shell .session-tree-group .session-tree-disclosure-chevron { position: absolute; right: 8px; }
-.workspace-shell :is(.session-tree-session, .session-tree-recent) { padding-left: 30px; }
+.workspace-shell .session-tree-group .session-tree-disclosure-chevron { position: absolute; right: var(--session-tree-chevron-inset); }
+.workspace-shell :is(.session-tree-session, .session-tree-recent, .session-tree-subagent) {
+  padding: 0 8px 0 var(--session-tree-child-title-inset);
+}
 .workspace-shell .session-tree-group-empty,
-.workspace-shell .session-tree-more { padding-left: 36px; }
+.workspace-shell .session-tree-more { padding-left: calc(var(--session-tree-inset-left) + var(--session-tree-child-title-inset)); }
 .workspace-shell :is(.session-tree-recent, .session-tree-subagent) {
   left: var(--session-tree-inset-left); right: var(--session-tree-inset-right);
   border-radius: 8px; color: var(--text-muted); cursor: pointer; overflow: hidden;
 }
-.workspace-shell .session-tree-recent { padding-right: 4px; }
 .workspace-shell :is(.session-tree-recent, .session-tree-subagent):hover { background: var(--bg-hover); color: var(--text); }
 .workspace-shell :is(.session-tree-recent, .session-tree-subagent).is-selected {
   background: color-mix(in srgb, var(--bg-selected) 50%, transparent);
   color: var(--text);
 }
 .workspace-shell :is(.session-tree-recent, .session-tree-subagent).is-selected:hover { background: var(--bg-selected); }
-.workspace-shell .session-tree-subagent { padding: 0 8px; }
 .workspace-shell .session-tree-subagent .session-tree-title {
   color: var(--text);
-  font-size: 14px;
   font-weight: 500;
 }
 .workspace-shell :is(.session-tree-recent, .session-tree-subagent) a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 .session-tree-session-avatar,
 .session-tree-subagent-avatar { flex: none; width: 16px; height: 16px; }
-.session-tree-session-avatar {
-  display: none;
+:is(.session-tree-session-avatar, .session-tree-subagent-avatar) {
   position: absolute;
-  inset: 0 auto 0 8px;
+  /* A 16px icon followed by 6px before the title. */
+  inset: 0 auto 0 calc(var(--session-tree-child-title-inset) - 22px);
   margin-block: auto;
 }
+.session-tree-session-avatar { display: none; }
 .session-tree-subagent-avatar { display: grid; place-items: center; }
 
 /* The outer navigation sits on a quiet backdrop around one inset workspace. */
@@ -362,7 +368,6 @@
   border-right-color: color-mix(in srgb, var(--border) 58%, transparent) !important;
 }
 .workspace-shell .sidebar-brand { font-size: 18px; }
-.workspace-shell .session-tree-section { color: var(--text-muted); }
 .workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming) {
   box-shadow: none; background: var(--bg-selected);
 }
@@ -635,15 +640,26 @@
 [data-theme^="sunbeam"] .workspace-chat-header > div:first-child {
   height: var(--sunbeam-header-height) !important;
 }
-[data-theme^="sunbeam"] .workspace-unified-bar,
-[data-theme^="sunbeam"] .workspace-main:not(.has-unified-header) .workspace-chat-header {
-  border-bottom: 0;
-  box-shadow: inset 0 -1px var(--sunbeam-rule);
+[data-theme^="sunbeam"] .workspace-unified-bar { border-bottom: 0; }
+@media (max-width: 640px) {
+  [data-theme^="sunbeam"] .workspace-chat-header { box-shadow: inset 0 -1px var(--sunbeam-rule); }
+}
+[data-theme^="sunbeam"] .session-sidebar svg:has(> .sidebar-icon-pixel) > :not(.sidebar-icon-pixel) { display: none; }
+[data-theme^="sunbeam"] .session-sidebar .sidebar-icon-pixel { display: inline; }
+[data-theme^="sunbeam"] .workspace-shell .session-sidebar :is(
+  .sidebar-brand, .sidebar-search-toggle, .sidebar-new-button, .sidebar-tab, .sidebar-archive-entry,
+  .session-tree-session, .session-tree-recent, .session-tree-subagent, .session-tree-group,
+  .session-tree-section-toggle, .session-tree-section-action, .session-tree-group-action, .session-tree-action
+) { border-radius: 2px; }
+[data-theme^="sunbeam"] .workspace-shell .sidebar-header .sidebar-new-button:hover {
+  box-shadow: inset 0 0 0 1px var(--workspace-outline);
+}
+[data-theme^="sunbeam"] .session-sidebar :is(.session-tree-group-name, .session-tree-section-count, .sidebar-archive-entry-count) {
+  font-family: var(--font-mono);
 }
 [data-theme^="sunbeam"] .workspace-shell .session-tree-session.is-selected:not(.is-confirming):not(.is-renaming),
 [data-theme^="sunbeam"] .workspace-shell .session-tree-subagent.is-selected {
   background: var(--workspace-chrome);
-  border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--workspace-outline);
 }
 [data-theme^="sunbeam"] :is(.session-tree-session-avatar, .session-tree-subagent-avatar) {
@@ -701,7 +717,7 @@
   gap: 10px;
   padding-block: var(--sunbeam-step-block-padding);
   padding-inline-start: 0;
-  border-radius: 9px;
+  border-radius: var(--step-card-radius, 9px);
 }
 [data-theme^="sunbeam"] .thinking-step-toggle { gap: 10px; min-height: var(--sunbeam-step-icon-size); }
 [data-theme^="sunbeam"] .thinking-step-toggle[aria-expanded="true"] { width: var(--sunbeam-step-icon-column); }
@@ -741,9 +757,13 @@
 [data-theme^="sunbeam"] .chat-transcript-column .assistant-reply-group [data-message-role="assistant"]::before {
   content: none;
 }
-.assistant-reply-group .process-details-group { margin-bottom: 8px !important; }
+.assistant-reply-group .process-details-group {
+  --step-card-radius: 5px;
+  margin-bottom: 8px !important;
+}
 .assistant-reply-group .process-details-toggle {
   padding: 2px 8px !important;
+  border-radius: var(--step-card-radius);
   background: var(--bg-panel) !important;
   border: 1px solid var(--border) !important;
 }
@@ -751,9 +771,10 @@
   background: var(--bg-hover) !important;
 }
 .assistant-reply-group .process-details-content {
+  --sunbeam-step-icon-size: 20px;
+  --sunbeam-step-icon-column: 28px;
+  --sunbeam-step-block-padding: 6px;
   display: flow-root;
-  border-inline-start: 2px solid var(--border);
-  padding-inline-start: 10px;
 }
 .workspace-shell .assistant-reply-group .process-details-content [data-message-role="assistant"] {
   margin-bottom: 8px !important;
@@ -794,11 +815,23 @@
     padding-top: calc(5px + env(safe-area-inset-top));
     box-shadow: inset -1px 0 var(--sunbeam-rule);
   }
+  /* Paint one rule above the docked panes so fractional zoom snaps it together. */
+  [data-theme^="sunbeam"] .workspace-frame::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: calc(var(--sunbeam-header-height) - 1px);
+    height: 1px;
+    background: var(--sunbeam-rule);
+    z-index: 201;
+    pointer-events: none;
+  }
   [data-theme^="sunbeam"] .workspace-frame > .sidebar-container.sidebar-open:not(.is-peeking) {
-    border-image: linear-gradient(to bottom,
-      var(--workspace-chrome) calc(var(--sunbeam-header-height) - 1px),
-      var(--sunbeam-rule) calc(var(--sunbeam-header-height) - 1px) var(--sunbeam-header-height),
-      color-mix(in srgb, var(--border) 72%, transparent) var(--sunbeam-header-height)) 1;
+    border-right-color: transparent !important;
+    background:
+      linear-gradient(var(--workspace-chrome) var(--sunbeam-header-height), transparent 0) border-box,
+      linear-gradient(to left, color-mix(in srgb, var(--border) 72%, transparent) 1px, transparent 0) border-box,
+      var(--workspace-sidebar) !important;
   }
   [data-theme^="sunbeam"] .sidebar-resize-handle::after {
     top: var(--sunbeam-header-height);
@@ -808,10 +841,6 @@
     align-items: center;
     min-height: 0;
     padding: 0 8px 5px;
-    background: linear-gradient(to bottom,
-      var(--workspace-chrome) calc(var(--sunbeam-header-height) - 1px),
-      var(--sunbeam-rule) calc(var(--sunbeam-header-height) - 1px) var(--sunbeam-header-height),
-      transparent var(--sunbeam-header-height));
   }
   [data-theme^="sunbeam"] .workspace-shell .sidebar-header .sidebar-new-button { height: 32px; }
   [data-theme^="sunbeam"] .workspace-shell .sidebar-brand { font-size: 16px; }

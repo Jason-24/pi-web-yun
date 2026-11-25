@@ -61,7 +61,8 @@
 
 .session-sidebar { --sidebar-archive-entry-height: 38px; }
 .session-sidebar.has-archive-footer { --sidebar-toast-footer-space: calc(var(--sidebar-archive-entry-height) + 12px); }
-.sidebar-archive-entry { display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-height: var(--sidebar-archive-entry-height); margin: 4px 8px 8px; padding: 8px 10px; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+.sidebar-archive-entry { position: relative; display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: var(--sidebar-archive-entry-height); margin: 4px max(8px, var(--session-tree-scrollbar, 0px)) 8px 8px; padding: 8px; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+.sidebar-archive-entry::before { content: ""; position: absolute; inset: -4px 0 auto; border-top: 1px solid var(--border); pointer-events: none; }
 .sidebar-archive-entry:hover, .sidebar-archive-entry[aria-current="page"] { color: var(--text); background: var(--bg-selected); }
 .sidebar-archive-entry-count { margin-left: auto; color: var(--text-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
 .sidebar-archive-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

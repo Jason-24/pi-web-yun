@@ -10,7 +10,14 @@ import type { TerminalTab } from "./terminal-tab-state";
 import { placeSidebarMenu } from "./SidebarMenu";
 import { ImagePreview } from "./ImagePreview";
 import { getFileIcon } from "./FileIcons";
+import { AgentsIcon, ConversationBranchesIcon, HistoryIcon } from "./SidebarIcons";
 import styles from "./SessionOverview.module.css";
+
+const shortcuts = [
+  { view: "agents", label: "collaboration.title", Icon: AgentsIcon },
+  { view: "branches", label: "i18n.branches", Icon: ConversationBranchesIcon },
+  { view: "history", label: "history.full", Icon: HistoryIcon },
+] as const;
 
 interface Props {
   cwd: string | null;
@@ -20,6 +27,7 @@ interface Props {
   covered?: boolean;
   refreshKey: string;
   terminals: TerminalTab[];
+  onOpenView(view: typeof shortcuts[number]["view"]): void;
   onOpenFile(path: string, diff?: boolean): void;
   onOpenTerminal(id: string): void;
 }
@@ -27,7 +35,7 @@ type Remote<T> = { data: T | null; loading: boolean; error: boolean; url?: strin
 const initial = { data: null, loading: true, error: false };
 const PREVIEW_LIMIT = 3;
 
-export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refreshKey, terminals, onOpenFile, onOpenTerminal }: Props) {
+export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refreshKey, terminals, onOpenView, onOpenFile, onOpenTerminal }: Props) {
   const { t } = useI18n();
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -135,6 +143,12 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
           </button>
           <button ref={closeButton} type="button" className={styles.icon} onClick={() => close()} aria-label={t("overview.close")} title={t("overview.close")}>×</button>
         </header>
+        {sessionId && <div className={styles.shortcuts}>
+          {shortcuts.map(({ view, label, Icon }) => <button key={view} type="button" className={styles.shortcut}
+            onClick={() => { close(false); onOpenView(view); }}>
+            <Icon size={16} /><span>{t(label)}</span>
+          </button>)}
+        </div>}
         <section className={styles.section} aria-label={t("overview.changes")}>
           <div className={styles.heading}><h3>{t("overview.changes")}</h3>{git.data?.isGitRepository && <span className={styles.counts}><span>+{git.data.additions}</span><span>−{git.data.deletions}</span></span>}</div>
           <p className={styles.hint}>{t("overview.changesHint")}</p>
