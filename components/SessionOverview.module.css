@@ -40,7 +40,9 @@
 .heading { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 8px; }
 .heading h3 { margin: 0; color: var(--text); font-size: 13px; font-weight: 550; }
 .section p, .heading > small { margin: 6px 0; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
-.section .hint { font-size: 11px; margin: -2px 0 10px; }
+.section .hint { font-size: 11px; margin: -2px 0 6px; }
+.section[data-empty] { margin-top: 12px; padding-top: 10px; }
+.section[data-empty] .heading, .section[data-empty] .heading > small { margin: 0; }
 .counts { display: flex; gap: 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .counts > :first-child { color: color-mix(in srgb, #16a34a 78%, var(--text)); }
 .counts > :last-child { color: color-mix(in srgb, #dc2626 78%, var(--text)); }

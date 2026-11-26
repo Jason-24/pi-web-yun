@@ -77,10 +77,9 @@ const open = async () => {
   await entry.waitFor();
   assert.match(await entry.innerText(), /1 运行中/);
   assert.match(await entry.innerText(), /1 失败/);
-  assert.equal(await overview.getByRole('button', { name: '会话协作', exact: true }).count(), 0);
   assert.equal(await page.locator('[data-row-key="section-subagents"]').count(), 0);
-  await entry.click();
-  await page.locator("#file-panel [data-subagent-list]").getByRole("button", { name: "会话协作", exact: true }).click();
+  await overview.getByRole("button", { name: "会话协作", exact: true }).click();
+  await overview.waitFor({ state: "hidden" });
 };
 
 try {

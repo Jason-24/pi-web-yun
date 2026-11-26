@@ -59,7 +59,7 @@ pi-yun update [--check]   # 更新全局 npm 安装，或只检查更新
 | `--no-open` 或 `PI_WEB_NO_OPEN=1` | 禁止自动打开浏览器 | 自动打开 |
 | `PI_WEB_PASSWORD` | 启用浏览器密码登录；API 可使用用户名 `pi` 的 Basic Auth | 未启用 |
 | `PI_WEB_ALLOWED_HOSTS` | 允许的额外代理或自定义主机名，以逗号分隔 | 未设置 |
-| `PI_WEB_APP_NAME` | PWA 的显示名称；修改后需重启服务 | `Pi Web` |
+| `PI_WEB_APP_NAME` | PWA 的显示名称，修改后需重启服务 | `PI-YUN` |
 | `PI_WEB_SKIP_VERSION_CHECK=1` | 关闭更新检查 | 未设置 |
 | `PI_WEB_IDLE_TIMEOUT_MS` | 会话空闲关闭时间，`0` 为禁用 | `600000` 毫秒 |
 | `PI_WEB_SHUTDOWN_DEADLINE_MS` | 扩展处理会话关闭事件的最长等待时间 | `5000` 毫秒 |
@@ -116,7 +116,7 @@ window.addEventListener("pi-web:session-row-contextmenu", (event) => {
 
 The detail object contains `id`, `path`, `cwd`, optional `name`, pointer
 coordinates, and a `refresh()` callback for actions that change the session
-list. If no listener cancels the extension event, Pi Web opens its built-in
+list. If no listener cancels the extension event, PI-YUN opens its built-in
 session menu (pin, rename, fork, mark read or unread, archive, open in new
 tab, delete) at the pointer instead of the browser's native context menu.
 The row's `⋯` button always opens the built-in menu and does not dispatch the

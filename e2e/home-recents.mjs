@@ -70,15 +70,14 @@ try {
     const box = el.getBoundingClientRect();
     const avatar = el.querySelector(".session-tree-session-avatar");
     const avatarStyle = getComputedStyle(avatar);
-    const meta = el.querySelector(".session-tree-meta");
+    const link = el.querySelector(".session-tree-main");
     const actionWidth = el.querySelector(".session-tree-actions")?.getBoundingClientRect().width ?? 0;
     return {
       left: box.left,
       width: box.width,
       height: box.height,
       title: el.querySelector(".session-tree-title").getBoundingClientRect().left,
-      time: meta.textContent,
-      trailingEdge: meta.getBoundingClientRect().right + actionWidth,
+      trailingEdge: link.getBoundingClientRect().right + actionWidth,
       avatar: avatar.getBoundingClientRect().left,
       avatarWidth: avatar.getBoundingClientRect().width,
       image: avatarStyle.backgroundImage,
@@ -89,11 +88,15 @@ try {
     if (await projectToggle.getAttribute("aria-expanded") === "false") await projectToggle.click();
     await page.mouse.move(0, 0);
     const project = await sessionColumns(projectRow);
-    assert.deepEqual(await sessionColumns(recentRow), project, "project and recent rows share the title, avatar and time columns");
+    assert.deepEqual(await sessionColumns(recentRow), project, "project and recent rows share the title and avatar columns");
+    for (const row of [projectRow, recentRow]) {
+      assert.equal(await row.locator(".session-tree-meta").count(), 0, "an idle row leaves the trailing space to its title");
+      assert.match(await row.locator(".session-tree-main").getAttribute("title"), / · .+(前|后)$/);
+    }
     const projectLabel = await projectToggle.locator(".session-tree-group-name").boundingBox();
     assert.ok(project.title > projectLabel.x, "session titles are indented under their project");
     const archiveCount = await archiveEntry.locator(".sidebar-archive-entry-count").boundingBox();
-    assert.equal(archiveCount.x + archiveCount.width, project.trailingEdge, "archive counts and session metadata share a trailing edge");
+    assert.equal(archiveCount.x + archiveCount.width, project.trailingEdge, "archive counts and session rows share a trailing edge");
     assert.equal(project.avatarWidth, pixels ? 16 : 0);
     if (pixels) assert.match(project.image, /sunbeam-avatars\.png/);
     for (const section of [projectToggle, toggle]) {
@@ -175,6 +178,31 @@ try {
   await page.screenshot({ path: resolve(artifacts, "mobile-dark.png") });
   await home.locator(".home-session").nth(15).click();
   await page.waitForURL(`**/?session=${sessions[15].id}`);
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => { document.documentElement.dataset.theme = "breeze"; });
+  const selectedRow = page.locator(`[data-row-key="session:group:${sessions[15].id}"].is-selected`);
+  const selectedLink = selectedRow.locator(".session-tree-main");
+  const selectedMenu = selectedRow.locator(".session-tree-more-action");
+  await selectedLink.waitFor();
+  await page.mouse.move(400, 60);
+  const menuOpacity = () => selectedMenu.evaluate(el => getComputedStyle(el).opacity);
+  assert.equal(await menuOpacity(), "0", "the idle desktop selection gives its full width to the title");
+  const selectedAppearance = await selectedRow.evaluate(el => ({
+    background: getComputedStyle(el).backgroundColor,
+    weight: getComputedStyle(el.querySelector(".session-tree-title")).fontWeight,
+  }));
+  assert.notEqual(selectedAppearance.background, "rgba(0, 0, 0, 0)");
+  assert.equal(selectedAppearance.weight, "500");
+  await page.locator(".session-tree-inner").screenshot({ path: resolve(artifacts, "sidebar-breeze.png"), animations: "disabled" });
+  await selectedRow.hover();
+  assert.equal(await menuOpacity(), "1");
+  await page.mouse.move(400, 60);
+  await selectedLink.press("ArrowRight");
+  assert.equal(await menuOpacity(), "1");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  assert.equal(await selectedMenu.evaluate(el => el === document.activeElement), true, "Tab reaches the revealed menu");
 
   catalog = sessions.slice(0, 2);
   await page.goto(`${base}/?home=1`, { waitUntil: "domcontentloaded" });

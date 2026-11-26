@@ -123,11 +123,11 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
 
   const close = (restore = true) => { restoreFocus.current = restore; setOpen(false); };
   const failure = <p role="alert">{t("overview.loadFailed")} <button className={styles.more} onClick={() => setReload(value => value + 1)}>{t("overview.retry")}</button></p>;
-  const retry = <T,>(remote: Remote<T>, empty: string) => remote.loading ? <p role="status">{t("overview.loading")}</p>
-    : remote.error ? failure
-      : <p>{empty}</p>;
+  const loadStatus = (remote: Remote<unknown>) => remote.loading ? <p role="status">{t("overview.loading")}</p>
+    : remote.error ? failure : null;
   const files = git.data?.files ?? [];
   const items = sources.data?.sources ?? [];
+  const sourcesEmpty = sources.data?.total === 0 && !sources.loading && !sources.error;
   return <>
     <button ref={trigger} type="button" className={styles.trigger} disabled={!cwd || covered} tabIndex={covered ? -1 : undefined}
       aria-label={t("overview.title")} title={t("overview.title")} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
@@ -149,7 +149,7 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
           <button ref={closeButton} type="button" className={styles.icon} onClick={() => close()} aria-label={t("overview.close")} title={t("overview.close")}>×</button>
         </header>
         {sessionId && <div className={styles.shortcuts}>
-          {shortcuts.filter(({ view }) => view !== "agents" || !subagents.some(session => session.relation?.kind === "subagent")).map(({ view, label, Icon }) => <button key={view} type="button" className={styles.shortcut}
+          {shortcuts.map(({ view, label, Icon }) => <button key={view} type="button" className={styles.shortcut}
             onClick={() => { close(false); onOpenView(view); }}>
             <Icon size={16} /><span>{t(label)}</span>
           </button>)}
@@ -165,16 +165,16 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
               {getFileIcon(getFileName(file.filePath))}<span>{getRelativeFilePath(file.filePath, cwd ?? undefined)}</span><small>{file.code}</small>
             </button>)}
             {files.length > PREVIEW_LIMIT && <button className={styles.more} aria-expanded={allFiles} onClick={() => setAllFiles(value => !value)}>{t(allFiles ? "overview.showLess" : "overview.showAll", { count: files.length })}</button>}
-          </> : retry(git, t(git.data && !git.data.isGitRepository ? "overview.notGit" : "overview.noChanges"))}
+          </> : loadStatus(git) ?? <p>{t(git.data && !git.data.isGitRepository ? "overview.notGit" : "overview.noChanges")}</p>}
         </section>
-        <section className={styles.section} aria-label={t("overview.terminals")}>
+        <section className={styles.section} data-empty={currentTerminals.length === 0 || undefined} aria-label={t("overview.terminals")}>
           <div className={styles.heading}><h3>{t("overview.terminals")}</h3><small>{currentTerminals.length}</small></div>
-          {currentTerminals.length ? currentTerminals.map((tab, index) => <button key={tab.id} type="button" className={styles.row} onClick={() => { close(false); onOpenTerminal(tab.id); }} title={tab.cwd}>
+          {currentTerminals.map((tab, index) => <button key={tab.id} type="button" className={styles.row} onClick={() => { close(false); onOpenTerminal(tab.id); }} title={tab.cwd}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="m7 9 3 3-3 3m6 0h4" /></svg>
             <span>{t("overview.terminal", { number: index + 1 })}<small>{tab.cwd}</small></span>
-          </button>) : <p>{t("overview.noTerminals")}</p>}
+          </button>)}
         </section>
-        <section className={styles.section} aria-label={t("overview.sources")}>
+        <section className={styles.section} data-empty={sourcesEmpty || undefined} aria-label={t("overview.sources")}>
           <div className={styles.heading}><h3>{t("overview.sources")}</h3>{sources.data && <small>{sources.data.total}</small>}</div>
           {sources.error && items.length > 0 && failure}
           {items.length ? <>
@@ -188,7 +188,7 @@ export function SessionOverview({ cwd, sessionId, leafId, mobile, covered, refre
             </ImagePreview>)}
             {items.length > PREVIEW_LIMIT && <button className={styles.more} aria-expanded={allSources} onClick={() => setAllSources(value => !value)}>{t(allSources ? "overview.showLess" : "overview.showAll", { count: items.length })}</button>}
             {sources.data!.total > items.length && <p>{t("overview.limited", { count: items.length, total: sources.data!.total })}</p>}
-          </> : retry(sources, t("overview.noSources"))}
+          </> : loadStatus(sources)}
         </section>
       </div>
     </dialog>, document.body)}

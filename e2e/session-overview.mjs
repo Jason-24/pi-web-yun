@@ -16,7 +16,7 @@ const unrelatedId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const session = { id, cwd, projectRoot: cwd, projectKey: cwd, name: "概览测试", firstMessage: "Overview fixture", messageCount: 1,
   created: "2026-11-04T00:00:00Z", modified: "2026-11-04T00:00:00Z" };
-const second = { ...session, id: otherId, name: "另一条对话" };
+const second = { ...session, id: otherId, cwd: `${cwd}/subfolder`, name: "另一条对话" };
 const files = Array.from({ length: 7 }, (_, index) => ({ filePath: `${cwd}/change-${index}.ts`, code: "M", status: "modified", indexStatus: " ", worktreeStatus: "M" }));
 const sourceFiles = Array.from({ length: 7 }, (_, index) => ({ kind: "file", id: `file-${index}`, path: `${cwd}/source-${index}.txt`, name: `source-${index}.txt` }));
 const state = { model: { provider: "fixture", id: "base" }, thinkingLevel: "off", isStreaming: false, isPromptRunning: false };
@@ -176,13 +176,30 @@ try {
       await page.mouse.click(width - 2, 2);
       await panel.waitFor({ state: "hidden" });
       assert.equal(await input.inputValue(), "Preserve this draft");
+      notGit = false;
       const showSidebar = page.getByRole("button", { name: "Show sidebar", exact: true });
       if (await showSidebar.isVisible()) await showSidebar.click();
       await page.locator(`a[href*="session=${otherId}"]`).filter({ visible: true }).first().click();
       await page.waitForURL(url => url.searchParams.get("session") === otherId);
       await open();
-      await panel.getByText("No images or file references in this branch yet.", { exact: true }).waitFor();
+      const terminals = panel.getByRole("region", { name: "Open terminals", exact: true });
+      const sources = panel.getByRole("region", { name: "Conversation sources", exact: true });
+      for (const region of [terminals, sources]) {
+        await region.getByText("0", { exact: true }).waitFor();
+        assert.equal(await region.locator("p").count(), 0, "empty section shows its heading and count only");
+        assert.ok((await region.boundingBox()).height <= 36, "empty section fits on one line");
+      }
       assert.equal(await panel.getByText("Image 1", { exact: true }).count(), 0, "another conversation never inherits previous sources");
+      await panel.getByText("+407", { exact: true }).waitFor();
+      await panel.screenshot({ path: resolve(artifacts, `panel-${theme}-${width}-empty.png`) });
+
+      failSources = true;
+      await refresh.click();
+      await sources.getByRole("alert").waitFor();
+      failSources = false;
+      await sources.getByRole("button", { name: "Retry", exact: true }).click();
+      await sources.getByRole("alert").waitFor({ state: "hidden" });
+      await sources.getByText("0", { exact: true }).waitFor();
       await page.keyboard.press("Escape");
       assert.equal(commands.some(c => ["prompt", "abort", "set_model", "get_commands"].includes(c.type)), false);
       assert.deepEqual(errors, []);

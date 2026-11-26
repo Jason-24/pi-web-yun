@@ -592,16 +592,15 @@ const SessionRowView = memo(function SessionRowView({
   // A fork named by the sidebar's Fork: the ellipsis cuts its title before
   // the suffix that tells it from its source, never the suffix.
   const forkTitle = root.name && root.relation?.kind === "fork" ? splitForkSuffix(root.name) : null;
-  const details = root.detailsPending ? "…" : t("sidebar.messagesCount", { count: root.messageCount });
-  const tooltip = row.kind === "recent"
-    ? `${title} · ${row.project.name}`
-    : `${title}\n${details} · ${formatRelativeTime(root.modified, locale, nowDate)}${branch ? ` · ⑂ ${branch}` : ""}`;
+  const details = row.kind === "recent" ? row.project.name
+    : root.detailsPending ? "…" : t("sidebar.messagesCount", { count: root.messageCount });
+  const modified = new Date(family.latestModified);
+  const activity = Number.isNaN(modified.getTime()) ? "" : formatRelativeTime(modified, locale, nowDate);
+  const tooltip = `${title}\n${[details, activity, branch && `⑂ ${branch}`].filter(Boolean).join(" · ")}`;
 
-  // The right column says the one thing worth knowing: awaiting input, else
-  // running, else unread, else when (a pinned row names its project instead).
-  // An archived row shows its family's time like every row, never the archive
-  // time: an old session archived today read as "just now" (#1351).
-  let meta: ReactNode;
+  // Live rows reserve the trailing space for activity. Pins name their project.
+  // Archived rows use the family's activity time so old sessions retain their age (#1351).
+  let meta: ReactNode = null;
   let metaState = "";
   let metaTitle: string | undefined;
   if (status.awaiting) {
@@ -621,7 +620,7 @@ const SessionRowView = memo(function SessionRowView({
     metaTitle = t("sidebar.newActivity");
   } else if (context === "pinned") {
     meta = <span className="session-tree-project">{row.project.name}</span>;
-  } else {
+  } else if (context === "archive") {
     meta = formatShortRelativeTime(family.latestModified, locale, nowDate);
   }
 
@@ -646,7 +645,7 @@ const SessionRowView = memo(function SessionRowView({
           {branch}
         </span>
       )}
-      <span className={`session-tree-meta${metaState}`} title={metaTitle}>{meta}</span>
+      {meta && <span className={`session-tree-meta${metaState}`} title={metaTitle}>{meta}</span>}
     </>
   );
 

@@ -132,6 +132,10 @@ try {
   assert.ok(await longList.evaluate(el => el.scrollHeight > el.clientHeight), 'Long lists scroll inside the dock');
   await longList.locator('[data-subagent-id="long-44"]').click();
   await page.locator('#file-panel').getByRole('tab', { name: /Long task 44/ }).waitFor();
+  await page.locator('.file-panel-close-button').click();
+  const reopenedList = await openList();
+  await reopenedList.getByRole('button', { name: '会话协作', exact: true }).click();
+  await page.locator('[data-workspace-page="agents"]').getByRole('heading', { name: '会话协作', exact: true }).waitFor();
   assert.equal(commands.includes('prompt'), false);
   assert.equal(commands.includes('abort'), false);
   assert.deepEqual(errors, []);

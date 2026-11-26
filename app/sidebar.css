@@ -178,12 +178,9 @@
   background: #d97706;
 }
 
-/* Session row: title, branch, time; actions take the time's place on
-   hover. Hover and selection are a rounded box inset from the sidebar's
-   edges, never a full-width band. The title starts in the text column,
-   under its group's name; the time ends 4px inside the box, on a folded
-   group's summary's edge (no gap before the actions while they are hidden:
-   each shown action brings its own). */
+/* Hover and selection use an inset rounded box. Titles follow the project
+   name column. Trailing activity stays visible beside revealed actions, and
+   inactive rows give that space to the title. */
 .session-tree-session {
   right: var(--session-tree-inset-right);
   left: var(--session-tree-inset-left);
@@ -357,7 +354,7 @@ a.session-tree-main {
   vertical-align: -1px;
 }
 
-/* The right column: the time, or the running spinner / unread dot in its place. */
+/* The right column shows activity, a pin's project or an archived row's time. */
 .session-tree-meta {
   display: flex;
   flex: none;
@@ -371,7 +368,7 @@ a.session-tree-main {
   white-space: nowrap;
 }
 
-/* A pinned row's project: meta, in the time's type (.session-tree-meta). */
+/* A pinned row's project shares the metadata style. */
 .session-tree-project {
   display: inline-block;
   max-width: 70px;
@@ -380,8 +377,7 @@ a.session-tree-main {
   vertical-align: bottom;
 }
 
-/* Always rendered, empty-looking while its buttons are hidden: a gap of its
-   own would keep the time 2px off the edge. */
+/* Visible buttons bring their own leading gap. */
 .session-tree-actions {
   display: flex;
   flex: none;
@@ -389,7 +385,9 @@ a.session-tree-main {
 }
 
 .session-tree-action {
-  display: none;
+  position: absolute;
+  inset-inline-end: 0;
+  display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
@@ -399,6 +397,8 @@ a.session-tree-main {
   padding: 0;
   border-radius: 6px;
   color: var(--text-dim);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .session-tree .session-tree-action:hover,
@@ -412,43 +412,25 @@ a.session-tree-main {
   background: var(--bg-hover);
 }
 
-/* Desktop: ⋯ (and archive) on hover; ⋯ alone on the selected row or while its menu is open. */
-.session-tree-session:hover .session-tree-action,
-.session-tree-session.is-selected .session-tree-more-action,
-.session-tree-session.is-menu-open .session-tree-more-action {
-  display: flex;
+/* Hidden actions give their space to the title while remaining in the tab order. */
+.session-tree-session:is(:hover, :has(:focus-visible)) .session-tree-action,
+.session-tree-session.is-menu-open .session-tree-more-action,
+.session-tree.is-mobile .session-tree-more-action {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .session-tree-meta.is-running {
   color: var(--accent);
 }
 
-.session-tree-session:hover .session-tree-meta {
+.session-tree:not(.is-mobile) .session-tree-session:hover .session-tree-meta:not(.is-running, .is-awaiting, .is-unread) {
   display: none;
 }
 
-/* A running row has no archive button: its spinner stays beside ⋯. */
-.session-tree-session.is-running:hover .session-tree-meta {
-  display: flex;
-}
-
-/*
- * Keyboard focus shows them too. Only :focus-visible: Chrome focuses a
- * clicked button, and :focus-within would keep a clicked row's actions up
- * (and its time hidden) after the pointer leaves. Each :has() rule stands
- * alone so a browser without :has() drops only that rule; it gets the
- * :focus-within fallback in the @supports block after the group rules.
- */
-.session-tree-session:has(:focus-visible) .session-tree-action {
-  display: flex;
-}
-
-.session-tree-session:has(:focus-visible) .session-tree-meta {
+.session-tree:not(.is-mobile) .session-tree-session:has(:focus-visible) .session-tree-meta:not(.is-running, .is-awaiting, .is-unread) {
   display: none;
-}
-
-.session-tree-session.is-running:has(:focus-visible) .session-tree-meta {
-  display: flex;
 }
 
 .session-tree-rename {
@@ -715,19 +697,19 @@ a.session-tree-main {
 }
 
 @supports not selector(:has(*)) {
-  .session-tree-session:focus-within .session-tree-action,
+  .session-tree-session:focus-within .session-tree-action {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .session-tree-group:focus-within .session-tree-group-actions {
     display: flex;
   }
 
-  .session-tree-session:focus-within .session-tree-meta,
+  .session-tree:not(.is-mobile) .session-tree-session:focus-within .session-tree-meta:not(.is-running, .is-awaiting, .is-unread),
   .session-tree-group:focus-within .session-tree-summary {
     display: none;
-  }
-
-  .session-tree.is-mobile .session-tree-session:focus-within .session-tree-meta,
-  .session-tree-session.is-running:focus-within .session-tree-meta {
-    display: flex;
   }
 
   .session-tree.is-mobile .session-tree-group:focus-within .session-tree-summary {
@@ -859,17 +841,8 @@ a.session-tree-main {
 }
 
 .session-tree.is-mobile .session-tree-more-action {
-  display: flex;
   width: 32px;
   height: 32px;
-}
-
-.session-tree.is-mobile .session-tree-session:hover .session-tree-meta {
-  display: flex;
-}
-
-.session-tree.is-mobile .session-tree-session:has(:focus-visible) .session-tree-meta {
-  display: flex;
 }
 
 .session-tree.is-mobile .session-tree-group-actions {
@@ -898,7 +871,9 @@ a.session-tree-main {
 /* Touch screens wider than a phone have no hover: keep ⋯ reachable. */
 @media (hover: none) {
   .session-tree-more-action {
-    display: flex;
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 

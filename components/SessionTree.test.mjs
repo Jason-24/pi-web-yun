@@ -192,14 +192,15 @@ test("a group's ⋯ shows its open menu; its + starts a session at once", () => 
   assert.equal(plus, '<button type="button" class="session-tree-group-action" aria-label="New session in app" title="New session in app">');
 });
 
-test("an idle session row shows its short time, branch and both actions", () => {
+test("an idle project row leaves the time in its tooltip and keeps its branch and actions", () => {
   const root = session("idle", { isWorktree: true, branch: "feat/rows" });
   const html = rowMarkup(render({ rows: [sessionRow(root)] }), "session:group:idle");
   assert.match(html, /^<div class="session-tree-row session-tree-session" style="top:0;height:28px" data-row-key="session:group:idle">/);
   // The decorative avatar uses the title's existing inset in Pixel.
   // A saved session's title is a real link to it (middle-click, Ctrl/Cmd-click).
   // The branch keeps the upstream icon and type; the tooltip keeps the ⑂ glyph.
-  assert.match(html, /<a class="session-tree-main" href="\?session=idle" title="[^"]*"><span class="session-tree-session-avatar" aria-hidden="true" style="--chat-avatar-position:\d+%"><\/span><span class="session-tree-title">first idle<\/span><span class="session-tree-branch"><svg width="10" height="10"[^>]*class="session-tree-branch-icon" aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><span class="session-tree-meta">5m<\/span><\/a>/);
+  assert.match(html, /<a class="session-tree-main" href="\?session=idle" title="[^"]*"><span class="session-tree-session-avatar" aria-hidden="true" style="--chat-avatar-position:\d+%"><\/span><span class="session-tree-title">first idle<\/span><span class="session-tree-branch"><svg width="10" height="10"[^>]*class="session-tree-branch-icon" aria-hidden="true">[\s\S]*?<\/svg>feat\/rows<\/span><\/a>/);
+  assert.doesNotMatch(html, /session-tree-meta/);
   assert.match(html, /title="first idle\n3 msgs · 5 minutes ago · ⑂ feat\/rows"/);
   assert.match(html, /class="session-tree-action session-tree-quick-action" aria-label="Archive" title="Archive"/);
   assert.match(html, /class="session-tree-action session-tree-more-action" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded="false"/);
@@ -215,7 +216,7 @@ test("a branch chip needs a linked worktree", () => {
 test("a fork's row keeps its name's suffix in view; other titles stay one span", () => {
   const fork = { kind: "fork", originSessionId: "src" };
   const named = rowMarkup(render({ rows: [sessionRow(session("copy", { name: "PR#1030 状态栏命令按钮 · 3f9a", relation: fork }))] }), "session:group:copy");
-  assert.match(named, /<span class="session-tree-title has-fork-suffix"><span class="session-tree-title-base">PR#1030 状态栏命令按钮<\/span><span class="session-tree-title-suffix"> · 3f9a<\/span><\/span><span class="session-tree-meta">/);
+  assert.match(named, /<span class="session-tree-title has-fork-suffix"><span class="session-tree-title-base">PR#1030 状态栏命令按钮<\/span><span class="session-tree-title-suffix"> · 3f9a<\/span><\/span><\/a>/);
   assert.match(named, /title="PR#1030 状态栏命令按钮 · 3f9a\n/, "the tooltip has the whole name");
   // Not a fork, no suffix, or no name: the title is cut as a whole.
   for (const extra of [
@@ -586,7 +587,8 @@ test("project names and sessions share a content column, with section labels bef
   // One rhythm: session rows, every header (a project's, the pinned
   // section's, the archive's projects), the empty note and the footer are
   // one height, 28px (44px on a phone); only "show more" is shorter.
-  assert.deepEqual(SIDEBAR_ROW_HEIGHTS.desktop, { section: 38, recent: 28, subagent: 30, "pinned-header": 28, session: 28, "pinned-more": 26, group: 28, "group-more": 26, "group-empty": 28, spacer: 8, "footer-open": 28, "footer-archived": 28, "archive-group": 28 });
+  assert.equal(SIDEBAR_ROW_HEIGHTS.desktop.section, 44);
+  assert.equal(SIDEBAR_ROW_HEIGHTS.mobile.section, 44);
   for (const [layout, height] of [["desktop", 28], ["mobile", 44]]) {
     for (const kind of ["session", "recent", "group", "pinned-header", "group-empty", "footer-open", "footer-archived", "archive-group"]) {
       assert.equal(SIDEBAR_ROW_HEIGHTS[layout][kind], height, `${layout} ${kind}`);
