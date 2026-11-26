@@ -253,6 +253,15 @@ export function TerminalIcon(props: SidebarIconProps) {
   );
 }
 
+export function ClockIcon(props: SidebarIconProps) {
+  return (
+    <SidebarIcon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </SidebarIcon>
+  );
+}
+
 export function SearchIcon(props: SidebarIconProps) {
   return (
     <SidebarIcon {...props} pixelPath="M2 1h5v1h1v1h1v4H8v1h1v1h1v1h1v1H9v-1H8V9H7V8H2V7H1V6H0V3h1V2h1ZM2 3v3h1v1h4V6h1V3H7V2H3v1Z">
@@ -305,6 +314,16 @@ export function MessageIcon(props: SidebarIconProps) {
   return <SidebarIcon {...props} pixelPath="M1 1h10v1h1v7H5v1H4v1H3v1H1ZM2 2v8h1V9h1V8h7V2Z">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </SidebarIcon>;
+}
+
+/** "@ mention in chat": the files tab's and the file viewer's insert-a-reference button. */
+export function MentionIcon({ size = 11, ...props }: SidebarIconProps) {
+  return (
+    <SidebarIcon {...props} size={size} strokeWidth={2.2}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+    </SidebarIcon>
+  );
 }
 
 /**

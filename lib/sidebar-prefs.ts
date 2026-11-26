@@ -1,7 +1,11 @@
+import { getBrowserStorage } from "./browser-storage";
+import { RECENT_SECTIONS, type RecentSection, type SidebarListMode } from "./session-tree";
+
 /**
  * Per-browser sidebar preferences: the active tab (sessions or files), the
  * user's explicit project group expand/collapse choices, the archive view's
- * folded projects, whether the pinned section is collapsed, whether the files section below the sessions is
+ * folded projects, whether the pinned section is collapsed, the session list's
+ * mode (by project or recent) and the recent list's folded date sections, whether the files section below the sessions is
  * collapsed, whether the files tab or section lists ignored files, whether the
  * Git changes panel shows a flat list or a folder tree, and the folders the
  * worktree listing last found outside git.
@@ -24,6 +28,8 @@ const ARCHIVE_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-archive-collapsed";
 const PINNED_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-pins-collapsed";
 const RECENTS_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-recents-collapsed";
 const SUBAGENTS_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-subagents-collapsed";
+const LIST_MODE_STORAGE_KEY = "pi-web:sidebar-list-mode";
+const RECENT_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-recent-collapsed";
 const SHOW_IGNORED_FILES_STORAGE_KEY = "pi-web:sidebar-files-show-ignored";
 const FILES_COLLAPSED_STORAGE_KEY = "pi-web:sidebar-files-collapsed";
 const CHANGES_VIEW_MODE_STORAGE_KEY = "pi-web:sidebar-changes-view-mode";
@@ -49,15 +55,6 @@ interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem?(key: string): void;
-}
-
-function getBrowserStorage(): StorageLike | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export function loadSidebarTab(storage: StorageLike | null = getBrowserStorage()): SidebarTab {
@@ -218,6 +215,47 @@ export function loadSubagentsCollapsed(): boolean {
 
 export function saveSubagentsCollapsed(collapsed: boolean): void {
   saveBrowserFlag(SUBAGENTS_COLLAPSED_STORAGE_KEY, collapsed);
+}
+
+/** The session list's mode: by project unless the browser saved the recent list. */
+export function loadListMode(storage: StorageLike | null = getBrowserStorage()): SidebarListMode {
+  if (!storage) return "projects";
+  try {
+    return storage.getItem(LIST_MODE_STORAGE_KEY) === "recent" ? "recent" : "projects";
+  } catch {
+    return "projects";
+  }
+}
+
+export function saveListMode(mode: SidebarListMode, storage: StorageLike | null = getBrowserStorage()): void {
+  if (!storage) return;
+  try {
+    storage.setItem(LIST_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Persistence is best-effort.
+  }
+}
+
+/** The recent list's folded date sections; open unless saved here. Unknown names are dropped. */
+export function loadRecentCollapsed(storage: StorageLike | null = getBrowserStorage()): RecentSection[] {
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(RECENT_COLLAPSED_STORAGE_KEY);
+    const value: unknown = raw === null ? [] : JSON.parse(raw);
+    if (!Array.isArray(value)) return [];
+    return RECENT_SECTIONS.filter((section) => value.includes(section));
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentCollapsed(sections: readonly RecentSection[], storage: StorageLike | null = getBrowserStorage()): void {
+  if (!storage) return;
+  try {
+    storage.setItem(RECENT_COLLAPSED_STORAGE_KEY, JSON.stringify(RECENT_SECTIONS.filter((section) => sections.includes(section))));
+  } catch {
+    // Persistence is best-effort.
+  }
 }
 
 /** The files tab's (or section's) ignored-files switch; off unless the browser saved it on. */

@@ -13,6 +13,7 @@ import { TrashIcon } from "./SidebarIcons";
 import { AgentAvatar } from "./AgentAvatar";
 import { SidebarMenu, type SidebarMenuAnchor } from "./SidebarMenu";
 import styles from "./AgentSessionPanel.module.css";
+import { errorMessage } from "@/lib/errors";
 
 interface Props {
   rootSession: SessionInfo;
@@ -251,7 +252,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
     if (newSideChatPending) return;
     setNewSideChatPending(true); setError(null);
     try { setError(await onNewSideChat()); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+    catch (caught) { setError(errorMessage(caught)); }
     finally { setNewSideChatPending(false); }
   };
   const cancelDelete = () => { setConfirmingId(null); menuButtonRef.current?.focus(); };
@@ -265,7 +266,7 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
         setInspectedId(rootSession.id);
         listRef.current?.querySelector<HTMLButtonElement>("[data-collaboration-session]")?.focus();
       }
-    } catch (caught) { setError(t("sidebar.deleteFailed", { error: caught instanceof Error ? caught.message : String(caught) })); }
+    } catch (caught) { setError(t("sidebar.deleteFailed", { error: errorMessage(caught) })); }
     finally { setDeletingId(null); }
   };
   const toggleTab = () => onToggleSubagentTab(inspected.id, side ? t("sideChat.title") : title, side);

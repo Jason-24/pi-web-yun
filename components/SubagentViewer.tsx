@@ -14,7 +14,7 @@ interface Props {
   /** Label from the subagent tool call (`description || profile`), used until the session info loads. */
   fallbackLabel: string;
   running: boolean;
-  onOpenFile: (filePath: string, page?: number) => void;
+  onOpenFile: (filePath: string, target?: import("@/lib/file-links").FileLinkTarget) => void;
 }
 
 const POLL_MS = 2000;

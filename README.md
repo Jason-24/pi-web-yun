@@ -174,3 +174,5 @@ npm run lint
 PI-YUN 基于 [agegr/pi-web](https://github.com/agegr/pi-web) 开发，并使用 [pi](https://github.com/earendil-works/pi) 生态。感谢上游项目及所有贡献者。
 
 [MIT License](./LICENSE)
+
+默认仅允许同源页面嵌入 PI-YUN。需要从其他站点通过 iframe 嵌入时，可设置 `PI_WEB_FRAME_ANCESTORS`（逗号分隔的来源列表），例如 `https://portal.example.com`。
